@@ -1,11 +1,22 @@
-import { labelOf, findBlock } from '@nxt/blocks';
+import { EXAMPLES, labelOf, findBlock } from '@nxt/blocks';
 import type { SensorKind } from '@nxt/compiler';
-import { LCD_HEIGHT, LCD_WIDTH, SCENARIOS, type ButtonName } from '@nxt/sim';
+import {
+  CHALLENGES,
+  LCD_HEIGHT,
+  LCD_WIDTH,
+  SCENARIOS,
+  type ButtonName,
+  type Scenario,
+  type Simulation,
+} from '@nxt/sim';
 import { useEffect, useRef, useState, type PointerEvent as ReactPointerEvent } from 'react';
 import { useEditor } from '../editor/EditorContext';
 import { iconUrl } from '../lib/icons';
+import { listLibrary, type LibraryEntry } from '../lib/library';
+import { blankMat, newMatId } from '../lib/mats';
 import { drawLcd, drawMat, matTransform } from './draw';
-import { formatValue, useSimulator } from './SimulatorContext';
+import { MatEditor } from './MatEditor';
+import { formatValue, useSimulator, type SecondBrick } from './SimulatorContext';
 
 const LCD_SCALE = 2;
 const SPEEDS = [0.25, 0.5, 1, 2, 4, 10];
@@ -42,7 +53,25 @@ export function SimulatorWindow() {
   const [message, setMessage] = useState('');
   const [sound, setSound] = useState(0);
   const [log, setLog] = useState<string[]>([]);
+  const [brick, setBrick] = useState<1 | 2>(1);
+  const [editing, setEditing] = useState<Scenario | null>(null);
+  const [library, setLibrary] = useState<LibraryEntry[]>([]);
   const sim = s.sim;
+  const sim2 = s.sim2;
+  /** The brick whose screen, buttons and read-outs are shown. */
+  const shown = brick === 2 && sim2 ? sim2 : sim;
+  const overlay = useRef({ challenge: s.challenge, reached: s.result?.reached ?? 0 });
+  useEffect(() => {
+    overlay.current = { challenge: s.challenge, reached: s.result?.reached ?? 0 };
+  });
+
+  useEffect(() => {
+    let live = true;
+    void listLibrary().then((entries) => live && setLibrary(entries));
+    return () => {
+      live = false;
+    };
+  }, []);
 
   // Redraw the mat and screen on every animation frame while the window is open.
   useEffect(() => {
@@ -51,34 +80,39 @@ export function SimulatorWindow() {
     const draw = () => {
       const mat = matRef.current?.getContext('2d');
       const lcd = lcdRef.current?.getContext('2d');
-      if (sim && mat) drawMat(mat, sim);
-      if (sim && lcd && sim.lcd.version !== lcdVersion) {
-        lcdVersion = sim.lcd.version;
-        drawLcd(lcd, sim.lcd, LCD_SCALE);
+      if (sim && mat) drawMat(mat, sim, { second: sim2, ...overlay.current });
+      if (shown && lcd && shown.lcd.version !== lcdVersion) {
+        lcdVersion = shown.lcd.version;
+        drawLcd(lcd, shown.lcd, LCD_SCALE);
       }
       id = requestAnimationFrame(draw);
     };
     id = requestAnimationFrame(draw);
     return () => cancelAnimationFrame(id);
-  }, [sim]);
+  }, [sim, sim2, shown]);
 
-  // Messages the program sends show up in a small log.
+  // Messages the programs send show up in a small log.
   useEffect(() => {
-    if (!sim) return;
-    return sim.on((e) => {
-      if (e.type === 'message') {
-        const to = e.connection === 0 ? 'master' : `connection ${e.connection}`;
-        setLog((l) => [`→ ${to}, mailbox ${e.mailbox}: ${formatValue(e.value)}`, ...l].slice(0, 6));
-      }
-    });
-  }, [sim]);
+    const listen = (from: Simulation | null, name: string) =>
+      from?.on((e) => {
+        if (e.type === 'message') {
+          const to = e.connection === 0 ? 'master' : `connection ${e.connection}`;
+          setLog((l) =>
+            [`${name}→ ${to}, mailbox ${e.mailbox}: ${formatValue(e.value)}`, ...l].slice(0, 6),
+          );
+        }
+      });
+    const offs = [listen(sim, sim2 ? 'Brick 1 ' : ''), listen(sim2, 'Brick 2 ')];
+    return () => offs.forEach((off) => off?.());
+  }, [sim, sim2]);
 
   useEffect(() => {
     sim?.setSoundLevel(sound);
-  }, [sim, sound]);
+    sim2?.setSoundLevel(sound);
+  }, [sim, sim2, sound]);
 
   const press = (button: ButtonName, down: boolean) => {
-    sim?.setButton(button, down);
+    shown?.setButton(button, down);
   };
 
   // Drag the title bar to move the window.
@@ -103,13 +137,18 @@ export function SimulatorWindow() {
   const placeRobot = (e: ReactPointerEvent<HTMLCanvasElement>) => {
     const canvas = e.currentTarget;
     if (!sim || !editable) return;
-    const update = (clientX: number, clientY: number) => {
+    const toMat = (clientX: number, clientY: number) => {
       const rect = canvas.getBoundingClientRect();
       const { scale, ox, oy } = matTransform(canvas, sim.world.scenario);
       const px = ((clientX - rect.left) * canvas.width) / rect.width;
       const py = ((clientY - rect.top) * canvas.height) / rect.height;
-      sim.placeRobot({ x: (px - ox) / scale, y: (py - oy) / scale });
+      return { x: (px - ox) / scale, y: (py - oy) / scale };
     };
+    // Move whichever robot is nearer to where the drag starts.
+    const start = toMat(e.clientX, e.clientY);
+    const near = (r: Simulation) => Math.hypot(r.world.pose.x - start.x, r.world.pose.y - start.y);
+    const robot = sim2 && near(sim2) < near(sim) ? sim2 : sim;
+    const update = (clientX: number, clientY: number) => robot.placeRobot(toMat(clientX, clientY));
     update(e.clientX, e.clientY);
     canvas.setPointerCapture(e.pointerId);
     const move = (ev: PointerEvent) => update(ev.clientX, ev.clientY);
@@ -121,12 +160,39 @@ export function SimulatorWindow() {
     canvas.addEventListener('pointerup', up);
   };
   const turnRobot = (e: React.WheelEvent) => {
-    if (!sim || !editable) return;
-    sim.placeRobot({ heading: sim.world.pose.heading + (e.deltaY > 0 ? 15 : -15) });
+    if (!shown || !editable) return;
+    shown.placeRobot({ heading: shown.world.pose.heading + (e.deltaY > 0 ? 15 : -15) });
   };
 
-  const running = s.status === 'running';
-  const scenario = SCENARIOS.find((x) => x.id === s.scenarioId) ?? SCENARIOS[0]!;
+  const running = s.status === 'running' || s.status2 === 'running';
+  const scenario = s.scenario;
+  const custom = s.customMats.some((m) => m.id === scenario.id);
+  const editMat = () =>
+    setEditing(
+      custom
+        ? scenario
+        : { ...structuredClone(scenario), id: newMatId(), name: `${scenario.name} (copy)` },
+    );
+  const secondValue = !s.second
+    ? ''
+    : s.second.kind === 'same'
+      ? 'same'
+      : `program:${s.second.name}`;
+  const chooseSecond = (value: string) => {
+    let next: SecondBrick = null;
+    if (value === 'same') next = { kind: 'same' };
+    else if (value.startsWith('example:')) {
+      const ex = EXAMPLES.find((x) => `example:${x.key}` === value);
+      if (ex) next = { kind: 'program', name: ex.name, program: ex.create() };
+    } else if (value.startsWith('library:')) {
+      const entry = library.find((x) => `library:${x.id}` === value);
+      if (entry) next = { kind: 'program', name: entry.name, program: entry.program };
+    }
+    s.setSecond(next);
+    if (!next) setBrick(1);
+  };
+  const result = s.result;
+  const time = (sim?.time ?? 0) / 1000;
   const activeNames = sim
     ? sim.activeBlocks().map((a) => {
         const block = findBlock(state.program, a.block)?.block;
@@ -145,7 +211,10 @@ export function SimulatorWindow() {
             : s.status === 'error'
               ? `Stopped: ${sim?.error ?? 'error'}`
               : 'Ready';
-  const userVars = state.program.variables;
+  const userVars =
+    brick === 2 && s.second?.kind === 'program'
+      ? s.second.program.variables
+      : state.program.variables;
 
   return (
     <div
@@ -226,10 +295,50 @@ export function SimulatorWindow() {
         </label>
         <label className="sim-field" title="Mat">
           <img src={iconUrl('map')} alt="" />
-          <select value={s.scenarioId} onChange={(e) => s.setScenario(e.target.value)}>
-            {SCENARIOS.map((sc) => (
-              <option key={sc.id} value={sc.id}>
-                {sc.name}
+          <select
+            value={scenario.id}
+            aria-label="Mat"
+            onChange={(e) =>
+              e.target.value === '+new' ? setEditing(blankMat()) : s.setScenario(e.target.value)
+            }
+          >
+            <optgroup label="Mats">
+              {SCENARIOS.map((sc) => (
+                <option key={sc.id} value={sc.id}>
+                  {sc.name}
+                </option>
+              ))}
+            </optgroup>
+            <optgroup label="My mats">
+              {s.customMats.map((sc) => (
+                <option key={sc.id} value={sc.id}>
+                  {sc.name}
+                </option>
+              ))}
+              <option value="+new">New mat…</option>
+            </optgroup>
+          </select>
+        </label>
+        <button
+          type="button"
+          className="tool-btn"
+          title={custom ? 'Edit this mat' : 'Edit a copy of this mat'}
+          disabled={running}
+          onClick={editMat}
+        >
+          <img src={iconUrl('map_edit')} alt="" />
+        </button>
+        <label className="sim-field" title="Challenge">
+          <img src={iconUrl('cup_gold')} alt="" />
+          <select
+            value={s.challenge?.id ?? ''}
+            aria-label="Challenge"
+            onChange={(e) => s.setChallenge(e.target.value || null)}
+          >
+            <option value="">No challenge</option>
+            {CHALLENGES.map((c) => (
+              <option key={c.id} value={c.id}>
+                {c.name}
               </option>
             ))}
           </select>
@@ -267,6 +376,34 @@ export function SimulatorWindow() {
         )}
       </div>
 
+      {s.challenge && (
+        <div className={`sim-challenge ${result?.state ?? 'running'}`} role="status">
+          <img src={iconUrl(result?.state === 'won' ? 'cup_gold' : 'flag_finish')} alt="" />
+          <div>
+            <strong>{s.challenge.name}</strong> — {s.challenge.description}
+            <div className="sim-challenge-line">
+              <span>
+                {Math.min(time, s.challenge.timeLimit).toFixed(1)} / {s.challenge.timeLimit} s
+              </span>
+              <span>Score {result?.score ?? 0}</span>
+              {result && result.bumps > 0 && <span>Bumps {result.bumps}</span>}
+              {result?.state === 'won' && (
+                <span className="stars" aria-label={`${result.stars} stars`}>
+                  {'★'.repeat(result.stars)}
+                  {'☆'.repeat(3 - result.stars)}
+                </span>
+              )}
+              <span className="sim-challenge-message">
+                {result?.state === 'running' && s.status === 'ready'
+                  ? 'Press Run to start.'
+                  : result?.message}
+                {result && result.state !== 'running' && ' Press Run to try again.'}
+              </span>
+            </div>
+          </div>
+        </div>
+      )}
+
       {s.problems.length > 0 && (
         <div className="notice error" role="alert">
           <img src={iconUrl('exclamation')} alt="" />
@@ -287,11 +424,29 @@ export function SimulatorWindow() {
           />
           <p className="sim-hint">
             {scenario.description}
-            {editable && ' Drag to place the robot, scroll to turn it.'}
+            {editable && ` Drag to place ${sim2 ? 'a' : 'the'} robot, scroll to turn it.`}
           </p>
         </div>
 
         <div className="sim-brick">
+          {sim2 && (
+            <div className="sim-brick-tabs" role="tablist" aria-label="Brick">
+              {([1, 2] as const).map((b) => (
+                <button
+                  key={b}
+                  type="button"
+                  role="tab"
+                  aria-selected={brick === b}
+                  className={brick === b ? 'active' : ''}
+                  title={b === 1 ? state.program.name : (s.secondName ?? '')}
+                  onClick={() => setBrick(b)}
+                >
+                  Brick {b}
+                  {(b === 1 ? s.status : s.status2) === 'finished' && ' ✓'}
+                </button>
+              ))}
+            </div>
+          )}
           <div className="sim-lcd-frame">
             <canvas
               ref={lcdRef}
@@ -321,7 +476,7 @@ export function SimulatorWindow() {
             title="Dark grey button: stops the program"
             onClick={s.reset}
           />
-          <Readouts />
+          <Readouts sim={shown} />
           <label className="sim-slider" title="What the sound sensor hears">
             <img src={iconUrl('microphone')} alt="" />
             <input
@@ -347,7 +502,7 @@ export function SimulatorWindow() {
                 {userVars.map((v) => (
                   <tr key={v.name}>
                     <th>{v.name}</th>
-                    <td>{sim ? formatValue(sim.variables().get(v.name)) : ''}</td>
+                    <td>{shown ? formatValue(shown.variables().get(v.name)) : ''}</td>
                   </tr>
                 ))}
               </tbody>
@@ -357,6 +512,42 @@ export function SimulatorWindow() {
         </fieldset>
         <fieldset className="groupbox">
           <legend>Bluetooth messages</legend>
+          <label className="sim-second">
+            <img src={iconUrl('bricks')} alt="" />
+            Second brick
+            <select
+              value={secondValue}
+              aria-label="Second brick"
+              disabled={running}
+              onChange={(e) => chooseSecond(e.target.value)}
+            >
+              <option value="">None</option>
+              <option value="same">This program</option>
+              {s.second?.kind === 'program' && <option value={secondValue}>{s.second.name}</option>}
+              <optgroup label="Examples">
+                {EXAMPLES.map((ex) => (
+                  <option key={ex.key} value={`example:${ex.key}`}>
+                    {ex.name}
+                  </option>
+                ))}
+              </optgroup>
+              {library.length > 0 && (
+                <optgroup label="Program library">
+                  {library.slice(0, 40).map((entry) => (
+                    <option key={entry.id} value={`library:${entry.id}`}>
+                      {entry.name}
+                    </option>
+                  ))}
+                </optgroup>
+              )}
+            </select>
+          </label>
+          {sim2 && (
+            <p className="sim-muted">
+              Brick 1 is the master: it sends to brick 2 on connection 1, brick 2 answers on
+              connection 0. The robots can see and bump into each other.
+            </p>
+          )}
           <div className="sim-mail">
             <select
               value={mailbox}
@@ -380,7 +571,7 @@ export function SimulatorWindow() {
               type="button"
               className="btn"
               style={{ minWidth: 0 }}
-              disabled={!sim || message === ''}
+              disabled={!shown || message === ''}
               onClick={() => {
                 const n = Number(message);
                 const value =
@@ -391,8 +582,11 @@ export function SimulatorWindow() {
                       : Number.isNaN(n)
                         ? message
                         : n;
-                sim?.receive(mailbox, value);
-                setLog((l) => [`← mailbox ${mailbox}: ${formatValue(value)}`, ...l].slice(0, 6));
+                shown?.receive(mailbox, value);
+                const to = sim2 ? `brick ${brick} ` : '';
+                setLog((l) =>
+                  [`← ${to}mailbox ${mailbox}: ${formatValue(value)}`, ...l].slice(0, 6),
+                );
                 setMessage('');
               }}
             >
@@ -406,14 +600,28 @@ export function SimulatorWindow() {
           </ul>
         </fieldset>
       </div>
+      {editing && (
+        <MatEditor
+          mat={editing}
+          custom={s.customMats.some((m) => m.id === editing.id)}
+          onClose={() => setEditing(null)}
+          onSave={async (mat) => {
+            await s.saveMat(mat);
+            s.setScenario(mat.id);
+          }}
+          onDelete={async (id) => {
+            await s.deleteMat(id);
+            setEditing(null);
+          }}
+        />
+      )}
     </div>
   );
 }
 
-/** Sensor and motor read-outs. */
-function Readouts() {
+/** Sensor and motor read-outs of one brick. */
+function Readouts({ sim }: { sim: Simulation | null }) {
   const s = useSimulator();
-  const sim = s.sim;
   void s.tick;
   if (!sim) return null;
   return (

@@ -9,7 +9,7 @@ import type {
 } from '@nxt/compiler';
 import { Lcd } from './lcd.js';
 import { idleMotor, isBusy, startMotors, stepMotor, stopMotors, type Motor } from './motors.js';
-import { World, type Pose, type Scenario } from './world.js';
+import { World, type Pose, type RobotGeometry, type Scenario } from './world.js';
 
 /** A value held in a variable. */
 export type Value = number | boolean | string;
@@ -78,6 +78,10 @@ function mulberry32(seed: number): () => number {
 export interface SimOptions {
   /** Seed for the Random block, so runs can be repeated. */
   seed?: number;
+  /** How the robot is built (a standard driving base by default). */
+  robot?: RobotGeometry;
+  /** Where the robot starts (the mat's start by default). */
+  start?: Pose;
 }
 
 /**
@@ -122,7 +126,7 @@ export class Simulation {
     scenario: Scenario,
     options: SimOptions = {},
   ) {
-    this.world = new World(scenario);
+    this.world = new World(scenario, options.robot, options.start);
     this.random = mulberry32(options.seed ?? Date.now());
     this.subroutines = new Map(program.subroutines.map((s) => [s.name, s.body]));
     this.reset();
@@ -207,14 +211,15 @@ export class Simulation {
   }
 
   /**
-   * Drives the robot by hand (remote control): powers for the left (B) and right (C)
-   * wheels, −100…100. Only while no program is running; call {@link stepWorld} to move.
+   * Drives the robot by hand (remote control): powers for the left and right wheels
+   * (motors B and C on the standard base), −100…100. Only while no program is running;
+   * call {@link stepWorld} to move.
    */
   driveManually(left: number, right: number): void {
     if (this.status === 'running') return;
     for (const [port, power] of [
-      [1, left],
-      [2, right],
+      [this.world.robot.leftMotor, left],
+      [this.world.robot.rightMotor, right],
     ] as const) {
       if (power === 0) stopMotors(this.motors, [port], 'brake');
       else startMotors(this.motors, [port], power, 0, null, 'brake');
@@ -300,8 +305,8 @@ export class Simulation {
 
   private physics(dt: number): void {
     const turned = this.motors.map((m) => stepMotor(m, dt));
-    // Driving base: motor B is the left wheel, motor C the right one.
-    this.world.drive(turned[1]!, turned[2]!);
+    const { leftMotor, rightMotor } = this.world.robot;
+    this.world.drive(turned[leftMotor]!, turned[rightMotor]!);
   }
 
   private finish(): void {

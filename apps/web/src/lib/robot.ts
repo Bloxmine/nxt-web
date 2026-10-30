@@ -1,3 +1,5 @@
+import type { RobotGeometry } from '@nxt/sim';
+
 /**
  * The robot's build (Tools → Robot setup): used by the distance and turn calculator and
  * by the simulator. Remembered per browser.
@@ -48,12 +50,33 @@ export function loadRobot(): RobotSetup {
   }
 }
 
+/** Fired on `window` when the robot setup is saved, so the simulator can rebuild. */
+export const ROBOT_CHANGED = 'nxt-robot-changed';
+
 export function saveRobot(robot: RobotSetup): void {
   try {
     localStorage.setItem(KEY, JSON.stringify(robot));
   } catch {
     // A preference only.
   }
+  window.dispatchEvent(new Event(ROBOT_CHANGED));
+}
+
+const MOTOR_INDEX = { A: 0, B: 1, C: 2 } as const;
+
+/** The simulator's robot for a setup. */
+export function robotGeometry(robot: RobotSetup): RobotGeometry {
+  return {
+    wheelRadius: robot.wheelDiameter / 2,
+    axle: robot.track,
+    // The bumper has to reach past the collision circle to be pressed.
+    radius: Math.max(3, Math.min(robot.track / 2 + 1, robot.bumperOffset - 1.5)),
+    lightOffset: robot.lightOffset,
+    sonarOffset: robot.sonarOffset,
+    bumperOffset: robot.bumperOffset,
+    leftMotor: MOTOR_INDEX[robot.left],
+    rightMotor: MOTOR_INDEX[robot.right],
+  };
 }
 
 /** Wheel degrees to drive `cm` straight. */

@@ -1,5 +1,19 @@
-import { LoweringError, lowerProgram, wireVariable } from '@nxt/blocks';
-import { formatNumber, scenarioById, Simulation, type SimStatus, type Value } from '@nxt/sim';
+import { LoweringError, lowerProgram, wireVariable, type Program } from '@nxt/blocks';
+import {
+  BrickPair,
+  challengeById,
+  ChallengeJudge,
+  formatNumber,
+  SCENARIOS,
+  scenarioById,
+  secondStart,
+  Simulation,
+  type Challenge,
+  type ChallengeResult,
+  type Scenario,
+  type SimStatus,
+  type Value,
+} from '@nxt/sim';
 import {
   createContext,
   useCallback,
@@ -11,7 +25,10 @@ import {
   type ReactNode,
 } from 'react';
 import { useEditor } from '../editor/EditorContext';
+import { deleteMat as removeMat, listMats, saveMat as storeMat } from '../lib/mats';
+import { loadRobot, ROBOT_CHANGED, robotGeometry } from '../lib/robot';
 import { SimAudio } from './audio';
+import { recordScore } from './scores';
 
 /** What the editor needs to show the debugger: running blocks, breakpoints, wire values. */
 export interface DebugView {
@@ -36,6 +53,24 @@ export interface SimulatorControls {
   setSpeed(speed: number): void;
   scenarioId: string;
   setScenario(id: string): void;
+  /** The mat in use. */
+  scenario: Scenario;
+  /** Built-in mats followed by the user's own. */
+  scenarios: Scenario[];
+  customMats: Scenario[];
+  saveMat(mat: Scenario): Promise<void>;
+  deleteMat(id: string): Promise<void>;
+  /** The second simulated brick, if one is on the mat. */
+  sim2: Simulation | null;
+  status2: SimStatus | null;
+  second: SecondBrick;
+  setSecond(second: SecondBrick): void;
+  /** Name of the program on the second brick. */
+  secondName: string | null;
+  /** The challenge being played, if any. */
+  challenge: Challenge | null;
+  setChallenge(id: string | null): void;
+  result: ChallengeResult | null;
   audio: SimAudio;
   run(): void;
   pause(): void;
@@ -48,6 +83,10 @@ export interface SimulatorControls {
   /** Increases about ten times a second while running, for read-outs to refresh. */
   tick: number;
 }
+
+/** What runs on the second brick: a copy of this program, or another program. */
+export type SecondBrick =
+  null | { kind: 'same' } | { kind: 'program'; name: string; program: Program };
 
 const DebugContext = createContext<DebugView>({
   active: new Set(),
@@ -96,9 +135,16 @@ export function SimulatorProvider({
   const [open, setOpen] = useState(false);
   const [speed, setSpeed] = useState(1);
   const [scenarioId, setScenarioId] = useState(initialScenario);
+  const [customMats, setCustomMats] = useState<Scenario[]>([]);
+  const [robot, setRobot] = useState(() => robotGeometry(loadRobot()));
+  const [second, setSecondBrick] = useState<SecondBrick>(null);
+  const [challengeId, setChallengeId] = useState<string | null>(null);
   const [sim, setSim] = useState<Simulation | null>(null);
+  const [sim2, setSim2] = useState<Simulation | null>(null);
   const [builtFrom, setBuiltFrom] = useState<typeof program | null>(null);
   const [status, setStatus] = useState<SimStatus>('ready');
+  const [status2, setStatus2] = useState<SimStatus | null>(null);
+  const [result, setResult] = useState<ChallengeResult | null>(null);
   const [problems, setProblems] = useState<string[]>([]);
   const [breakpoints, setBreakpoints] = useState<ReadonlySet<string>>(new Set());
   const [active, setActive] = useState<ReadonlySet<string>>(new Set());
@@ -106,16 +152,55 @@ export function SimulatorProvider({
   const audio = useMemo(() => new SimAudio(), []);
   const speedRef = useRef(speed);
   const frame = useRef(0);
+  const pair = useRef<BrickPair | null>(null);
+  const judge = useRef<ChallengeJudge | null>(null);
 
   useEffect(() => {
     speedRef.current = speed;
   }, [speed]);
 
+  useEffect(() => {
+    let live = true;
+    void listMats().then((mats) => live && setCustomMats(mats));
+    return () => {
+      live = false;
+    };
+  }, []);
+
+  const scenario = useMemo(
+    () => customMats.find((m) => m.id === scenarioId) ?? scenarioById(scenarioId),
+    [customMats, scenarioId],
+  );
+  const challenge = challengeId ? (challengeById(challengeId) ?? null) : null;
   const stale = sim !== null && builtFrom !== program;
 
+  /** Throws the simulation away; the next run builds a new one. */
+  const invalidate = useCallback(() => {
+    audio.stop();
+    pair.current?.dispose();
+    pair.current = null;
+    setSim(null);
+    setSim2(null);
+    setStatus('ready');
+    setStatus2(null);
+    setActive(new Set());
+  }, [audio]);
+
+  // Tools → Robot setup changes the simulated robot.
+  useEffect(() => {
+    const changed = () => {
+      setRobot(robotGeometry(loadRobot()));
+      invalidate();
+    };
+    window.addEventListener(ROBOT_CHANGED, changed);
+    return () => window.removeEventListener(ROBOT_CHANGED, changed);
+  }, [invalidate]);
+
   /** Copies the simulation's state into React state (cheap when nothing changed). */
-  const sync = useCallback((s: Simulation) => {
+  const sync = useCallback((s: Simulation, s2: Simulation | null) => {
     setStatus(s.status);
+    setStatus2(s2?.status ?? null);
+    setResult(judge.current?.current ?? null);
     const blocks = s.activeBlocks().map((a) => a.block);
     setActive((prev) =>
       prev.size === blocks.length && blocks.every((b) => prev.has(b)) ? prev : new Set(blocks),
@@ -123,41 +208,88 @@ export function SimulatorProvider({
     setTick((t) => t + 1);
   }, []);
 
+  /** A fresh judge for the challenge, when one is played on this mat. */
+  const newJudge = useCallback(() => {
+    judge.current =
+      challenge && challenge.mat === scenario.id ? new ChallengeJudge(challenge) : null;
+    setResult(judge.current?.current ?? null);
+  }, [challenge, scenario]);
+
   /** A simulation of the current program, or null (with problems listed) if it has errors. */
   const build = useCallback((): Simulation | null => {
+    pair.current?.dispose();
+    pair.current = null;
+    let brick = 1;
     try {
       const ir = lowerProgram(program);
-      const next = new Simulation(ir, scenarioById(scenarioId));
+      const next = new Simulation(ir, scenario, { robot });
       for (const b of breakpoints) next.breakpoints.add(b);
       next.on((event) => audio.handle(event, speedRef.current));
+      let next2: Simulation | null = null;
+      if (second) {
+        brick = 2;
+        const ir2 = lowerProgram(second.kind === 'same' ? program : second.program);
+        next2 = new Simulation(ir2, scenario, { robot, start: secondStart(scenario) });
+        next2.on((event) => audio.handle(event, speedRef.current));
+        pair.current = new BrickPair(next, next2);
+      }
       setSim(next);
+      setSim2(next2);
+      setStatus2(next2?.status ?? null);
       setBuiltFrom(program);
       setProblems([]);
+      newJudge();
       return next;
     } catch (error) {
-      setProblems(
+      const messages =
         error instanceof LoweringError
           ? error.issues.map((i) => i.message)
-          : [error instanceof Error ? error.message : String(error)],
-      );
+          : [error instanceof Error ? error.message : String(error)];
+      setProblems(brick === 2 ? messages.map((m) => `Brick 2: ${m}`) : messages);
       return null;
     }
-  }, [program, scenarioId, breakpoints, audio]);
+  }, [program, scenario, robot, second, breakpoints, audio, newJudge]);
 
   // The animation loop: advances simulated time in step with the clock while running.
+  const live = status === 'running' || (status2 === 'running' && status !== 'paused');
   useEffect(() => {
-    if (!sim || status !== 'running') return;
+    if (!sim || !live) return;
+    const running = () =>
+      sim.status === 'running' ||
+      (sim2?.status === 'running' && sim.status !== 'paused' && sim.status !== 'ready');
+    /** Runs `ms` of simulated time, judging the challenge every 50 ms. */
+    const advance = (ms: number) => {
+      for (let left = ms; left > 0 && running(); left -= 50) {
+        const slice = Math.min(50, left);
+        if (pair.current) pair.current.advance(slice);
+        else sim.advance(slice);
+        const j = judge.current;
+        if (!j) continue;
+        const verdict = j.update(
+          sim.world,
+          sim.time,
+          sim.status === 'finished' || sim.status === 'error',
+        );
+        if (verdict.state !== 'running') {
+          recordScore(j.challenge.id, verdict);
+          sim.pause();
+          sim2?.pause();
+          break;
+        }
+      }
+    };
     let last = performance.now();
     let lastSync = 0;
     const loop = (now: number) => {
       const elapsed = Math.min(100, now - last);
       last = now;
-      sim.advance(elapsed * speedRef.current);
-      if (sim.status !== 'running' || now - lastSync > 100) {
+      advance(elapsed * speedRef.current);
+      const going = running();
+      if (!going || now - lastSync > 100) {
         lastSync = now;
-        sync(sim);
+        sync(sim, sim2);
       }
-      if (sim.status === 'running') frame.current = requestAnimationFrame(loop);
+      if (going) frame.current = requestAnimationFrame(loop);
       else if (sim.status === 'paused') {
         audio.stop();
         // Bring the block the program stopped at into view.
@@ -170,7 +302,7 @@ export function SimulatorProvider({
     };
     frame.current = requestAnimationFrame(loop);
     return () => cancelAnimationFrame(frame.current);
-  }, [sim, status, sync, audio]);
+  }, [sim, sim2, live, sync, audio]);
 
   const current = useCallback(
     () => (sim && !(stale && sim.status !== 'running' && sim.status !== 'paused') ? sim : build()),
@@ -193,6 +325,10 @@ export function SimulatorProvider({
     [sim],
   );
 
+  /** The second brick of the simulation `s` (only when `s` is the current one). */
+  const partner = () => pair.current?.slave ?? null;
+  const settled = () => judge.current && judge.current.current.state !== 'running';
+
   const controls: SimulatorControls = {
     open,
     setOpen,
@@ -205,31 +341,69 @@ export function SimulatorProvider({
     scenarioId,
     setScenario: (id) => {
       setScenarioId(id);
-      audio.stop();
-      setSim(null);
-      setStatus('ready');
-      setActive(new Set());
+      if (challenge && challenge.mat !== id) setChallengeId(null);
+      invalidate();
     },
+    scenario,
+    scenarios: [...SCENARIOS, ...customMats],
+    customMats,
+    saveMat: async (mat) => {
+      setCustomMats(await storeMat(mat));
+      if (mat.id === scenarioId) invalidate();
+    },
+    deleteMat: async (id) => {
+      setCustomMats(await removeMat(id));
+      if (id === scenarioId) {
+        setScenarioId('empty');
+        invalidate();
+      }
+    },
+    sim2,
+    status2,
+    second,
+    setSecond: (next) => {
+      setSecondBrick(next);
+      invalidate();
+    },
+    secondName: !second ? null : second.kind === 'same' ? program.name : second.name,
+    challenge,
+    setChallenge: (id) => {
+      setChallengeId(id);
+      const next = id ? challengeById(id) : undefined;
+      if (next) setScenarioId(next.mat);
+      invalidate();
+    },
+    result,
     audio,
     run: () => {
       audio.unlock();
       const s = current();
       if (!s) return;
+      const s2 = partner();
+      if (settled() || s.status === 'finished' || s.status === 'error') {
+        s.reset();
+        s2?.reset();
+        newJudge();
+      }
       s.start();
-      sync(s);
+      if (s2 && s2.status !== 'running') s2.start();
+      sync(s, s2);
     },
     pause: () => {
       if (!sim) return;
       sim.pause();
+      sim2?.pause();
       audio.stop();
-      sync(sim);
+      sync(sim, sim2);
     },
     step: () => {
       audio.unlock();
       const s = current();
       if (!s) return;
+      const s2 = partner();
+      if (s2 && s2.status !== 'running') s2.start();
       s.step(0);
-      sync(s);
+      sync(s, s2);
     },
     reset: () => {
       audio.stop();
@@ -240,7 +414,9 @@ export function SimulatorProvider({
         return;
       }
       sim.reset();
-      sync(sim);
+      sim2?.reset();
+      newJudge();
+      sync(sim, sim2);
     },
     toggleBreakpoint,
     refresh: () => setTick((t) => t + 1),

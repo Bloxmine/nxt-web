@@ -59,7 +59,9 @@ import { checkBrowserSupport } from './lib/browserSupport';
 import { openProjectFile, readProgramFile, saveProjectFile, type SavedFile } from './lib/files';
 import { iconUrl } from './lib/icons';
 import { loadValue, saveValue } from './lib/storage';
+import { CHALLENGES } from '@nxt/sim';
 import { SimulatorProvider, useSimulator, type SimulatorControls } from './sim/SimulatorContext';
+import { ChallengesDialog } from './sim/ChallengesDialog';
 import { SimulatorWindow } from './sim/SimulatorWindow';
 
 const support = checkBrowserSupport(navigator);
@@ -93,6 +95,7 @@ type Modal =
   | 'checker'
   | 'calculator'
   | 'robot'
+  | 'challenges'
   | 'library'
   | 'snippets'
   | 'tutorials'
@@ -926,6 +929,7 @@ function Studio() {
           icon: 'map',
           onClick: () => simActions.current?.setOpen(true),
         },
+        { label: 'Challenges…', icon: 'cup_gold', onClick: () => setModal('challenges') },
         {
           label: 'Toggle breakpoint',
           icon: 'bug',
@@ -975,6 +979,12 @@ function Studio() {
       icon: 'star',
       run: () => actions.loadExample(e.key),
     })),
+    ...CHALLENGES.map((c) => ({
+      label: `Challenge: ${c.name}`,
+      section: 'Simulator',
+      icon: 'cup_gold',
+      run: () => playChallenge(c.id),
+    })),
     ...TUTORIALS.map((t) => ({
       label: `Tutorial: ${t.title}`,
       section: 'Tutorials',
@@ -982,6 +992,11 @@ function Studio() {
       run: () => setTutorial({ tutorial: t, step: 0 }),
     })),
   ];
+
+  function playChallenge(id: string) {
+    simActions.current?.setChallenge(id);
+    simActions.current?.setOpen(true);
+  }
 
   const controller = (
     <Controller
@@ -1193,6 +1208,9 @@ function Studio() {
           />
         )}
         {modal === 'robot' && <RobotSetupDialog onClose={() => setModal(null)} />}
+        {modal === 'challenges' && (
+          <ChallengesDialog onPlay={playChallenge} onClose={() => setModal(null)} />
+        )}
         {modal === 'snippets' && (
           <SnippetsDialog onInsert={cmds.insertClip} onClose={() => setModal(null)} />
         )}

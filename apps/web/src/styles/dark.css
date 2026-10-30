@@ -362,3 +362,25 @@
   background: radial-gradient(circle, #4a4e54, #2c2f33);
   border-color: #1d1e21;
 }
+
+[data-theme='dark'] .sim-challenge {
+  border-color: #8a7020;
+  background: linear-gradient(#3a3420, #2f2a18);
+}
+[data-theme='dark'] .sim-challenge.won {
+  border-color: #3d7a3d;
+  background: linear-gradient(#22351f, #1c2b19);
+}
+[data-theme='dark'] .sim-challenge.lost {
+  border-color: #8a3c32;
+  background: linear-gradient(#3a2320, #2e1c19);
+}
+[data-theme='dark'] .sim-brick-tabs button,
+[data-theme='dark'] .challenge-card {
+  border-color: #4a4d52;
+  background: linear-gradient(#34373c, #2a2c30);
+  color: var(--text);
+}
+[data-theme='dark'] .sim-brick-tabs button.active {
+  background: #3a3d42;
+}

@@ -12,7 +12,21 @@ export type MatShape =
   | { type: 'rect'; x: number; y: number; w: number; h: number; color: string }
   | { type: 'circle'; x: number; y: number; r: number; color: string }
   /** A tape line through the points, `width` cm wide. Set `closed` to join the ends. */
-  | { type: 'path'; points: [number, number][]; width: number; color: string; closed?: boolean };
+  | { type: 'path'; points: [number, number][]; width: number; color: string; closed?: boolean }
+  /**
+   * A picture (such as a photo of a real mat) covering `w` × `h` cm, as `cols` × `rows`
+   * pixels in rows from the top, each 0xRRGGBB.
+   */
+  | {
+      type: 'bitmap';
+      x: number;
+      y: number;
+      w: number;
+      h: number;
+      cols: number;
+      rows: number;
+      pixels: number[];
+    };
 
 /** A solid obstacle. */
 export interface Wall {
@@ -44,10 +58,27 @@ export interface Scenario {
   /** True when the mat has a fence around it (walls on all four edges). */
   fenced: boolean;
   start: Pose;
+  /** Where a second robot starts (two simulated bricks); beside the first by default. */
+  start2?: Pose;
+}
+
+/** How the simulated robot is built. Lengths in cm, measured from the wheel axle. */
+export interface RobotGeometry {
+  wheelRadius: number;
+  /** Distance between the wheels. */
+  axle: number;
+  /** Collision radius around the centre; keep it below `bumperOffset`. */
+  radius: number;
+  lightOffset: number;
+  sonarOffset: number;
+  bumperOffset: number;
+  /** Motor index (0 = A, 1 = B, 2 = C) driving the left wheel and the right wheel. */
+  leftMotor: 0 | 1 | 2;
+  rightMotor: 0 | 1 | 2;
 }
 
 /** Robot dimensions, matching a typical two-wheeled NXT driving base. */
-export const ROBOT = {
+export const ROBOT: RobotGeometry = {
   /** Wheel radius (cm): the standard NXT tyre is 5.6 cm across. */
   wheelRadius: 2.8,
   /** Distance between the wheels (cm), as on the usual NXT 2.0 driving base. */
@@ -60,6 +91,9 @@ export const ROBOT = {
   sonarOffset: 6,
   /** Touch sensor bumper: how far ahead of the centre it reaches (cm). */
   bumperOffset: 9.5,
+  /** Motor B drives the left wheel, motor C the right one. */
+  leftMotor: 1,
+  rightMotor: 2,
 };
 
 /** The six colors the NXT 2.0 color sensor reports, in its numbering (1–6). */
@@ -126,6 +160,7 @@ function distanceToSegment(px: number, py: number, a: [number, number], b: [numb
 function insideShape(shape: MatShape, x: number, y: number): boolean {
   switch (shape.type) {
     case 'rect':
+    case 'bitmap':
       return x >= shape.x && x <= shape.x + shape.w && y >= shape.y && y <= shape.y + shape.h;
     case 'circle':
       return Math.hypot(x - shape.x, y - shape.y) <= shape.r;
@@ -147,7 +182,11 @@ export function matColorAt(scenario: Scenario, x: number, y: number): string {
   if (x < 0 || y < 0 || x > scenario.width || y > scenario.height) return '#303030';
   for (let i = scenario.shapes.length - 1; i >= 0; i--) {
     const shape = scenario.shapes[i]!;
-    if (insideShape(shape, x, y)) return shape.color;
+    if (!insideShape(shape, x, y)) continue;
+    if (shape.type !== 'bitmap') return shape.color;
+    const col = Math.min(shape.cols - 1, Math.floor(((x - shape.x) / shape.w) * shape.cols));
+    const row = Math.min(shape.rows - 1, Math.floor(((y - shape.y) / shape.h) * shape.rows));
+    return `#${(shape.pixels[row * shape.cols + col] ?? 0x808080).toString(16).padStart(6, '0')}`;
   }
   return scenario.background;
 }
@@ -200,6 +239,20 @@ function rayToWall(x: number, y: number, angle: number, wall: Wall): number {
   return tMin;
 }
 
+/** Distance along a ray to a circle, or Infinity. */
+function rayToCircle(x: number, y: number, angle: number, cx: number, cy: number, r: number) {
+  const dx = Math.cos(angle);
+  const dy = Math.sin(angle);
+  const fx = x - cx;
+  const fy = y - cy;
+  const b = fx * dx + fy * dy;
+  const c = fx * fx + fy * fy - r * r;
+  const disc = b * b - c;
+  if (disc < 0) return Infinity;
+  const t = -b - Math.sqrt(disc);
+  return t >= 0 ? t : c <= 0 ? 0 : Infinity;
+}
+
 const rad = (deg: number) => (deg * Math.PI) / 180;
 
 /** The robot in its world: pose, collisions and what each sensor sees. */
@@ -211,17 +264,24 @@ export class World {
   soundLevel = 0;
   /** Where the robot has been, for drawing its trail. */
   readonly trail: [number, number][] = [];
+  /** Other robots on the same mat (two simulated bricks): solid, and seen by the sonar. */
+  others: World[] = [];
   private readonly walls: Wall[];
 
-  constructor(readonly scenario: Scenario) {
-    this.pose = { ...scenario.start };
+  constructor(
+    readonly scenario: Scenario,
+    readonly robot: RobotGeometry = ROBOT,
+    /** Where this robot starts (the mat's start by default). */
+    readonly start: Pose = scenario.start,
+  ) {
+    this.pose = { ...start };
     this.walls = solidWalls(scenario);
     this.trail.push([this.pose.x, this.pose.y]);
   }
 
   /** Puts the robot back at the start. */
   reset(): void {
-    this.pose = { ...this.scenario.start };
+    this.pose = { ...this.start };
     this.blocked = false;
     this.trail.length = 0;
     this.trail.push([this.pose.x, this.pose.y]);
@@ -241,15 +301,23 @@ export class World {
    * since the last call). Movement into a wall is cancelled; turning on the spot is not.
    */
   drive(leftDegrees: number, rightDegrees: number): void {
-    const dl = rad(leftDegrees) * ROBOT.wheelRadius;
-    const dr = rad(rightDegrees) * ROBOT.wheelRadius;
+    const { robot } = this;
+    const dl = rad(leftDegrees) * robot.wheelRadius;
+    const dr = rad(rightDegrees) * robot.wheelRadius;
     const distance = (dl + dr) / 2;
-    const turn = ((dl - dr) / ROBOT.axle) * (180 / Math.PI);
+    const turn = ((dl - dr) / robot.axle) * (180 / Math.PI);
     const mid = rad(this.pose.heading + turn / 2);
     const x = this.pose.x + distance * Math.cos(mid);
     const y = this.pose.y + distance * Math.sin(mid);
     const heading = (((this.pose.heading + turn) % 360) + 360) % 360;
-    const hits = this.walls.some((w) => circleHitsWall(x, y, ROBOT.radius, w));
+    const hits =
+      this.walls.some((w) => circleHitsWall(x, y, robot.radius, w)) ||
+      this.others.some(
+        (o) =>
+          Math.hypot(o.pose.x - x, o.pose.y - y) < o.robot.radius + robot.radius &&
+          Math.hypot(o.pose.x - x, o.pose.y - y) <
+            Math.hypot(o.pose.x - this.pose.x, o.pose.y - this.pose.y),
+      );
     this.blocked = hits && Math.abs(distance) > 1e-6;
     this.pose = hits ? { ...this.pose, heading } : { x, y, heading };
     const last = this.trail[this.trail.length - 1];
@@ -262,25 +330,31 @@ export class World {
   /** True when the front bumper touches a wall. */
   touching(): boolean {
     return [-4, 0, 4].some((side) => {
-      const [x, y] = this.ahead(ROBOT.bumperOffset, side);
-      return this.walls.some((w) => pointInWall(x, y, w));
+      const [x, y] = this.ahead(this.robot.bumperOffset, side);
+      return (
+        this.walls.some((w) => pointInWall(x, y, w)) ||
+        this.others.some((o) => Math.hypot(o.pose.x - x, o.pose.y - y) <= o.robot.radius)
+      );
     });
   }
 
   /** Ultrasonic distance in cm (0–255) to the nearest wall in a narrow cone ahead. */
   distance(): number {
-    const [x, y] = this.ahead(ROBOT.sonarOffset);
+    const [x, y] = this.ahead(this.robot.sonarOffset);
     let best = Infinity;
     for (const spread of [-10, -5, 0, 5, 10]) {
       const angle = rad(this.pose.heading + spread);
       for (const wall of this.walls) best = Math.min(best, rayToWall(x, y, angle, wall));
+      for (const o of this.others) {
+        best = Math.min(best, rayToCircle(x, y, angle, o.pose.x, o.pose.y, o.robot.radius));
+      }
     }
     return Math.max(0, Math.min(255, Math.round(best)));
   }
 
   /** Colour under the light/color sensor. */
   colorUnderSensor(): [number, number, number] {
-    const [x, y] = this.ahead(ROBOT.lightOffset);
+    const [x, y] = this.ahead(this.robot.lightOffset);
     return rgbOf(matColorAt(this.scenario, x, y));
   }
 

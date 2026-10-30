@@ -2862,3 +2862,212 @@ svg[display='none'] {
     touch-action: none;
   }
 }
+
+/* Simulator: challenges, two bricks */
+.sim-challenge {
+  display: flex;
+  gap: 8px;
+  align-items: flex-start;
+  margin: 6px 8px 0;
+  padding: 5px 8px;
+  border: 1px solid #c9a227;
+  border-radius: 3px;
+  background: linear-gradient(#fffbe6, #fbefc0);
+  font-size: 12px;
+}
+
+.sim-challenge.won {
+  border-color: #3d9a3d;
+  background: linear-gradient(#f0fbe9, #d6f0c6);
+}
+
+.sim-challenge.lost {
+  border-color: #c64b3c;
+  background: linear-gradient(#fff1ee, #f8d6cf);
+}
+
+.sim-challenge img {
+  width: 16px;
+  height: 16px;
+  margin-top: 1px;
+}
+
+.sim-challenge-line {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 12px;
+  margin-top: 2px;
+  font-variant-numeric: tabular-nums;
+}
+
+.sim-challenge .stars {
+  color: #d69a00;
+  letter-spacing: 1px;
+}
+
+.sim-challenge-message {
+  font-weight: bold;
+}
+
+.sim-brick-tabs {
+  display: flex;
+  gap: 2px;
+  margin-bottom: 4px;
+}
+
+.sim-brick-tabs button {
+  flex: 1;
+  padding: 2px 6px;
+  border: 1px solid var(--border);
+  border-radius: 3px 3px 0 0;
+  background: linear-gradient(var(--chrome-light), var(--chrome));
+  font-size: 11px;
+  white-space: nowrap;
+  cursor: pointer;
+}
+
+.sim-brick-tabs button.active {
+  border-bottom-color: transparent;
+  background: var(--chrome-light);
+  font-weight: bold;
+}
+
+.sim-second {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  margin-bottom: 4px;
+}
+
+.sim-second select {
+  flex: 1;
+  min-width: 0;
+}
+
+/* Mat editor */
+.mat-editor {
+  display: flex;
+  gap: 8px;
+  align-items: flex-start;
+}
+
+.mat-tools {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.mat-canvas {
+  flex: 1;
+  min-width: 0;
+  max-width: 620px;
+  height: auto;
+  border: 1px solid var(--border-dark);
+  border-radius: 3px;
+  touch-action: none;
+}
+
+.mat-props {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  width: 220px;
+  flex-shrink: 0;
+}
+
+.mat-props .robot-field {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin: 0;
+}
+
+.mat-props .robot-field .text-input {
+  flex: 1;
+  min-width: 0;
+}
+
+.mat-props .groupbox {
+  margin: 0;
+}
+
+.mat-swatches {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 3px;
+  margin-bottom: 6px;
+}
+
+.mat-swatches button,
+.mat-swatches input {
+  width: 20px;
+  height: 20px;
+  padding: 0;
+  border: 1px solid var(--border-dark);
+  border-radius: 3px;
+  cursor: pointer;
+}
+
+.mat-swatches button.active {
+  outline: 2px solid var(--selection);
+  outline-offset: 1px;
+}
+
+@media (max-width: 760px) {
+  .mat-editor {
+    flex-wrap: wrap;
+  }
+  .mat-tools {
+    flex-direction: row;
+  }
+  .mat-props {
+    width: 100%;
+  }
+}
+
+/* Challenges dialog */
+.challenge-list {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+  gap: 8px;
+}
+
+.challenge-card {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: 8px;
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  background: linear-gradient(var(--chrome-light), var(--chrome));
+  font-size: 12px;
+}
+
+.challenge-card h3 {
+  display: flex;
+  justify-content: space-between;
+  margin: 0;
+  font-size: 13px;
+}
+
+.challenge-card .stars {
+  color: #d69a00;
+}
+
+.challenge-card p {
+  flex: 1;
+  margin: 0;
+}
+
+.challenge-card .meta {
+  color: var(--text-muted);
+  font-size: 11px;
+}
+
+.mat-tools .tool-sep {
+  width: 18px;
+  height: 1px;
+  margin: 3px auto;
+  border: 0;
+  background: var(--chrome-dark);
+}
