@@ -1,0 +1,11 @@
+NXT Web Studio
+
+This project is an independent, community-made tool. It is not affiliated
+with, endorsed by, or sponsored by the LEGO Group.
+
+LEGO and MINDSTORMS are trademarks of the LEGO Group. They are used here only
+to describe the hardware this software works with.
+
+This repository contains no LEGO artwork, icons, firmware images, or software.
+Protocol and file-format details are implemented from LEGO's publicly
+published developer documentation; see docs/spec/ for the excerpts used.

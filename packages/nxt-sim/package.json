@@ -1,0 +1,18 @@
+{
+  "name": "@nxt/sim",
+  "version": "0.0.0",
+  "private": true,
+  "description": "Minimal NXT VM interpreter for testing compiled programs.",
+  "license": "MIT",
+  "type": "module",
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "scripts": {
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run"
+  },
+  "dependencies": {
+    "@nxt/rxe": "workspace:*"
+  }
+}

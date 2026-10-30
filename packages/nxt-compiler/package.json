@@ -1,0 +1,18 @@
+{
+  "name": "@nxt/compiler",
+  "version": "0.0.0",
+  "private": true,
+  "description": "Compiles the block-program IR to .rxe bytecode.",
+  "license": "MIT",
+  "type": "module",
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "scripts": {
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run"
+  },
+  "dependencies": {
+    "@nxt/rxe": "workspace:*"
+  }
+}

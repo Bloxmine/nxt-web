@@ -1,0 +1,18 @@
+{
+  "name": "@nxt/protocol",
+  "version": "0.0.0",
+  "private": true,
+  "description": "Encoders and decoders for NXT direct and system commands.",
+  "license": "MIT",
+  "type": "module",
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "scripts": {
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run"
+  },
+  "dependencies": {
+    "@nxt/transport": "workspace:*"
+  }
+}

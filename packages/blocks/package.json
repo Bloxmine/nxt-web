@@ -1,0 +1,18 @@
+{
+  "name": "@nxt/blocks",
+  "version": "0.0.0",
+  "private": true,
+  "description": "Blockly block definitions and block-to-IR generators.",
+  "license": "MIT",
+  "type": "module",
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "scripts": {
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run"
+  },
+  "dependencies": {
+    "@nxt/compiler": "workspace:*"
+  }
+}

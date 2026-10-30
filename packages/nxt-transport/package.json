@@ -1,0 +1,16 @@
+{
+  "name": "@nxt/transport",
+  "version": "0.0.0",
+  "private": true,
+  "description": "Transport interface and WebUSB, Web Serial and mock implementations.",
+  "license": "MIT",
+  "type": "module",
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "scripts": {
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run"
+  },
+  "dependencies": {}
+}
