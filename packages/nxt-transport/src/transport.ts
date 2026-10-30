@@ -9,10 +9,13 @@ export type TransportStateListener = (state: TransportState) => void;
  *
  * The protocol layer only ever talks to this interface, so WebUSB, Web Serial
  * (Bluetooth) and the mock brick are interchangeable. Implementations deal in
- * whole telegrams: any link-level framing (such as the Bluetooth length prefix)
- * is added and removed inside the implementation.
+ * whole telegrams: link-level framing (such as the Bluetooth length prefix,
+ * docs/spec/telegram.md) is added and removed inside the implementation.
  */
 export interface Transport {
+  /** Short human-readable link type, e.g. "USB" or "Bluetooth". */
+  readonly kind: string;
+
   /** Current connection state. */
   readonly state: TransportState;
 
@@ -25,9 +28,32 @@ export interface Transport {
   /** Sends one telegram to the brick. */
   send(bytes: Uint8Array): Promise<void>;
 
-  /** Waits for the next telegram from the brick. */
-  receive(): Promise<Uint8Array>;
+  /**
+   * Waits for the next telegram from the brick.
+   * Rejects with {@link TransportTimeoutError} after `timeoutMs`, and with
+   * {@link TransportClosedError} if the link closes while waiting.
+   */
+  receive(timeoutMs: number): Promise<Uint8Array>;
+
+  /** Throws away any telegrams received but not yet read. */
+  drain(): void;
 
   /** Subscribes to state changes. Returns an unsubscribe function. */
   onStateChange(listener: TransportStateListener): () => void;
+}
+
+/** No telegram arrived within the timeout. */
+export class TransportTimeoutError extends Error {
+  constructor(timeoutMs: number) {
+    super(`No reply from the brick within ${timeoutMs} ms`);
+    this.name = 'TransportTimeoutError';
+  }
+}
+
+/** The link is closed (never opened, unplugged, or disconnected). */
+export class TransportClosedError extends Error {
+  constructor(message = 'Not connected to a brick') {
+    super(message);
+    this.name = 'TransportClosedError';
+  }
 }

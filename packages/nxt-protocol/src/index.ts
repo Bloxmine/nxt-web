@@ -1,6 +1,6 @@
-/**
- * @nxt/protocol — packet encoders and decoders for direct and system commands
- *
- * Placeholder until Phase 1. See PLAN.md.
- */
-export const PACKAGE_NAME = '@nxt/protocol';
+export * from './constants.js';
+export * from './direct.js';
+export * from './system.js';
+export { NxtClient, type BrickSummary, type NxtClientOptions } from './client.js';
+export { describeStatus, NxtProtocolError, NxtStatusError } from './errors.js';
+export { TelegramReader, TelegramWriter } from './bytes.js';
