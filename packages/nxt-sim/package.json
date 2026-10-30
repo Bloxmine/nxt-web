@@ -2,7 +2,7 @@
   "name": "@nxt/sim",
   "version": "0.0.0",
   "private": true,
-  "description": "Minimal NXT VM interpreter for testing compiled programs.",
+  "description": "Simulated NXT brick and robot that runs programs in the browser or in tests.",
   "license": "MIT",
   "type": "module",
   "exports": {
@@ -13,6 +13,10 @@
     "test": "vitest run"
   },
   "dependencies": {
-    "@nxt/rxe": "workspace:*"
+    "@nxt/compiler": "workspace:*"
+  },
+  "devDependencies": {
+    "@nxt/blocks": "workspace:*",
+    "@nxt/rbt": "workspace:*"
   }
 }

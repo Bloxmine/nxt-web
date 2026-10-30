@@ -278,9 +278,16 @@ importers:
 
   packages/nxt-sim:
     dependencies:
-      '@nxt/rxe':
+      '@nxt/compiler':
         specifier: workspace:*
-        version: link:../nxt-rxe
+        version: link:../nxt-compiler
+    devDependencies:
+      '@nxt/blocks':
+        specifier: workspace:*
+        version: link:../blocks
+      '@nxt/rbt':
+        specifier: workspace:*
+        version: link:../nxt-rbt
 
   packages/nxt-transport:
     devDependencies:
