@@ -9,3 +9,7 @@ to describe the hardware this software works with.
 This repository contains no LEGO artwork, icons, firmware images, or software.
 Protocol and file-format details are implemented from LEGO's publicly
 published developer documentation; see docs/spec/ for the excerpts used.
+
+Icons: FatCow Farm-Fresh Web Icons (http://www.fatcow.com/free-icons),
+licensed under Creative Commons Attribution 3.0. See
+apps/web/public/icons/readme-fatcow.txt.

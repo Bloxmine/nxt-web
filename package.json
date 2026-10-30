@@ -16,7 +16,8 @@
     "lint": "eslint .",
     "format": "prettier --write .",
     "format:check": "prettier --check .",
-    "check": "pnpm lint && pnpm format:check && pnpm typecheck && pnpm test && pnpm build"
+    "check": "pnpm lint && pnpm format:check && pnpm typecheck && pnpm test && pnpm build",
+    "fetch:nxtprograms": "node scripts/fetch-nxtprograms.mjs"
   },
   "devDependencies": {
     "@eslint/js": "^10.0.1",

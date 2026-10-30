@@ -1,4 +1,22 @@
 # Linux USB permissions
 
-On Linux the browser needs permission to open the brick's USB device. The udev rule
-`99-nxt.rules` and setup steps are added here in Phase 1.
+On Linux the browser needs permission to open the brick's USB device.
+
+1. Copy the rule into place and reload udev:
+
+   ```sh
+   sudo cp docs/udev/99-nxt.rules /etc/udev/rules.d/
+   sudo udevadm control --reload-rules
+   sudo udevadm trigger
+   ```
+
+2. Unplug the brick and plug it in again.
+3. In Chrome or Edge, click **Connect via USB** and pick the brick.
+
+`TAG+="uaccess"` gives the user at the computer access to the device, which works
+with systemd-logind (most desktop distributions). If yours doesn't use logind,
+replace it with `GROUP="plugdev"` and add yourself to that group.
+
+If Connect says "Permission denied", the rule is not active yet: check the file
+name ends in `.rules` and replug the brick. If it says "The brick is busy",
+another program (or browser tab) has it open.

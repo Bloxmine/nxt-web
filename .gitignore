@@ -5,3 +5,6 @@ coverage/
 .vite/
 .DS_Store
 *.log
+
+# Third-party files for local compatibility tests (not redistributable)
+fixtures/external/

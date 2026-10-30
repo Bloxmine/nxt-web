@@ -1,0 +1,19 @@
+{
+  "name": "@nxt/rbt",
+  "version": "0.0.0",
+  "private": true,
+  "description": "Reader for classic NXT-G .rbt program files (LabVIEW resource containers).",
+  "license": "MIT",
+  "type": "module",
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "scripts": {
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run"
+  },
+  "dependencies": {},
+  "devDependencies": {
+    "@types/node": "^24.19.2"
+  }
+}

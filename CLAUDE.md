@@ -16,6 +16,13 @@ code layout and dependency rules in [docs/architecture.md](docs/architecture.md)
 - TypeScript is pinned to 6.0 because typescript-eslint does not support 7 yet.
 - Packages are consumed as source (`exports` → `src/index.ts`); there is no per-package build.
 - Do not swap any choice in PLAN.md's "Tech stack" table without asking.
+- The editor is a classic sequence-beam editor in the style of the original NXT 2.0
+  software (layout, colours, data hubs, wires, parallel beams), with a 2000s look.
+  Blockly is planned later as an optional "modern" mode; both lower to the same IR.
+- Blocks use original artwork (FatCow icons, CC BY 3.0 – keep the credit in the About
+  dialog and NOTICE). No LEGO logos, artwork or screenshots in the repo.
+- Opening original `.rbt` programs one-to-one is a goal: see docs/rbt-compat.md.
+  Third-party sample programs live only in git-ignored `fixtures/external/`.
 
 ## How to work
 
@@ -38,9 +45,10 @@ code layout and dependency rules in [docs/architecture.md](docs/architecture.md)
 
 ## Progress
 
-- [x] Phase 0: Scaffolding (waiting on: first CI run, manual browser check)
-- [ ] Phase 1: NXT protocol over WebUSB
-- [ ] Phase 2: Blockly editor and block set
+- [x] Phase 0: Scaffolding (waiting on: manual browser check)
+- [ ] Phase 1: NXT protocol over WebUSB — code done; waiting on docs/hardware-tests.md Phase 1
+- [ ] Phase 2: Classic editor and block set — done except workspace search; Blockly mode later
+- [ ] .rbt import — container reader done; instances and diagram next (docs/rbt-compat.md)
 - [ ] Phase 3: Compiler to .rxe bytecode
 - [ ] Phase 4: Upload, run, and live monitoring
 - [ ] Phase 5: File manager, firmware tools, and Bluetooth
