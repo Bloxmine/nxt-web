@@ -1,6 +1,8 @@
-/**
- * @nxt/blocks — Blockly block definitions and generators
- *
- * Placeholder until Phase 2. See PLAN.md.
- */
-export const PACKAGE_NAME = '@nxt/blocks';
+export type * from './model.js';
+export * from './catalog.js';
+export * from './tree.js';
+export * from './validate.js';
+export * from './lower.js';
+export * from './project.js';
+export * from './examples.js';
+export { newId } from './ids.js';
