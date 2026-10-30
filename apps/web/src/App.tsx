@@ -13,7 +13,7 @@ import {
   type Block,
   type Program,
 } from '@nxt/blocks';
-import { visitStatements } from '@nxt/compiler';
+import { CompileError, compileProgram } from '@nxt/compiler';
 import {
   useCallback,
   useEffect,
@@ -46,6 +46,27 @@ import { SimulatorWindow } from './sim/SimulatorWindow';
 
 const support = checkBrowserSupport(navigator);
 const AUTOSAVE_KEY = 'autosave';
+/** Brick file name for a program: 15.3 characters, letters, digits, spaces, - and _. */
+function rxeFileName(name: string): string {
+  const base =
+    name
+      .replace(/[^A-Za-z0-9 _-]/g, '')
+      .trim()
+      .slice(0, 15) || 'Program';
+  return `${base}.rxe`;
+}
+
+function saveBytes(fileName: string, bytes: Uint8Array): void {
+  const url = URL.createObjectURL(
+    new Blob([Uint8Array.from(bytes)], { type: 'application/octet-stream' }),
+  );
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = fileName;
+  a.click();
+  setTimeout(() => URL.revokeObjectURL(url), 1000);
+}
+
 /** The simulator mat each example is meant for. */
 const EXAMPLE_MATS: Record<string, string> = {
   square: 'square',
@@ -254,26 +275,82 @@ function Studio() {
         );
         return;
       }
-      const ir = lowerProgram(state.program);
-      let count = 0;
-      visitStatements(ir.main, () => count++);
-      for (const s of ir.subroutines) visitStatements(s.body, () => count++);
-      message(
-        run ? 'Download and run' : 'Download',
-        'information',
-        <>
+      let bytes: Uint8Array;
+      try {
+        bytes = compileProgram(lowerProgram(state.program));
+      } catch (error) {
+        message(
+          'Cannot download',
+          'exclamation',
           <p style={{ marginTop: 0 }}>
-            <strong>Your program checks out.</strong> It was translated into {count} steps for the
-            brick.
-          </p>
-          <p>
-            Turning those steps into a file the brick can run is the next stage of development (the
-            compiler, Phase 3). Until then, use the NXT window to drive motors and read sensors
-            live.
-          </p>
-          {!connected && <p>Tip: connect your brick with the button in the top-right corner.</p>}
-        </>,
-      );
+            {error instanceof CompileError ? error.message : String(error)}
+          </p>,
+        );
+        return;
+      }
+      const fileName = rxeFileName(state.program.name);
+      if (!connected) {
+        message(
+          'No brick connected',
+          'disconnect',
+          <>
+            <p style={{ marginTop: 0 }}>
+              <strong>{fileName}</strong> is ready ({bytes.length} bytes). Connect your brick to
+              download it, save the file to copy it over another way, or try it in the simulator.
+            </p>
+            <p style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
+              <button
+                type="button"
+                className="btn"
+                disabled={!support.usb}
+                onClick={() => {
+                  setModal(null);
+                  void brick.connectUsb();
+                }}
+              >
+                <img src={iconUrl('connect')} alt="" /> Connect via USB
+              </button>
+              <button type="button" className="btn" onClick={() => saveBytes(fileName, bytes)}>
+                <img src={iconUrl('diskette')} alt="" /> Save {fileName}
+              </button>
+              <button
+                type="button"
+                className="btn"
+                onClick={() => {
+                  setModal(null);
+                  actionsRef.current.simulate();
+                }}
+              >
+                <img src={iconUrl('car')} alt="" /> Simulate
+              </button>
+            </p>
+          </>,
+        );
+        return;
+      }
+      const progress = (sent: number) =>
+        message(
+          run ? 'Download and run' : 'Download',
+          'download',
+          <>
+            <p style={{ marginTop: 0 }}>
+              Sending <strong>{fileName}</strong> to the brick…
+            </p>
+            <progress max={bytes.length} value={sent} style={{ width: '100%' }} />
+          </>,
+        );
+      progress(0);
+      void brick.downloadProgram(fileName, bytes, run, progress).then((ok) => {
+        if (!ok) return setModal(null);
+        message(
+          run ? 'Download and run' : 'Download',
+          'tick',
+          <p style={{ marginTop: 0 }}>
+            <strong>{fileName}</strong> ({bytes.length} bytes) is on the brick
+            {run ? ' and running.' : '. Find it under My Files › Software files.'}
+          </p>,
+        );
+      });
     },
     stop: () => void brick.stopEverything(),
     simulate: () => {

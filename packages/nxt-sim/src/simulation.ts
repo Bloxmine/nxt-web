@@ -48,7 +48,8 @@ interface Task {
   budget: number;
 }
 
-interface OpenFile {
+/** A file in the simulated brick's flash. */
+export interface OpenFile {
   data: string;
   readPos: number;
 }
@@ -266,6 +267,20 @@ export class Simulation {
     }
     this.cursor = 0;
     return true;
+  }
+
+  /**
+   * Moves the motors and robot on by `dt` ms and advances the clock, without running
+   * any program (used by {@link RxeVm}, which runs compiled code on this brick).
+   */
+  stepWorld(dt: number): void {
+    this.physics(dt);
+    this.time += dt;
+  }
+
+  /** Sends an event to listeners (for {@link RxeVm}). */
+  emitEvent(event: SimEvent): void {
+    this.emit(event);
   }
 
   private physics(dt: number): void {

@@ -13,7 +13,8 @@
     "test": "vitest run"
   },
   "dependencies": {
-    "@nxt/compiler": "workspace:*"
+    "@nxt/compiler": "workspace:*",
+    "@nxt/rxe": "workspace:*"
   },
   "devDependencies": {
     "@nxt/blocks": "workspace:*",

@@ -5,6 +5,7 @@ import {
   OutputMode,
   RegulationMode,
   RunState,
+  MAX_WRITE_CHUNK,
   Status,
   TelegramType,
   type InputPort,
@@ -211,6 +212,45 @@ export class NxtClient {
       bluetoothAddress: info.bluetoothAddress,
       freeFlashBytes: info.freeFlashBytes,
     };
+  }
+
+  /**
+   * Uploads a file, replacing one with the same name. Programs (.rxe) and other files
+   * the firmware reads in place are written with OPEN WRITE LINEAR (docs/spec).
+   */
+  async uploadFile(
+    fileName: string,
+    data: Uint8Array,
+    onProgress?: (sent: number, total: number) => void,
+  ): Promise<void> {
+    const linear = /\.(rxe|ric|rso)$/i.test(fileName);
+    const open = () =>
+      this.call(
+        linear
+          ? s.encodeOpenWriteLinear(fileName, data.length)
+          : s.encodeOpenWrite(fileName, data.length),
+      );
+    let reply: Uint8Array;
+    try {
+      reply = await open();
+    } catch (error) {
+      if (!(error instanceof NxtStatusError && error.status === Status.FileExists)) throw error;
+      await this.call(s.encodeDelete(fileName));
+      reply = await open();
+    }
+    const handle = s.decodeHandle(reply);
+    try {
+      for (let sent = 0; sent < data.length;) {
+        const chunk = data.subarray(sent, sent + MAX_WRITE_CHUNK);
+        const written = s.decodeWrite(await this.call(s.encodeWrite(handle, chunk)));
+        if (written !== chunk.length)
+          throw new Error(`Only ${written} of ${chunk.length} bytes were written`);
+        sent += chunk.length;
+        onProgress?.(sent, data.length);
+      }
+    } finally {
+      await this.call(s.encodeClose(handle));
+    }
   }
 
   /** Lists files matching a wildcard such as "*.rxe" or "*.*". */

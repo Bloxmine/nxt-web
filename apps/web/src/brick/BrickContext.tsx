@@ -26,6 +26,13 @@ export interface BrickContextValue {
   refresh(): Promise<void>;
   /** Stops the program, all motors and sound. */
   stopEverything(): Promise<void>;
+  /** Uploads a compiled program and optionally starts it. Resolves to false on failure. */
+  downloadProgram(
+    fileName: string,
+    bytes: Uint8Array,
+    start: boolean,
+    onProgress?: (sent: number, total: number) => void,
+  ): Promise<boolean>;
   clearError(): void;
 }
 
@@ -118,6 +125,27 @@ export function BrickProvider({ children }: { children: ReactNode }) {
     [run],
   );
 
+  const downloadProgram = useCallback(
+    async (
+      fileName: string,
+      bytes: Uint8Array,
+      start: boolean,
+      onProgress?: (sent: number, total: number) => void,
+    ) => {
+      let ok = false;
+      await run(async () => {
+        const c = clientRef.current;
+        if (!c) throw new Error('No brick connected');
+        await c.stopProgram();
+        await c.uploadFile(fileName, bytes, onProgress);
+        if (start) await c.startProgram(fileName);
+        ok = true;
+      });
+      return ok;
+    },
+    [run],
+  );
+
   // Keep the brick awake while connected.
   useEffect(() => {
     if (state !== 'connected' || !client) return;
@@ -136,6 +164,7 @@ export function BrickProvider({ children }: { children: ReactNode }) {
     disconnect,
     refresh,
     stopEverything,
+    downloadProgram,
     clearError: () => setError(null),
   };
   return <BrickContext.Provider value={value}>{children}</BrickContext.Provider>;

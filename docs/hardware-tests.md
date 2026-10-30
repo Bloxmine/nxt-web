@@ -50,3 +50,32 @@ No hardware needed.
 4. Open "Show distance": drag from a Value plug to a Number plug to make a wire; try a
    text plug to a number plug and check it is refused with a message.
 5. Drag the start node downwards: a parallel beam appears.
+
+## Phase 3: compiled programs on a real brick
+
+The compiler is tested against the specification's example file and against a VM that
+runs on the simulated brick, but only a real brick can confirm the details marked "to be
+confirmed" in [spec/rxe.md](spec/rxe.md). Connect over USB, then:
+
+1. **Spike program.** Open a new program with a Sound block (tone, 0.5 s), a Wait (0.5 s)
+   and a Display block (text "Hello NXT"), then **Download and run**. The brick beeps, shows
+   the text, and returns to its menu after about 3 s. If it shows **File Error**, save the
+   .rxe (download without a brick connected) and send it to us.
+2. **Branches.** File → Examples → Drive in a square, Download and run: the robot drives
+   four sides and beeps once (loops and jumps work).
+3. **Motor goals.** In the same program the robot must stop after each side and turn
+   (waiting for a rotation goal reads RUN_STATE). If it never moves on from the first side,
+   tell us.
+4. **Sensors.** Bumper car (touch on 1) and Avoid obstacles (ultrasonic on 4). For the
+   ultrasonic example, hold a hand 15 cm in front: the robot backs up.
+5. **NXT 2.0 color sensor.** Put a Wait block for the Color Sensor (color mode, port 3)
+   before a Sound block. Show it a red brick: the tone plays. Then the Color Lamp block
+   (red, green, blue): the lamp changes colour. These type codes are not in the v1.0
+   specification (see spec/rxe.md, "Beyond v1.0").
+6. **Display and numbers.** Show distance example: the screen shows "Distance: N cm" and
+   updates.
+7. **Files.** A program with File Access write (number 42), close, read: Display shows 42.
+   NXT window → Memory lists the .txt file.
+8. **Two beams.** Drive and sing: the robot drives while the tune plays.
+9. **Bluetooth messages (two bricks).** 5ButtonRemote/5ButtonSteer from nxtprograms.com:
+   messages arrive in mailboxes 1 and 2.

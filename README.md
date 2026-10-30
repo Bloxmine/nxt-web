@@ -5,13 +5,24 @@ Drag blocks, click Run, and the robot moves. No install and no server.
 
 > Independent project, not affiliated with the LEGO Group. See [NOTICE](NOTICE).
 
-**Status:** the editor and brick connection work; compiling programs for the brick is next.
+**Status:** the editor, simulator, brick connection and compiler work; the compiler still
+needs its first run on a real brick (Phase 3 in the hardware checklist).
 See [PLAN.md](PLAN.md) for the roadmap and [docs/hardware-tests.md](docs/hardware-tests.md)
 for what to test on a real brick.
 
 The editor follows the classic NXT 2.0 software: a sequence beam with blocks, loops and
 switches, fold-out data hubs with wires, parallel beams, a configuration panel and a
 controller. Try `?example=distance` or `?example=parallel` in the URL.
+
+**Simulator:** press F5 (or **Simulate**) to run the program on a virtual robot: pick a mat
+(line-follow oval, obstacle room, color race and more), watch the brick's screen, press its
+buttons, and hear its tones. Running blocks light up and data wires show their values; set
+breakpoints with F9 and step block by block.
+
+**Download:** programs compile to `.rxe` files for the stock firmware and upload over USB
+(or Bluetooth, experimental). Without a brick you can save the `.rxe` file.
+
+**Works offline:** once loaded, the app can be installed and runs without a network.
 
 **Opens original NXT-G programs:** File → Open (or drop a file on the window) accepts `.rbt`
 files from the NXT 2.0 software. See [docs/rbt-compat.md](docs/rbt-compat.md).

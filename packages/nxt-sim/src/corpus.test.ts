@@ -1,10 +1,12 @@
 import { existsSync, readdirSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { lowerProgram } from '@nxt/blocks';
+import { compileProgram } from '@nxt/compiler';
 import { importRbt } from '@nxt/rbt';
 import { describe, expect, it } from 'vitest';
 import { SCENARIOS } from './scenarios.js';
 import { Simulation } from './simulation.js';
+import { RxeVm } from './vm.js';
 
 // Real NXT-G programs (not committed; see docs/rbt-compat.md). Each must run in every
 // scenario for a while without a simulator error.
@@ -24,5 +26,15 @@ describe.skipIf(files.length === 0)('real programs run in the simulator (local o
       }
       expect(sim.error).toBeNull();
     }
+    // Compiled, the program runs in the VM without errors too.
+    const bytes = compileProgram(ir);
+    expect(bytes.length).toBeLessThan(64 * 1024);
+    const sim = new Simulation({ ...ir, main: [], parallel: [] }, SCENARIOS[0]!, { seed: 7 });
+    const vm = new RxeVm(bytes, sim);
+    for (let t = 0; t < 10_000 && vm.running; t += 100) {
+      sim.setButton('enter', t % 1000 < 300);
+      vm.advance(100);
+    }
+    expect(vm.error).toBeNull();
   });
 });

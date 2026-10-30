@@ -20,14 +20,33 @@ Blockly workspace ──► IR ──► VM instructions ──► .rxe file ─
 | `@nxt/rxe`       | `packages/nxt-rxe`       | `.rxe` writer (and a reader for tests); VM opcode tables               |
 | `@nxt/compiler`  | `packages/nxt-compiler`  | IR types, lowering, codegen to `.rxe`                                  |
 | `@nxt/sim`       | `packages/nxt-sim`       | Small VM interpreter for testing compiled programs                     |
-| `@nxt/blocks`    | `packages/blocks`        | Blockly block definitions and block-to-IR generators                   |
+| `@nxt/blocks`    | `packages/blocks`        | Classic block program model, validation and lowering to IR             |
+| `@nxt/rbt`       | `packages/nxt-rbt`       | Importer for original NXT-G `.rbt` programs                            |
 | `@nxt/web`       | `apps/web`               | React + Tailwind UI, Blockly host, PWA shell                           |
 
 ```
 apps/web ──► blocks ──► nxt-compiler ──► nxt-rxe ◄── nxt-sim
-    │
+    │   └──► nxt-rbt ──► blocks             ▲            │
+    ├──► nxt-sim ─────────────────────────────────────────┘ (IR types)
     └──► nxt-protocol ──► nxt-transport (interface)
 ```
+
+## Simulator and debugger
+
+`@nxt/sim` runs a program's IR on a simulated brick: one generator per beam, motors with
+degree goals and steering, a two-wheeled robot on a mat (touch, light, color, sound and
+ultrasonic sensors), the 100×64 screen, buttons, mailboxes and files. Statements carry the
+id of the block they came from, so the simulator window in `apps/web` can highlight the
+running blocks, stop at breakpoints and show values on data wires.
+
+`RxeVm` (same package) runs compiled `.rxe` files on that brick. Compiler tests run every
+example both ways and compare the results.
+
+## Offline
+
+`apps/web/build/offline.ts` is a small Vite plugin that writes `sw.js` after each build,
+listing every output file. The service worker caches them on install and serves them
+cache-first, so the installed app works without a network.
 
 ## Dependency rules
 

@@ -284,6 +284,9 @@ importers:
       '@nxt/compiler':
         specifier: workspace:*
         version: link:../nxt-compiler
+      '@nxt/rxe':
+        specifier: workspace:*
+        version: link:../nxt-rxe
     devDependencies:
       '@nxt/blocks':
         specifier: workspace:*

@@ -18,6 +18,7 @@ export {
   type SimStatus,
   type Value,
 } from './simulation.js';
+export { RxeVm } from './vm.js';
 export {
   MAT_COLORS,
   NXT_COLORS,

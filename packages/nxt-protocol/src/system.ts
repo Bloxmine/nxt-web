@@ -114,6 +114,16 @@ export function decodeHandle(reply: Uint8Array): number {
   return new TelegramReader(reply).u8(3);
 }
 
+/** WRITE (0x83): appends data to an open file. */
+export function encodeWrite(handle: number, data: Uint8Array): Uint8Array {
+  return system(SystemOpcode.Write).u8(handle).raw(data).done();
+}
+
+/** Decodes the number of bytes written from a WRITE reply. */
+export function decodeWrite(reply: Uint8Array): number {
+  return new TelegramReader(reply).u16(4);
+}
+
 /** CLOSE (0x84). */
 export function encodeClose(handle: number): Uint8Array {
   return system(SystemOpcode.Close).u8(handle).done();

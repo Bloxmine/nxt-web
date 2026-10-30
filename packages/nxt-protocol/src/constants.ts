@@ -160,4 +160,8 @@ export const Status = {
   NoActiveProgram: 0xec,
   NoMoreFiles: 0x83,
   FileNotFound: 0x87,
+  FileExists: 0x8f,
 } as const;
+
+/** Largest WRITE payload: a 64-byte telegram minus type, opcode and handle. */
+export const MAX_WRITE_CHUNK = MAX_TELEGRAM_LENGTH - 3;

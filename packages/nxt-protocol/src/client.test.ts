@@ -12,6 +12,31 @@ async function setup(responder: (req: Uint8Array) => Uint8Array | Uint8Array[] |
 }
 
 describe('NxtClient', () => {
+  it('uploads a program in 61-byte chunks, replacing an existing file', async () => {
+    let exists = true;
+    const { mock, client } = await setup((req) => {
+      switch (req[1]) {
+        case 0x89: // OPEN WRITE LINEAR
+          return exists ? reply(0x89, 0x8f) : reply(0x89, 0, 7);
+        case 0x85: // DELETE
+          exists = false;
+          return reply(0x85, 0, ...new Array(20).fill(0));
+        case 0x83: // WRITE: echo the handle and the byte count
+          return reply(0x83, 0, req[2]!, req.length - 3, 0);
+        default: // CLOSE
+          return reply(req[1]!, 0, req[2]!);
+      }
+    });
+    const data = Uint8Array.from({ length: 150 }, (_, i) => i);
+    const progress: number[] = [];
+    await client.uploadFile('Prog.rxe', data, (sent) => progress.push(sent));
+    expect(mock.sent.map((t) => t[1])).toEqual([0x89, 0x85, 0x89, 0x83, 0x83, 0x83, 0x84]);
+    expect(progress).toEqual([61, 122, 150]);
+    const written = mock.sent.filter((t) => t[1] === 0x83).flatMap((t) => [...t.subarray(3)]);
+    expect(written).toEqual([...data]);
+    expect(mock.sent.every((t) => t.length <= 64)).toBe(true);
+  });
+
   it('reads the battery level', async () => {
     const { client } = await setup(() => reply(0x0b, 0, 0x40, 0x1f));
     expect(await client.getBatteryLevel()).toBe(8000);
