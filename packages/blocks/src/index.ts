@@ -1,6 +1,8 @@
 export type * from './model.js';
 export * from './catalog.js';
 export * from './tree.js';
+export * from './plugs.js';
+export * from './wires.js';
 export * from './validate.js';
 export * from './lower.js';
 export * from './project.js';

@@ -1,4 +1,5 @@
 import type { Block, Program } from './model.js';
+import { findPlug } from './plugs.js';
 
 /** Which nested sequence of a container block. */
 export type Branch = 'body' | 'whenTrue' | 'whenFalse';
@@ -8,7 +9,7 @@ export type Branch = 'body' | 'whenTrue' | 'whenFalse';
  * Block (`parent` null), or a branch of a loop or switch.
  */
 export interface SeqRef {
-  /** "main" or a My Block id. */
+  /** "main", a parallel lane "main#1", "main#2"…, or a My Block id. */
   root: string;
   /** Container block id, or null for the root sequence. */
   parent: string | null;
@@ -36,27 +37,92 @@ function withChild(block: Block, branch: Branch, blocks: Block[]): Block {
   throw new Error(`Block ${block.id} has no "${branch}" branch`);
 }
 
-/** All root sequences: the main program and each My Block. */
+/** Root id of parallel lane `n` (1-based); lane 0 is "main". */
+export function laneRoot(n: number): string {
+  return n === 0 ? 'main' : `main#${n}`;
+}
+
+/** Lane number of a root id, or null if it is not a main-program lane. */
+export function laneOf(root: string): number | null {
+  if (root === 'main') return 0;
+  const match = /^main#(\d+)$/.exec(root);
+  return match ? Number(match[1]) : null;
+}
+
+/** The editor tab a root belongs to: all lanes live on the "main" tab. */
+export function tabOf(root: string): string {
+  return laneOf(root) === null ? root : 'main';
+}
+
+/** All root sequences: the main beam, its parallel lanes, and each My Block. */
 export function roots(program: Program): { root: string; blocks: Block[] }[] {
   return [
     { root: 'main', blocks: program.body },
+    ...program.parallel.map((blocks, i) => ({ root: laneRoot(i + 1), blocks })),
     ...program.myBlocks.map((m) => ({ root: m.id, blocks: m.body })),
   ];
 }
 
 function rootBlocks(program: Program, root: string): Block[] {
-  if (root === 'main') return program.body;
+  const lane = laneOf(root);
+  if (lane === 0) return program.body;
+  if (lane !== null) {
+    const blocks = program.parallel[lane - 1];
+    if (!blocks) throw new Error(`Unknown lane ${root}`);
+    return blocks;
+  }
   const def = program.myBlocks.find((m) => m.id === root);
   if (!def) throw new Error(`Unknown My Block ${root}`);
   return def.body;
 }
 
 function withRoot(program: Program, root: string, blocks: Block[]): Program {
-  if (root === 'main') return { ...program, body: blocks };
+  const lane = laneOf(root);
+  if (lane === 0) return { ...program, body: blocks };
+  if (lane !== null) {
+    return { ...program, parallel: program.parallel.map((b, i) => (i === lane - 1 ? blocks : b)) };
+  }
   return {
     ...program,
     myBlocks: program.myBlocks.map((m) => (m.id === root ? { ...m, body: blocks } : m)),
   };
+}
+
+/**
+ * Adds an empty parallel beam. With `afterLane` (0 = main beam) the new beam
+ * goes directly below that one; otherwise it goes at the bottom.
+ */
+export function addLane(program: Program, afterLane?: number): Program {
+  const at =
+    afterLane === undefined
+      ? program.parallel.length
+      : Math.min(afterLane, program.parallel.length);
+  return {
+    ...program,
+    parallel: [...program.parallel.slice(0, at), [], ...program.parallel.slice(at)],
+  };
+}
+
+/** Removes parallel lane `n` (1-based) and any wires to its blocks. */
+export function removeLane(program: Program, n: number): Program {
+  if (n < 1 || n > program.parallel.length) return program;
+  return pruneWires({ ...program, parallel: program.parallel.filter((_, i) => i !== n - 1) });
+}
+
+/**
+ * Drops wires whose blocks or plugs no longer exist (after a delete, or after a
+ * setting change that removed a plug).
+ */
+export function pruneWires(program: Program): Program {
+  if (program.wires.length === 0) return program;
+  const blocks = new Map<string, Block>();
+  for (const r of roots(program)) walk(r.blocks, (b) => blocks.set(b.id, b));
+  const valid = (end: { block: string; plug: string }) => {
+    const block = blocks.get(end.block);
+    return block !== undefined && findPlug(block, end.plug) !== undefined;
+  };
+  const wires = program.wires.filter((w) => valid(w.from) && valid(w.to));
+  return wires.length === program.wires.length ? program : { ...program, wires };
 }
 
 /** Calls `fn` for every block in a sequence, depth first. */
@@ -156,19 +222,23 @@ export function insertBlock(program: Program, ref: SeqRef, index: number, block:
   });
 }
 
-/** Removes a block (and its contents). Returns the program unchanged if not found. */
-export function removeBlock(program: Program, id: string): Program {
+function detachBlock(program: Program, id: string): Program {
   const found = findBlock(program, id);
   if (!found) return program;
   return updateSequence(program, found.ref, (blocks) => blocks.filter((b) => b.id !== id));
 }
 
-/** Replaces a block with `fn(block)`. */
+/** Removes a block (and its contents) and its wires. Unchanged if not found. */
+export function removeBlock(program: Program, id: string): Program {
+  return pruneWires(detachBlock(program, id));
+}
+
+/** Replaces a block with `fn(block)`, dropping wires to plugs that disappear. */
 export function updateBlock(program: Program, id: string, fn: (block: Block) => Block): Program {
   const found = findBlock(program, id);
   if (!found) return program;
-  return updateSequence(program, found.ref, (blocks) =>
-    blocks.map((b) => (b.id === id ? fn(b) : b)),
+  return pruneWires(
+    updateSequence(program, found.ref, (blocks) => blocks.map((b) => (b.id === id ? fn(b) : b))),
   );
 }
 
@@ -200,5 +270,5 @@ export function moveBlock(program: Program, id: string, ref: SeqRef, index: numb
     found.ref.parent === ref.parent &&
     found.ref.branch === ref.branch;
   const target = sameSequence && found.index < index ? index - 1 : index;
-  return insertBlock(removeBlock(program, id), ref, target, found.block);
+  return insertBlock(detachBlock(program, id), ref, target, found.block);
 }

@@ -69,6 +69,7 @@ export function Palette() {
               title={group.label}
               aria-label={`${group.label} blocks`}
               onClick={(e) => openFlyout(group.label, group.entries, e.currentTarget)}
+              onMouseEnter={(e) => openFlyout(group.label, group.entries, e.currentTarget)}
             >
               <img src={iconUrl(group.icon, 32)} alt="" />
               <span className="more">▸</span>
@@ -159,6 +160,7 @@ function PaletteButton({
       aria-label={label}
       draggable
       onClick={onClick ? (e) => onClick(e.currentTarget) : undefined}
+      onMouseEnter={onClick ? (e) => onClick(e.currentTarget) : undefined}
       onDragStart={(e) => {
         onDragStart();
         startDrag(e, { type: 'palette', key: entry.key });

@@ -1,4 +1,5 @@
-import { createBlock, defaultCondition } from './catalog.js';
+import { createBlock, createSensorBlock, defaultCondition } from './catalog.js';
+import { newId } from './ids.js';
 import type { Block, Program } from './model.js';
 import { emptyProgram } from './project.js';
 
@@ -104,6 +105,72 @@ export const EXAMPLES: Example[] = [
             make('move', { steering: 100, power: 50, duration: { unit: 'degrees', value: 180 } }),
           ],
         }),
+      ],
+    }),
+  },
+  {
+    key: 'distance',
+    name: 'Show distance',
+    description:
+      'Shows the ultrasonic distance on the screen using data wires. Ultrasonic sensor on port 4.',
+    create: () => {
+      const sensor = createSensorBlock('ultrasonic');
+      const toText = createBlock('numberToText');
+      const join = { ...createBlock('text'), a: 'Distance: ', c: ' cm' } as Block;
+      const display = { ...createBlock('display'), hub: true } as Block;
+      const wire = (from: Block, fromPlug: string, to: Block, toPlug: string) => ({
+        id: newId('w'),
+        from: { block: from.id, plug: fromPlug },
+        to: { block: to.id, plug: toPlug },
+      });
+      return {
+        ...emptyProgram('Distance'),
+        body: [
+          make('loop', {
+            control: { type: 'forever' },
+            body: [
+              sensor,
+              toText,
+              join,
+              display,
+              make('wait', { control: { type: 'time', seconds: 0.2 } }),
+            ],
+          }),
+        ],
+        wires: [
+          wire(sensor, 'value', toText, 'number'),
+          wire(toText, 'text', join, 'b'),
+          wire(join, 'result', display, 'text'),
+        ],
+      };
+    },
+  },
+  {
+    key: 'parallel',
+    name: 'Drive and sing',
+    description: 'Two beams at once: the robot drives a square while a second beam plays a tune.',
+    create: () => ({
+      ...emptyProgram('DriveSing'),
+      body: [
+        make('loop', {
+          control: { type: 'count', count: 4 },
+          body: [
+            make('move', { duration: { unit: 'rotations', value: 2 } }),
+            make('move', { steering: 100, power: 50, duration: { unit: 'degrees', value: 230 } }),
+          ],
+        }),
+      ],
+      parallel: [
+        [
+          make('loop', {
+            control: { type: 'count', count: 4 },
+            body: [
+              make('sound', { frequency: 523, seconds: 0.3 }),
+              make('sound', { frequency: 659, seconds: 0.3 }),
+              make('sound', { frequency: 784, seconds: 0.6 }),
+            ],
+          }),
+        ],
       ],
     }),
   },

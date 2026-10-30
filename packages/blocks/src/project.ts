@@ -17,7 +17,14 @@ export interface ProjectFile {
 
 /** Creates an empty program. */
 export function emptyProgram(name = 'Untitled-1'): Program {
-  return { name, variables: [{ name: 'Number 1', type: 'number' }], myBlocks: [], body: [] };
+  return {
+    name,
+    variables: [{ name: 'Number 1', type: 'number' }],
+    myBlocks: [],
+    body: [],
+    parallel: [],
+    wires: [],
+  };
 }
 
 /** Serialises a program to the project file format. */
@@ -59,7 +66,16 @@ export function parseProject(text: string): Program {
   ) {
     throw new ProjectFormatError('The project file is damaged: the program is missing.');
   }
-  return program as unknown as Program;
+  return normalizeProgram(program as unknown as Program);
+}
+
+/** Fills in fields added after a project was saved (parallel beams, wires). */
+export function normalizeProgram(program: Program): Program {
+  return {
+    ...program,
+    parallel: Array.isArray(program.parallel) ? program.parallel : [],
+    wires: Array.isArray(program.wires) ? program.wires : [],
+  };
 }
 
 function isRecord(value: unknown): value is Record<string, unknown> {

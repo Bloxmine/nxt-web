@@ -1,4 +1,4 @@
-import { findBlock, labelOf, PALETTE, type Block } from '@nxt/blocks';
+import { findBlock, labelOf, PALETTE, tabOf, type Block } from '@nxt/blocks';
 import { useEditor } from '../editor/EditorContext';
 import { iconUrl } from '../lib/icons';
 
@@ -62,7 +62,7 @@ export function HelpPanel() {
                   type="button"
                   onClick={() => {
                     const where = findBlock(state.program, issue.blockId);
-                    if (where) dispatch({ type: 'openTab', tab: where.ref.root });
+                    if (where) dispatch({ type: 'openTab', tab: tabOf(where.ref.root) });
                     dispatch({ type: 'select', id: issue.blockId });
                   }}
                 >

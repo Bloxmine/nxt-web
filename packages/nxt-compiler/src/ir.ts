@@ -17,7 +17,7 @@ export type SensorKind =
   'touch' | 'lightActive' | 'lightAmbient' | 'soundDb' | 'soundDba' | 'ultrasonic';
 
 /** Value types. */
-export type ValueType = 'number' | 'boolean';
+export type ValueType = 'number' | 'boolean' | 'text';
 
 /** Binary operators. Comparisons and logic return booleans. */
 export type BinaryOp =
@@ -27,6 +27,7 @@ export type BinaryOp =
 export type Expr =
   | { kind: 'number'; value: number }
   | { kind: 'boolean'; value: boolean }
+  | { kind: 'text'; value: string }
   | { kind: 'var'; name: string }
   | { kind: 'binary'; op: BinaryOp; left: Expr; right: Expr }
   | { kind: 'not'; operand: Expr }
@@ -38,7 +39,13 @@ export type Expr =
   /** Milliseconds since the program started. */
   | { kind: 'tick' }
   /** True while a brick button is pressed. */
-  | { kind: 'button'; button: 'left' | 'right' | 'enter' };
+  | { kind: 'button'; button: 'left' | 'right' | 'enter' }
+  /** `then` when the condition is true, otherwise `else`. */
+  | { kind: 'choose'; condition: Expr; then: Expr; else: Expr }
+  /** A number formatted as text. */
+  | { kind: 'numberToText'; value: Expr }
+  /** Text pieces joined together. */
+  | { kind: 'concat'; parts: Expr[] };
 
 /** Fields every statement may carry. */
 export interface StmtBase {
@@ -67,11 +74,11 @@ export type Stmt = StmtBase &
       }
     | { kind: 'motorStop'; ports: OutputPort[]; mode: 'brake' | 'coast' }
     | { kind: 'resetMotor'; port: OutputPort }
-    | { kind: 'tone'; frequency: Expr; durationMs: Expr; volume: number; wait: boolean }
-    | { kind: 'soundFile'; file: string; loop: boolean; volume: number; wait: boolean }
+    | { kind: 'tone'; frequency: Expr; durationMs: Expr; volume: Expr; wait: boolean }
+    | { kind: 'soundFile'; file: string; loop: boolean; volume: Expr; wait: boolean }
     | { kind: 'stopSound' }
     | { kind: 'clearScreen' }
-    | { kind: 'drawText'; x: Expr; line: Expr; text: string }
+    | { kind: 'drawText'; x: Expr; line: Expr; text: Expr }
     | { kind: 'drawNumber'; x: Expr; line: Expr; value: Expr }
     | { kind: 'wait'; ms: Expr }
     | { kind: 'waitUntil'; condition: Expr }
@@ -103,5 +110,8 @@ export interface IrProgram {
   /** Sensor configuration applied before `main` runs. */
   sensors: Partial<Record<InputPort, SensorKind>>;
   subroutines: Subroutine[];
+  /** The main task. */
   main: Stmt[];
+  /** Tasks started alongside `main` (parallel sequence beams). */
+  parallel: Stmt[][];
 }

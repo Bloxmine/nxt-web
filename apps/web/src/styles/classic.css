@@ -1466,3 +1466,394 @@ input[type='range'] {
     display: none;
   }
 }
+
+/* ======================================================================
+ * Beam alignment, data hubs, wires and parallel beams
+ * ==================================================================== */
+
+:root {
+  --advanced-top: #c9b6f2;
+  --advanced-bottom: #7b5cc9;
+  --advanced-border: #5e43a8;
+  --wire-number: #e3b800;
+  --wire-logic: #2f9a2a;
+  --wire-text: #e8711a;
+}
+
+.cat-advanced .block-face {
+  background: linear-gradient(var(--advanced-top), var(--advanced-bottom));
+}
+
+.palette-btn.cat-advanced {
+  border-color: var(--advanced-border);
+}
+
+.canvas-content {
+  position: relative;
+}
+
+/* Items align on a shared beam line using computed top margins. */
+.sequence,
+.loop,
+.switch-branch {
+  align-items: flex-start;
+}
+
+.slot {
+  align-self: flex-start;
+  height: 48px;
+}
+
+.lanes {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+  z-index: 1;
+}
+
+.lane {
+  display: flex;
+  align-items: flex-start;
+}
+
+.lane-start {
+  position: relative;
+  display: flex;
+  align-items: center;
+  width: 26px;
+  flex-shrink: 0;
+}
+
+.node {
+  display: grid;
+  place-items: center;
+  width: 22px;
+  height: 22px;
+  border-radius: 50%;
+  border: 1px solid #8f9295;
+  background: radial-gradient(circle at 40% 35%, #fff, #d7d9db);
+  font-weight: bold;
+  color: #666;
+  position: relative;
+  z-index: 2;
+}
+
+.node.main {
+  border-radius: 5px;
+  background: linear-gradient(#fdfdfd, #d4d6d8);
+}
+
+.node.main::after {
+  content: '';
+  width: 10px;
+  height: 10px;
+  border: 2px solid #e17f12;
+  border-radius: 2px;
+  background: #ffd08a;
+}
+
+.lane-remove {
+  position: absolute;
+  left: -14px;
+  top: 3px;
+  width: 14px;
+  height: 14px;
+  padding: 0;
+  border: none;
+  background: none;
+  color: #a33;
+  font-weight: bold;
+  line-height: 1;
+  cursor: pointer;
+}
+
+.lane-add {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  align-self: flex-start;
+  padding: 0;
+  border: none;
+  background: none;
+  color: #777;
+  cursor: pointer;
+  opacity: 0.75;
+}
+
+.lane-add:hover {
+  opacity: 1;
+  color: #333;
+}
+
+.lane-add .node {
+  width: 18px;
+  height: 18px;
+  margin-left: 2px;
+}
+
+/* Data hub: folds out under a block. */
+.block-wrap {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+
+.block-bottom {
+  position: relative;
+}
+
+.block-bottom .summary {
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.hub-tab {
+  position: absolute;
+  left: 3px;
+  bottom: 2px;
+  width: 12px;
+  height: 11px;
+  padding: 0;
+  border: 1px solid #8d9093;
+  border-radius: 2px 2px 4px 4px;
+  background: linear-gradient(#f4f4f4, #bfc2c4);
+  cursor: pointer;
+}
+
+.hub-tab::after {
+  content: '';
+  position: absolute;
+  left: 2px;
+  top: 3px;
+  border: 3px solid transparent;
+  border-top: 4px solid #555;
+}
+
+.hub-tab.open::after {
+  top: -1px;
+  border-top-color: transparent;
+  border-bottom: 4px solid #555;
+}
+
+.hub {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  width: 70px;
+  margin-top: -1px;
+  padding: 3px 0 4px;
+  border: 1px solid #898c8f;
+  border-top: none;
+  border-radius: 0 0 6px 6px;
+  background: linear-gradient(90deg, #c9cccd, #e9eaeb 50%, #c4c7c8);
+  box-shadow: 1px 2px 3px rgba(0, 0, 0, 0.25);
+}
+
+.hub.cap-hub {
+  width: auto;
+  margin-top: 4px;
+  padding: 2px;
+  border: 1px solid #b5b8ba;
+  border-radius: 4px;
+  box-shadow: none;
+}
+
+.hub-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 2px;
+  height: 16px;
+  padding: 0 2px;
+}
+
+.hub-label {
+  flex: 1;
+  overflow: hidden;
+  font-size: 8px;
+  text-align: center;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+  color: #333;
+}
+
+.cap-hub .hub-label {
+  display: none;
+}
+
+.socket,
+.socket-gap {
+  width: 11px;
+  height: 11px;
+  flex-shrink: 0;
+}
+
+.socket {
+  position: relative;
+  border: 1px solid #6f7275;
+  border-radius: 2px;
+  background: linear-gradient(#fff, #d6d8d9);
+  cursor: crosshair;
+}
+
+.socket::after {
+  content: '';
+  position: absolute;
+  inset: 2px;
+  border-radius: 1px;
+  background: #b9bcbe;
+}
+
+.socket.type-number::after {
+  background: #d9c35c;
+}
+.socket.type-logic::after {
+  background: #7dbd6f;
+}
+.socket.type-text::after {
+  background: #e9a06b;
+}
+
+.socket.connected::after {
+  inset: 1px;
+}
+
+.socket.type-number.connected::after {
+  background: var(--wire-number);
+}
+.socket.type-logic.connected::after {
+  background: var(--wire-logic);
+}
+.socket.type-text.connected::after {
+  background: var(--wire-text);
+}
+
+.socket:hover {
+  outline: 2px solid var(--selection);
+}
+
+.canvas-content.wiring .socket:hover {
+  outline: 2px solid #ff9a1a;
+}
+
+/* Wires */
+.wire-layer {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  overflow: visible;
+  pointer-events: none;
+  z-index: 5;
+}
+
+.wire {
+  fill: none;
+  stroke-width: 2.5;
+  stroke-linejoin: round;
+  filter: drop-shadow(0 1px 0 rgba(0, 0, 0, 0.25));
+}
+
+.wire.selected {
+  stroke-width: 4;
+  stroke-dasharray: 6 3;
+}
+
+.wire.pending {
+  stroke-dasharray: 4 3;
+}
+
+.wire-hit {
+  fill: none;
+  stroke: transparent;
+  stroke-width: 10;
+  pointer-events: stroke;
+  cursor: pointer;
+}
+
+.lane-rail {
+  stroke: #b5b8ba;
+  stroke-width: 8;
+  stroke-linecap: round;
+}
+
+/* Loop end cap with plugs */
+.loop-cap.end {
+  justify-content: flex-start;
+}
+
+/* Switch condition bar */
+.switch-bar {
+  justify-content: flex-start;
+}
+
+.switch-branch {
+  min-height: 0;
+  padding: 4px 0;
+}
+
+.branch-mark {
+  align-self: flex-start;
+  height: 16px;
+}
+
+.canvas-toast {
+  position: sticky;
+  left: 12px;
+  bottom: 12px;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  margin: 0 0 12px 12px;
+  padding: 6px 10px;
+  border: 1px solid #d8c26a;
+  border-radius: 4px;
+  background: #fff9d9;
+  box-shadow: 2px 2px 4px rgba(0, 0, 0, 0.25);
+  z-index: 20;
+}
+
+.canvas-toast img {
+  width: 16px;
+  height: 16px;
+}
+
+.node[data-lane-node] {
+  cursor: ns-resize;
+}
+
+.beam-ghost {
+  position: absolute;
+  width: 8px;
+  border-radius: 4px;
+  background: rgba(150, 153, 156, 0.6);
+  z-index: 6;
+  pointer-events: none;
+}
+
+.beam-ghost::after {
+  content: '';
+  position: absolute;
+  left: 0;
+  bottom: -8px;
+  width: 90px;
+  height: 16px;
+  border: 1px dashed #8f9295;
+  border-radius: 3px;
+  background: rgba(195, 197, 199, 0.5);
+}
+
+.beam-ghost.ok,
+.beam-ghost.ok::after {
+  background: rgba(47, 111, 209, 0.35);
+}
+
+/* Sockets sit above the wire layer so connected sockets stay grabbable. */
+.lanes {
+  z-index: auto;
+}
+
+.socket {
+  z-index: 6;
+}

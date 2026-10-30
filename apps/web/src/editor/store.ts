@@ -6,6 +6,8 @@ export interface EditorState {
   past: Program[];
   future: Program[];
   selected: string | null;
+  /** Selected wire id (Delete removes it). */
+  selectedWire: string | null;
   /** Open tabs: "main" or My Block ids. */
   tabs: string[];
   activeTab: string;
@@ -28,6 +30,7 @@ export type EditorAction =
   | { type: 'undo' }
   | { type: 'redo' }
   | { type: 'select'; id: string | null }
+  | { type: 'selectWire'; id: string | null }
   | { type: 'openTab'; tab: string }
   | { type: 'closeTab'; tab: string }
   | { type: 'zoom'; zoom: number }
@@ -41,6 +44,7 @@ export function initialState(program: Program = emptyProgram()): EditorState {
     past: [],
     future: [],
     selected: null,
+    selectedWire: null,
     tabs: ['main'],
     activeTab: 'main',
     zoom: 1,
@@ -108,7 +112,9 @@ export function editorReducer(state: EditorState, action: EditorAction): EditorS
       };
     }
     case 'select':
-      return { ...state, selected: action.id };
+      return { ...state, selected: action.id, selectedWire: null };
+    case 'selectWire':
+      return { ...state, selectedWire: action.id, selected: action.id ? null : state.selected };
     case 'openTab':
       return {
         ...state,

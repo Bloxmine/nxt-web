@@ -1,6 +1,7 @@
 import type { SensorKind } from '@nxt/compiler';
 import type { Block, Condition, Duration, Program, SensorPort } from './model.js';
-import { childSequences, walk } from './tree.js';
+import { childSequences, roots, walk } from './tree.js';
+import { wireInto, wireProblem, wireWarning } from './wires.js';
 
 /** A problem with one block, shown on the block before the user presses Run. */
 export interface Issue {
@@ -30,6 +31,7 @@ export function conditionOf(block: Block): Condition | null {
   if (block.kind === 'wait' && block.control.type === 'sensor') return block.control.condition;
   if (block.kind === 'loop' && block.control.type === 'sensor') return block.control.condition;
   if (block.kind === 'switch') return block.condition;
+  if (block.kind === 'sensor') return block.condition;
   return null;
 }
 
@@ -71,6 +73,12 @@ export function validateProgram(program: Program): Issue[] {
     }
     if ((c.source === 'light' || c.source === 'sound') && (c.value < 0 || c.value > 100)) {
       add(block.id, 'Level must be between 0 and 100.');
+    }
+    if (c.source === 'logic') {
+      if (block.kind === 'wait') add(block.id, 'Wait blocks cannot use a wired value.');
+      else if (!wireInto(program, block.id, 'condition')) {
+        add(block.id, 'Wire a yes/no value into this block’s plug.');
+      }
     }
     if (block.kind !== 'wait' && c.source === 'touch' && c.action === 'bumped') {
       add(block.id, '"Bumped" is treated as "pressed" here.', 'warning');
@@ -149,6 +157,17 @@ export function validateProgram(program: Program): Issue[] {
       case 'variable':
         if (!variables.has(block.name)) add(block.id, `Variable "${block.name}" does not exist.`);
         break;
+      case 'math':
+        if (block.op === '/' && block.b === 0 && !wireInto(program, block.id, 'b')) {
+          add(block.id, 'Dividing by zero.', 'warning');
+        }
+        break;
+      case 'random':
+        if (block.min > block.max) add(block.id, 'Minimum is larger than maximum.');
+        break;
+      case 'range':
+        if (block.low > block.high) add(block.id, 'Low is larger than high.', 'warning');
+        break;
       case 'myBlock': {
         const def = program.myBlocks.find((m) => m.id === block.ref);
         if (!def) add(block.id, 'This My Block no longer exists.');
@@ -166,13 +185,17 @@ export function validateProgram(program: Program): Issue[] {
     if (d.unit !== 'unlimited' && d.value <= 0) add(id, 'Duration must be more than 0.');
   };
 
-  walk(program.body, checkBlock);
-  checkSequence(program.body);
-  for (const def of program.myBlocks) {
-    walk(def.body, checkBlock);
-    checkSequence(def.body);
+  for (const r of roots(program)) {
+    walk(r.blocks, checkBlock);
+    checkSequence(r.blocks);
   }
   checkRecursion(program, add);
+  for (const wire of program.wires) {
+    const problem = wireProblem(program, wire.from, wire.to);
+    if (problem) add(wire.to.block, problem);
+    const warning = wireWarning(program, wire);
+    if (warning) add(wire.to.block, warning, 'warning');
+  }
   return issues;
 }
 

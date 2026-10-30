@@ -13,6 +13,7 @@ export function portsLabel(block: Block): string {
     case 'loop':
       return block.control.type === 'sensor' ? conditionPort(block.control.condition) : '';
     case 'switch':
+    case 'sensor':
       return conditionPort(block.condition);
     default:
       return '';
@@ -54,6 +55,8 @@ export function conditionText(c: Condition): string {
       return `${c.button} ${c.action}`;
     case 'variable':
       return `${c.name} ${c.compare} ${c.value}`;
+    case 'logic':
+      return 'wired';
   }
 }
 
@@ -86,9 +89,27 @@ export function blockSummary(block: Block): string {
     case 'resetTimer':
       return 'reset';
     case 'variable':
+      if (block.action === 'read') return block.name;
       return block.action === 'set' ? `= ${block.value}` : `+= ${block.value}`;
     case 'myBlock':
       return '';
+    case 'sensor':
+      return 'port' in block.condition
+        ? `port ${block.condition.port}`
+        : conditionText(block.condition);
+    case 'math':
+    case 'compare':
+      return `A ${block.op} B`;
+    case 'logic':
+      return block.op;
+    case 'range':
+      return `${block.low}–${block.high}`;
+    case 'random':
+      return `${block.min}–${block.max}`;
+    case 'numberToText':
+      return '# → T';
+    case 'text':
+      return 'A+B+C';
     default:
       return '';
   }

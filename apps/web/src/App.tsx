@@ -5,7 +5,10 @@ import {
   findBlock,
   lowerProgram,
   newId,
+  normalizeProgram,
+  disconnect,
   removeBlock,
+  tabOf,
   updateSequence,
   type Block,
   type Program,
@@ -79,7 +82,7 @@ function Studio() {
     const example = EXAMPLES.find((e) => e.key === exampleKey);
     void loadValue<unknown>(AUTOSAVE_KEY).then((saved) => {
       if (example) dispatch({ type: 'load', program: example.create() });
-      else if (isProgram(saved)) dispatch({ type: 'load', program: saved });
+      else if (isProgram(saved)) dispatch({ type: 'load', program: normalizeProgram(saved) });
       setReady(true);
     });
   }, []);
@@ -136,6 +139,12 @@ function Studio() {
         dispatch({ type: 'edit', update: (p) => ({ ...p, name: name.trim().slice(0, 15) }) });
     },
     deleteSelected: () => {
+      const wire = state.selectedWire;
+      if (wire) {
+        dispatch({ type: 'edit', update: (p) => disconnect(p, wire) });
+        dispatch({ type: 'selectWire', id: null });
+        return;
+      }
       const id = state.selected;
       if (id) dispatch({ type: 'edit', update: (p) => removeBlock(p, id), select: null });
     },
@@ -173,7 +182,7 @@ function Studio() {
       const errors = issues.filter((i) => i.severity === 'error');
       if (errors.length > 0) {
         const first = findBlock(state.program, errors[0]!.blockId);
-        if (first) dispatch({ type: 'openTab', tab: first.ref.root });
+        if (first) dispatch({ type: 'openTab', tab: tabOf(first.ref.root) });
         dispatch({ type: 'select', id: errors[0]!.blockId });
         message(
           'Cannot download',
@@ -299,7 +308,7 @@ function Studio() {
           label: 'Delete block',
           icon: 'delete',
           shortcut: 'Del',
-          disabled: !state.selected,
+          disabled: !state.selected && !state.selectedWire,
           onClick: actions.deleteSelected,
         },
         {
@@ -415,7 +424,7 @@ function Studio() {
                   key: 'delete',
                   label: 'Delete block (Del)',
                   icon: 'delete',
-                  disabled: !state.selected,
+                  disabled: !state.selected && !state.selectedWire,
                   onClick: actions.deleteSelected,
                 },
               ],

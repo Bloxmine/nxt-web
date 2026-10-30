@@ -1,10 +1,10 @@
 /**
  * Program model for the classic sequence-beam editor.
  *
- * A program is a sequence of blocks on a beam. Loops and switches contain
- * nested sequences. Sensors are not standalone blocks yet (that needs data
- * wires); instead Wait, Loop and Switch blocks carry a sensor condition, the
- * way the classic editor configures them.
+ * A program is a sequence of blocks on a beam, plus optional parallel beams
+ * that run at the same time. Loops and switches contain nested sequences.
+ * Blocks have data plugs on a fold-out hub; wires carry values from an output
+ * plug to an input plug, overriding the block's configured setting.
  */
 
 export type MotorPort = 'A' | 'B' | 'C';
@@ -30,12 +30,16 @@ export type Condition =
     }
   | { source: 'timer'; compare: Compare; seconds: number }
   | { source: 'button'; button: 'left' | 'right' | 'enter'; action: 'pressed' | 'released' }
-  | { source: 'variable'; name: string; compare: Compare | '='; value: number };
+  | { source: 'variable'; name: string; compare: Compare | '='; value: number }
+  /** A logic value wired into the block's "condition" plug (Loop and Switch only). */
+  | { source: 'logic' };
 
 export type ConditionSource = Condition['source'];
 
 interface Base {
   id: string;
+  /** Whether the data hub is folded out. */
+  hub?: boolean;
 }
 
 export interface MoveBlock extends Base {
@@ -103,6 +107,8 @@ export interface LoopBlock extends Base {
     | { type: 'count'; count: number }
     | { type: 'time'; seconds: number }
     | { type: 'sensor'; condition: Condition };
+  /** Show the loop counter output plug. */
+  showCounter?: boolean;
   body: Block[];
 }
 
@@ -129,8 +135,62 @@ export interface ResetTimerBlock extends Base {
 export interface VariableBlock extends Base {
   kind: 'variable';
   name: string;
-  action: 'set' | 'change';
+  action: 'read' | 'set' | 'change';
   value: number;
+}
+
+/** Reads a sensor and outputs its value and a yes/no comparison. */
+export interface SensorBlock extends Base {
+  kind: 'sensor';
+  condition: Exclude<Condition, { source: 'variable' } | { source: 'logic' }>;
+}
+
+export interface MathBlock extends Base {
+  kind: 'math';
+  op: '+' | '-' | '*' | '/';
+  a: number;
+  b: number;
+}
+
+export interface CompareBlock extends Base {
+  kind: 'compare';
+  op: '<' | '>' | '=';
+  a: number;
+  b: number;
+}
+
+export interface LogicBlock extends Base {
+  kind: 'logic';
+  op: 'and' | 'or' | 'xor' | 'not';
+  a: boolean;
+  b: boolean;
+}
+
+export interface RangeBlock extends Base {
+  kind: 'range';
+  /** True: yes when inside the range; false: yes when outside. */
+  inside: boolean;
+  low: number;
+  high: number;
+  value: number;
+}
+
+export interface RandomBlock extends Base {
+  kind: 'random';
+  min: number;
+  max: number;
+}
+
+export interface NumberToTextBlock extends Base {
+  kind: 'numberToText';
+  value: number;
+}
+
+export interface TextBlock extends Base {
+  kind: 'text';
+  a: string;
+  b: string;
+  c: string;
 }
 
 export interface MyBlockCall extends Base {
@@ -151,7 +211,15 @@ export type Block =
   | ResetRotationBlock
   | ResetTimerBlock
   | VariableBlock
-  | MyBlockCall;
+  | MyBlockCall
+  | SensorBlock
+  | MathBlock
+  | CompareBlock
+  | LogicBlock
+  | RangeBlock
+  | RandomBlock
+  | NumberToTextBlock
+  | TextBlock;
 
 export type BlockKind = Block['kind'];
 
@@ -167,9 +235,29 @@ export interface VariableDefinition {
   type: 'number';
 }
 
+/** Value types carried by plugs and wires. */
+export type DataType = 'number' | 'logic' | 'text';
+
+/** One end of a wire: a plug on a block. */
+export interface PlugRef {
+  block: string;
+  plug: string;
+}
+
+/** A data wire from an output plug to an input plug. */
+export interface Wire {
+  id: string;
+  from: PlugRef;
+  to: PlugRef;
+}
+
 export interface Program {
   name: string;
   variables: VariableDefinition[];
   myBlocks: MyBlockDefinition[];
+  /** The main sequence beam. */
   body: Block[];
+  /** Extra beams that run at the same time as the main one. */
+  parallel: Block[][];
+  wires: Wire[];
 }

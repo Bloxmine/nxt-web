@@ -14,6 +14,7 @@ import {
 } from '@nxt/blocks';
 import { useEditor } from '../editor/EditorContext';
 import { iconUrl } from '../lib/icons';
+import { DataFields } from './DataFields';
 import { DirectionButtons, Field, NumberInput, Radios, Select, Slider } from './fields';
 
 const SENSOR_PORTS = [
@@ -459,6 +460,7 @@ function BlockFields({ block, update, program, onEditVariables }: FieldsProps) {
                 ['count', 'Count'],
                 ['time', 'Time'],
                 ...CONDITION_OPTIONS,
+                ['logic', 'Logic (wired value)'],
               ]}
               onChange={(v) =>
                 update({
@@ -505,6 +507,16 @@ function BlockFields({ block, update, program, onEditVariables }: FieldsProps) {
               onChange={(condition) => update({ control: { type: 'sensor', condition } })}
             />
           )}
+          <Field label="Counter">
+            <label className="check">
+              <input
+                type="checkbox"
+                checked={block.showCounter ?? false}
+                onChange={(e) => update({ showCounter: e.target.checked })}
+              />
+              Show counter plug
+            </label>
+          </Field>
           {control.type !== 'forever' && (
             <p style={{ margin: 0, color: '#555' }}>Checked after each pass.</p>
           )}
@@ -518,7 +530,7 @@ function BlockFields({ block, update, program, onEditVariables }: FieldsProps) {
             <Select
               label="Switch on"
               value={block.condition.source}
-              options={CONDITION_OPTIONS}
+              options={[...CONDITION_OPTIONS, ['logic', 'Logic (wired value)']]}
               onChange={(v) => update({ condition: defaultCondition(v) })}
             />
           </Field>
@@ -561,6 +573,7 @@ function BlockFields({ block, update, program, onEditVariables }: FieldsProps) {
               name={`var-${block.id}`}
               value={block.action}
               options={[
+                ['read', 'Read'],
                 ['set', 'Set to'],
                 ['change', 'Change by'],
               ]}
@@ -583,8 +596,41 @@ function BlockFields({ block, update, program, onEditVariables }: FieldsProps) {
       return <p>Ends the program when reached.</p>;
     case 'resetTimer':
       return <p>Resets the timer to zero.</p>;
+    case 'sensor':
+      return (
+        <>
+          <Field label="Sensor" icon="hand_point">
+            <Select
+              label="Sensor"
+              value={block.condition.source}
+              options={SENSOR_BLOCK_OPTIONS}
+              onChange={(source) =>
+                update({ condition: defaultCondition(source) } as Partial<Block>)
+              }
+            />
+          </Field>
+          <ConditionFields
+            id={block.id}
+            condition={block.condition}
+            variables={variableOptions}
+            onChange={(condition) => update({ condition } as Partial<Block>)}
+          />
+        </>
+      );
+    default:
+      return <DataFields block={block} update={update} />;
   }
 }
+
+const SENSOR_BLOCK_OPTIONS = [
+  ['touch', 'Touch sensor'],
+  ['light', 'Light sensor'],
+  ['sound', 'Sound sensor'],
+  ['ultrasonic', 'Ultrasonic sensor'],
+  ['rotation', 'Rotation sensor'],
+  ['timer', 'Timer'],
+  ['button', 'NXT buttons'],
+] as const;
 
 const CONDITION_OPTIONS = [
   ['touch', 'Touch sensor'],
@@ -642,6 +688,8 @@ function ConditionFields({
     ) : null;
 
   switch (c.source) {
+    case 'logic':
+      return <p style={{ margin: 0 }}>Wire a yes/no value into the block’s plug.</p>;
     case 'touch':
       return (
         <>

@@ -1,0 +1,125 @@
+import type { DataType, Program } from '@nxt/blocks';
+import { useLayoutEffect, useRef, type RefObject } from 'react';
+import type { WireEnd } from '../editor/wiring';
+
+const COLORS: Record<DataType, string> = { number: '#e3b800', logic: '#2f9a2a', text: '#e8711a' };
+
+interface Props {
+  program: Program;
+  content: RefObject<HTMLDivElement | null>;
+  zoom: number;
+  selectedWire: string | null;
+  pending: (WireEnd & { x: number; y: number }) | null;
+  onSelectWire(id: string): void;
+  /** Wire types by id, so each wire gets its data colour. */
+  types: Map<string, DataType>;
+}
+
+/** Orthogonal route from an output (left) to an input (right), like the classic editor. */
+function route(x1: number, y1: number, x2: number, y2: number): string {
+  if (x2 > x1 + 16) {
+    const mid = Math.round(x1 + (x2 - x1) / 2);
+    return `M${x1},${y1} H${mid} V${y2} H${x2}`;
+  }
+  const below = Math.max(y1, y2) + 26;
+  return `M${x1},${y1} H${x1 + 8} V${below} H${x2 - 8} V${y2} H${x2}`;
+}
+
+/**
+ * Draws data wires and the parallel-beam rail over the canvas. Paths are
+ * measured from the DOM after each render, so they follow blocks wherever the
+ * layout puts them.
+ */
+export function WireLayer({
+  program,
+  content,
+  zoom,
+  selectedWire,
+  pending,
+  onSelectWire,
+  types,
+}: Props) {
+  const svg = useRef<SVGSVGElement>(null);
+
+  useLayoutEffect(() => {
+    // The svg sits directly inside the canvas content; use that rather than the
+    // parent's ref, which is attached after this child's layout effect on mount.
+    const layer = svg.current;
+    const root = (layer?.parentElement as HTMLDivElement | null | undefined) ?? content.current;
+    if (!root || !layer) return;
+    const origin = root.getBoundingClientRect();
+    const center = (selector: string) => {
+      const el = root.querySelector(selector);
+      if (!el) return null;
+      const r = el.getBoundingClientRect();
+      return {
+        x: (r.left + r.width / 2 - origin.left) / zoom,
+        y: (r.top + r.height / 2 - origin.top) / zoom,
+      };
+    };
+    const socket = (block: string, plug: string, side: string) =>
+      center(`[data-plug="${CSS.escape(`${block}:${plug}:${side}`)}"]`);
+
+    for (const path of layer.querySelectorAll<SVGPathElement>('path[data-wire]')) {
+      const wire = program.wires.find((w) => w.id === path.dataset['wire']);
+      const a = wire && socket(wire.from.block, wire.from.plug, 'out');
+      const b = wire && socket(wire.to.block, wire.to.plug, 'in');
+      path.setAttribute('d', a && b ? route(a.x, a.y, b.x, b.y) : '');
+    }
+
+    const pendingPath = layer.querySelector<SVGPathElement>('path[data-pending]');
+    if (pendingPath && pending) {
+      const a = socket(pending.block, pending.plug, pending.side);
+      if (a) {
+        pendingPath.setAttribute(
+          'd',
+          pending.side === 'out'
+            ? route(a.x, a.y, pending.x, pending.y)
+            : route(pending.x, pending.y, a.x, a.y),
+        );
+      }
+    }
+
+    const rail = layer.querySelector<SVGLineElement>('line[data-rail]');
+    const nodes = root.querySelectorAll('[data-lane-node]');
+    if (rail) {
+      const first = nodes[0]?.getBoundingClientRect();
+      const last = nodes[nodes.length - 1]?.getBoundingClientRect();
+      if (first && last && nodes.length > 1) {
+        const x = (first.left + first.width / 2 - origin.left) / zoom;
+        rail.setAttribute('x1', String(x));
+        rail.setAttribute('x2', String(x));
+        rail.setAttribute('y1', String((first.top + first.height / 2 - origin.top) / zoom));
+        rail.setAttribute('y2', String((last.top + last.height / 2 - origin.top) / zoom));
+      } else {
+        rail.setAttribute('y2', rail.getAttribute('y1') ?? '0');
+      }
+    }
+  });
+
+  return (
+    <svg ref={svg} className="wire-layer" aria-hidden="false">
+      <line data-rail="" className="lane-rail" x1="0" y1="0" x2="0" y2="0" />
+      {program.wires.map((wire) => (
+        <g key={wire.id}>
+          <path
+            data-wire={wire.id}
+            className="wire-hit"
+            onClick={(e) => {
+              e.stopPropagation();
+              onSelectWire(wire.id);
+            }}
+          >
+            <title>Data wire (click to select, Delete to remove)</title>
+          </path>
+          <path
+            data-wire={wire.id}
+            className={`wire ${selectedWire === wire.id ? 'selected' : ''}`}
+            stroke={COLORS[types.get(wire.id) ?? 'number']}
+          />
+        </g>
+      ))}
+      {pending && <path data-pending="" className="wire pending" stroke={COLORS[pending.type]} />}
+    </svg>
+  );
+}

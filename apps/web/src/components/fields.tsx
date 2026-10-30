@@ -8,7 +8,7 @@ export function Field({
   children,
 }: {
   label: string;
-  icon?: string;
+  icon?: string | undefined;
   children: ReactNode;
 }) {
   return (
