@@ -2792,6 +2792,12 @@ p.gallery-meta {
   inset: 0;
 }
 
+/* Tailwind's preflight makes every svg display: block, which beats the display="none"
+   attribute Blockly uses to hide things (such as a closed flyout's scrollbar). */
+svg[display='none'] {
+  display: none;
+}
+
 .blockly-loading {
   position: absolute;
   top: 40%;

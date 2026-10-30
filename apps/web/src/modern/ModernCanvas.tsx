@@ -50,6 +50,31 @@ export function ModernCanvas({ overlay }: { overlay: ReactNode }) {
       renderer: 'geras',
     });
     workspace.current = ws;
+    // Keep the zoom buttons and trashcan clear of the NXT controller in the corner: they
+    // stack up from the corner, past the rectangles of components placed before them.
+    const frame = host.current;
+    const controllerSpot: BlocklyNS.IPositionable = {
+      id: 'nxtController',
+      position: () => {},
+      getBoundingRectangle: () => {
+        const controller = frame.parentElement?.querySelector('.controller');
+        if (!controller) return null;
+        const c = controller.getBoundingClientRect();
+        const h = frame.getBoundingClientRect();
+        return new Blockly.utils.Rect(
+          c.top - h.top,
+          c.bottom - h.top,
+          c.left - h.left,
+          c.right - h.left,
+        );
+      },
+    };
+    ws.getComponentManager().addComponent({
+      component: controllerSpot,
+      weight: Blockly.ComponentManager.ComponentWeight.FLYOUT_WEIGHT,
+      capabilities: [Blockly.ComponentManager.Capability.POSITIONABLE],
+    });
+    ws.resize();
     let timer: ReturnType<typeof setTimeout> | undefined;
     ws.addChangeListener((e: BlocklyNS.Events.Abstract) => {
       if (e.type === Blockly.Events.SELECTED) {
