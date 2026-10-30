@@ -2644,18 +2644,26 @@ input[type='range'] {
 }
 
 p.gallery-meta {
-  flex: 0;
+  flex: none;
   display: flex;
   flex-wrap: wrap;
+  align-items: center;
   gap: 4px;
   font-size: 10px;
+  line-height: 14px;
   color: var(--text-muted);
+}
+
+.gallery-meta > span {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  white-space: nowrap;
 }
 
 .gallery-meta img {
   width: 12px;
   height: 12px;
-  vertical-align: -2px;
 }
 
 .gallery-meta .topic {
@@ -2676,6 +2684,7 @@ p.gallery-meta {
 
 [data-theme='dark'] .gallery-meta .topic {
   border-color: #50545a;
+  background: #2a2d31;
 }
 
 /* ---------- Tutorials ---------- */

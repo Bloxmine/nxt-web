@@ -258,13 +258,25 @@
 [data-theme='dark'] .dialog-footer {
   border-top-color: #18191b;
 }
-[data-theme='dark'] .dialog-tab {
+[data-theme='dark'] .dialog-tabs {
   border-bottom-color: #4f535a;
+}
+[data-theme='dark'] .dialog-tab {
+  border-color: #4f535a;
+  background: linear-gradient(#3a3d42, #2e3034);
+  color: var(--text-muted);
+}
+[data-theme='dark'] .dialog-tab:hover:not(.active) {
+  color: var(--text);
 }
 [data-theme='dark'] .dialog-tab.active,
 [data-theme='dark'] .panel {
   background: #24262a;
   border-color: #4f535a;
+  color: var(--text);
+}
+[data-theme='dark'] .dialog-tab.active {
+  border-top-color: #e68b2c;
 }
 [data-theme='dark'] .btn {
   background: linear-gradient(#4a4e54, #36393e 85%, #2c2f33);
