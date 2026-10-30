@@ -1,0 +1,24 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512">
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#fdb515"/>
+      <stop offset="1" stop-color="#e08a00"/>
+    </linearGradient>
+    <linearGradient id="body" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#f4f4f4"/>
+      <stop offset="1" stop-color="#c8c8c8"/>
+    </linearGradient>
+    <linearGradient id="lcd" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#c9d9a8"/>
+      <stop offset="1" stop-color="#9fb87a"/>
+    </linearGradient>
+  </defs>
+  <rect width="512" height="512" rx="96" fill="url(#bg)"/>
+  <rect x="112" y="56" width="288" height="400" rx="56" fill="url(#body)" stroke="#555" stroke-width="10"/>
+  <rect x="152" y="104" width="208" height="136" rx="12" fill="url(#lcd)" stroke="#555" stroke-width="8"/>
+  <rect x="176" y="150" width="96" height="14" fill="#2e3a1e"/>
+  <rect x="176" y="182" width="150" height="14" fill="#2e3a1e"/>
+  <rect x="220" y="290" width="72" height="72" rx="10" fill="#e8730c" stroke="#555" stroke-width="8"/>
+  <path d="M156 326 l34 -26 v52 z M356 326 l-34 -26 v52 z" fill="#888"/>
+  <rect x="226" y="390" width="60" height="30" rx="8" fill="#666"/>
+</svg>
