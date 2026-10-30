@@ -7,4 +7,5 @@ export * from './validate.js';
 export * from './lower.js';
 export * from './project.js';
 export * from './examples.js';
+export * from './edit.js';
 export { newId } from './ids.js';

@@ -196,3 +196,56 @@ describe('project files', () => {
     ).toThrow('newer version');
   });
 });
+
+describe('copy, paste and history labels', async () => {
+  const {
+    copyBlocks,
+    pasteBlocks,
+    removeBlocks,
+    describeChange,
+    EXAMPLES,
+    labelOf,
+    MAIN,
+    walkProgram,
+  } = await import('./index.js');
+  const program = EXAMPLES.find((e) => e.key === 'distance')!.create();
+  const loop = program.body[0] as Extract<Block, { kind: 'loop' }>;
+
+  it('pastes copies with new ids and keeps the wires between them', () => {
+    const clip = copyBlocks(program, [loop.id]);
+    expect(clip.wires).toHaveLength(3);
+    const { program: next, ids } = pasteBlocks(program, clip, MAIN, 1);
+    expect(next.body).toHaveLength(2);
+    expect(ids[0]).not.toBe(loop.id);
+    expect(next.wires).toHaveLength(6);
+    const all = new Set<string>();
+    walkProgram(next, (b) => {
+      expect(all.has(b.id)).toBe(false);
+      all.add(b.id);
+    });
+    for (const w of next.wires) expect(all.has(w.from.block) && all.has(w.to.block)).toBe(true);
+  });
+
+  it('copies only the wires inside the selection', () => {
+    const [sensor, toText] = loop.body;
+    expect(copyBlocks(program, [sensor!.id]).wires).toHaveLength(0);
+    expect(copyBlocks(program, [sensor!.id, toText!.id]).wires).toHaveLength(1);
+  });
+
+  it('removes several blocks and their wires', () => {
+    const [sensor, toText] = loop.body;
+    const next = removeBlocks(program, [sensor!.id, toText!.id]);
+    expect((next.body[0] as typeof loop).body).toHaveLength(3);
+    expect(next.wires).toHaveLength(1);
+  });
+
+  it('describes changes', () => {
+    const [sensor] = loop.body;
+    const removed = removeBlocks(program, [sensor!.id]);
+    expect(describeChange(program, removed, labelOf)).toMatch(/^Deleted /);
+    expect(describeChange(removed, program, labelOf)).toMatch(/^Added /);
+    expect(describeChange(program, { ...program, name: 'X' }, labelOf)).toBe(
+      'Renamed program to “X”',
+    );
+  });
+});

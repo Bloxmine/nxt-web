@@ -1,4 +1,4 @@
-import type { DataType, Program } from '@nxt/blocks';
+import { wireWarning, type DataType, type Program } from '@nxt/blocks';
 import { useLayoutEffect, useRef, type RefObject } from 'react';
 import type { WireEnd } from '../editor/wiring';
 import { useWireValues } from '../sim/SimulatorContext';
@@ -14,12 +14,23 @@ interface Props {
   onSelectWire(id: string): void;
   /** Wire types by id, so each wire gets its data colour. */
   types: Map<string, DataType>;
+  /**
+   * Which layer this is. Classic wires draw the visible wires behind the blocks
+   * ('visual') and an invisible layer on top to click them ('hit').
+   */
+  part?: 'all' | 'visual' | 'hit';
+  /** Classic look: tube-style wires, each in its own vertical lane. */
+  classic?: boolean;
 }
 
 /** Orthogonal route from an output (left) to an input (right), like the classic editor. */
-function route(x1: number, y1: number, x2: number, y2: number): string {
+function route(x1: number, y1: number, x2: number, y2: number, lane = 0): string {
   if (x2 > x1 + 16) {
-    const mid = Math.round(x1 + (x2 - x1) / 2);
+    // `lane` spreads wires sharing a stretch of beam into separate vertical channels.
+    const span = x2 - x1;
+    const mid = Math.round(
+      x1 + span / 2 + Math.max(-span / 2 + 6, Math.min(span / 2 - 6, lane * 6)),
+    );
     return `M${x1},${y1} H${mid} V${y2} H${x2}`;
   }
   const below = Math.max(y1, y2) + 26;
@@ -39,6 +50,8 @@ export function WireLayer({
   pending,
   onSelectWire,
   types,
+  part = 'all',
+  classic = false,
 }: Props) {
   const svg = useRef<SVGSVGElement>(null);
   // While simulating, each wire shows the value it carries next to its output end.
@@ -64,10 +77,12 @@ export function WireLayer({
       center(`[data-plug="${CSS.escape(`${block}:${plug}:${side}`)}"]`);
 
     for (const path of layer.querySelectorAll<SVGPathElement>('path[data-wire]')) {
-      const wire = program.wires.find((w) => w.id === path.dataset['wire']);
+      const index = program.wires.findIndex((w) => w.id === path.dataset['wire']);
+      const wire = program.wires[index];
       const a = wire && socket(wire.from.block, wire.from.plug, 'out');
       const b = wire && socket(wire.to.block, wire.to.plug, 'in');
-      path.setAttribute('d', a && b ? route(a.x, a.y, b.x, b.y) : '');
+      const lane = classic ? (index % 5) - 2 : 0;
+      path.setAttribute('d', a && b ? route(a.x, a.y, b.x, b.y, lane) : '');
       const label = layer.querySelector<SVGGElement>(
         `g[data-wire-label="${CSS.escape(path.dataset['wire'] ?? '')}"]`,
       );
@@ -105,28 +120,44 @@ export function WireLayer({
   });
 
   return (
-    <svg ref={svg} className="wire-layer" aria-hidden="false">
-      <line data-rail="" className="lane-rail" x1="0" y1="0" x2="0" y2="0" />
-      {program.wires.map((wire) => (
-        <g key={wire.id}>
-          <path
-            data-wire={wire.id}
-            className="wire-hit"
-            onClick={(e) => {
-              e.stopPropagation();
-              onSelectWire(wire.id);
-            }}
-          >
-            <title>Data wire (click to select, Delete to remove)</title>
-          </path>
-          <path
-            data-wire={wire.id}
-            className={`wire ${selectedWire === wire.id ? 'selected' : ''}`}
-            stroke={COLORS[types.get(wire.id) ?? 'number']}
-          />
-        </g>
-      ))}
+    <svg ref={svg} className={`wire-layer ${part}`} aria-hidden="false">
+      {part !== 'hit' && <line data-rail="" className="lane-rail" x1="0" y1="0" x2="0" y2="0" />}
+      {program.wires.map((wire) => {
+        const broken = wireWarning(program, wire) !== null;
+        const color = broken ? '#8a8a8a' : COLORS[types.get(wire.id) ?? 'number'];
+        return (
+          <g key={wire.id}>
+            {part !== 'visual' && (
+              <path
+                data-wire={wire.id}
+                className="wire-hit"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  onSelectWire(wire.id);
+                }}
+              >
+                <title>
+                  {broken
+                    ? `Broken wire: ${wireWarning(program, wire)}`
+                    : 'Data wire (click to select, Delete to remove)'}
+                </title>
+              </path>
+            )}
+            {part !== 'hit' && classic && (
+              <path data-wire={wire.id} className="wire-tube" stroke={color} />
+            )}
+            {part !== 'hit' && (
+              <path
+                data-wire={wire.id}
+                className={`wire ${classic ? 'classic' : ''} ${broken ? 'broken' : ''} ${selectedWire === wire.id ? 'selected' : ''}`}
+                stroke={classic ? '#ffffffaa' : color}
+              />
+            )}
+          </g>
+        );
+      })}
       {values &&
+        part !== 'visual' &&
         program.wires.map((wire) => {
           const text = values.get(wire.id) ?? '';
           return (
@@ -138,7 +169,9 @@ export function WireLayer({
             </g>
           );
         })}
-      {pending && <path data-pending="" className="wire pending" stroke={COLORS[pending.type]} />}
+      {pending && part !== 'visual' && (
+        <path data-pending="" className="wire pending" stroke={COLORS[pending.type]} />
+      )}
     </svg>
   );
 }

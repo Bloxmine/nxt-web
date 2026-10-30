@@ -24,6 +24,7 @@ export function emptyProgram(name = 'Untitled-1'): Program {
     body: [],
     parallel: [],
     wires: [],
+    comments: [],
   };
 }
 
@@ -75,6 +76,7 @@ export function normalizeProgram(program: Program): Program {
     ...program,
     parallel: Array.isArray(program.parallel) ? program.parallel : [],
     wires: Array.isArray(program.wires) ? program.wires : [],
+    comments: Array.isArray(program.comments) ? program.comments : [],
   };
 }
 

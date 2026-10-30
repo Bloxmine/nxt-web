@@ -363,6 +363,17 @@ export interface Wire {
   to: PlugRef;
 }
 
+/** A note placed on the canvas (the original's comment tool). */
+export interface CanvasComment {
+  id: string;
+  /** Tab it belongs to: "main" or a My Block id. */
+  tab: string;
+  /** Position in canvas pixels (unzoomed). */
+  x: number;
+  y: number;
+  text: string;
+}
+
 export interface Program {
   name: string;
   variables: VariableDefinition[];
@@ -372,4 +383,6 @@ export interface Program {
   /** Extra beams that run at the same time as the main one. */
   parallel: Block[][];
   wires: Wire[];
+  /** Notes on the canvas. Optional: older projects have none. */
+  comments?: CanvasComment[];
 }

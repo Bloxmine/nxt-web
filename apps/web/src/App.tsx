@@ -7,7 +7,6 @@ import {
   newId,
   normalizeProgram,
   disconnect,
-  removeBlock,
   tabOf,
   updateSequence,
   type Block,
@@ -35,8 +34,12 @@ import { Palette } from './components/Palette';
 import { SupportBanner } from './components/SupportBanner';
 import { Toolbar } from './components/Toolbar';
 import { VariablesDialog } from './components/VariablesDialog';
+import { addComment } from './components/CanvasExtras';
+import { HistoryDialog, InsertDialog, SearchDialog, WireDialog } from './components/EditorDialogs';
+import { saveVersion } from './lib/versions';
 import { EditorContext, useIssues } from './editor/EditorContext';
-import { editorReducer, initialState } from './editor/store';
+import { describeBlock, describeProgram, editCommands } from './editor/commands';
+import { editorReducer, initialState, selectedIds } from './editor/store';
 import { checkBrowserSupport } from './lib/browserSupport';
 import { openProjectFile, readProgramFile, saveProjectFile, type SavedFile } from './lib/files';
 import { iconUrl } from './lib/icons';
@@ -78,7 +81,16 @@ const EXAMPLE_MATS: Record<string, string> = {
 };
 
 type Modal =
-  'nxt' | 'variables' | 'about' | { title: string; icon: string; body: ReactNode } | null;
+  | 'nxt'
+  | 'variables'
+  | 'about'
+  | 'search'
+  | 'history'
+  | 'insert'
+  | 'wire'
+  | 'outline'
+  | { title: string; icon: string; body: ReactNode }
+  | null;
 
 export function App() {
   return (
@@ -108,6 +120,17 @@ function Studio() {
   // Simulator controls, filled in by <SimulatorHooks> inside the provider.
   const simActions = useRef<SimulatorControls | null>(null);
   const [initialMat, setInitialMat] = useState('empty');
+  // Polite announcements for screen readers (selection, clipboard).
+  const [announcement, setAnnouncement] = useState('');
+  const cmds = editCommands(state, dispatch, setAnnouncement);
+  const selectionKey = selectedIds(state).join(',');
+  useEffect(() => {
+    if (!state.selected) return;
+    const extra = state.extra.length ? ` (and ${state.extra.length} more selected)` : '';
+    setAnnouncement(describeBlock(state.program, state.selected) + extra);
+    // Only when the selection changes, not on every edit.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [selectionKey]);
   const connected = brick.state === 'connected';
 
   // Restore the last session, then autosave every change.
@@ -129,6 +152,20 @@ function Studio() {
     const id = setTimeout(() => void saveValue(AUTOSAVE_KEY, state.program), 400);
     return () => clearTimeout(id);
   }, [state.program, ready]);
+
+  // Keep a copy in the browser every five minutes while there are changes.
+  const programRef = useRef(state.program);
+  const dirtyRef = useRef(state.dirty);
+  useEffect(() => {
+    programRef.current = state.program;
+    dirtyRef.current = state.dirty;
+  }, [state.program, state.dirty]);
+  useEffect(() => {
+    const id = setInterval(() => {
+      if (dirtyRef.current) void saveVersion(programRef.current, 'Kept automatically');
+    }, 5 * 60_000);
+    return () => clearInterval(id);
+  }, []);
 
   useEffect(() => {
     document.title = `${state.program.name}${state.dirty ? '*' : ''} - NXT Web Studio`;
@@ -172,6 +209,7 @@ function Studio() {
     },
     open: async () => {
       if (!confirmDiscard()) return;
+      void saveVersion(state.program, 'Before opening another program');
       try {
         const result = await openProjectFile();
         if (!result) return;
@@ -183,6 +221,7 @@ function Studio() {
     },
     openFile: async (file: File) => {
       if (!confirmDiscard()) return;
+      void saveVersion(state.program, 'Before opening another program');
       try {
         const result = await readProgramFile(file);
         fileHandle.current = null;
@@ -195,6 +234,7 @@ function Studio() {
       try {
         fileHandle.current = await saveProjectFile(state.program, fileHandle.current, saveAs);
         dispatch({ type: 'saved' });
+        void saveVersion(state.program, 'Saved to a file');
       } catch (e) {
         message('Could not save', 'exclamation', e instanceof Error ? e.message : String(e));
       }
@@ -202,6 +242,7 @@ function Studio() {
     loadExample: (key: string) => {
       const example = EXAMPLES.find((e) => e.key === key);
       if (!example || !confirmDiscard()) return;
+      void saveVersion(state.program, 'Before opening an example');
       fileHandle.current = null;
       dispatch({ type: 'load', program: example.create() });
       const mat = EXAMPLE_MATS[key];
@@ -219,8 +260,7 @@ function Studio() {
         dispatch({ type: 'selectWire', id: null });
         return;
       }
-      const id = state.selected;
-      if (id) dispatch({ type: 'edit', update: (p) => removeBlock(p, id), select: null });
+      cmds.deleteSelection();
     },
     makeMyBlock: () => {
       const found = state.selected ? findBlock(state.program, state.selected) : null;
@@ -359,6 +399,7 @@ function Studio() {
       sim.setOpen(true);
       sim.run();
     },
+    cmds,
     toggleBreakpoint: () => {
       if (state.selected) simActions.current?.toggleBreakpoint(state.selected);
     },
@@ -391,6 +432,40 @@ function Studio() {
     } else if (e.key === 'Delete' || e.key === 'Backspace') {
       e.preventDefault();
       a.deleteSelected();
+    } else if (mod && e.key.toLowerCase() === 'f') {
+      e.preventDefault();
+      setModal('search');
+    } else if (!mod && !e.altKey && (e.key === 'Insert' || e.key.toLowerCase() === 'i')) {
+      e.preventDefault();
+      setModal('insert');
+    } else if (!mod && !e.altKey && e.key.toLowerCase() === 'w') {
+      e.preventDefault();
+      setModal('wire');
+    } else if (mod && e.key.toLowerCase() === 'c') {
+      e.preventDefault();
+      a.cmds.copy();
+    } else if (mod && e.key.toLowerCase() === 'x') {
+      e.preventDefault();
+      a.cmds.cut();
+    } else if (mod && e.key.toLowerCase() === 'v') {
+      e.preventDefault();
+      void a.cmds.paste();
+    } else if (mod && e.key.toLowerCase() === 'd') {
+      e.preventDefault();
+      a.cmds.duplicate();
+    } else if (mod && e.key.toLowerCase() === 'a') {
+      e.preventDefault();
+      a.cmds.selectAll();
+    } else if (e.key.startsWith('Arrow') && !mod) {
+      e.preventDefault();
+      const dir = e.key.slice(5).toLowerCase() as 'left' | 'right' | 'up' | 'down';
+      if (e.altKey && (dir === 'left' || dir === 'right')) a.cmds.shift(dir === 'left' ? -1 : 1);
+      else a.cmds.navigate(dir);
+      requestAnimationFrame(() =>
+        document
+          .querySelector<HTMLElement>('.block.selected, .loop.selected, .switch.selected')
+          ?.focus(),
+      );
     } else if (e.key === 'F9') {
       e.preventDefault();
       a.toggleBreakpoint();
@@ -475,6 +550,64 @@ function Studio() {
         },
         { separator: true },
         {
+          label: 'Cut',
+          icon: 'cut',
+          shortcut: 'Ctrl+X',
+          disabled: !state.selected,
+          onClick: cmds.cut,
+        },
+        {
+          label: 'Copy',
+          icon: 'page_copy',
+          shortcut: 'Ctrl+C',
+          disabled: !state.selected,
+          onClick: cmds.copy,
+        },
+        {
+          label: 'Paste',
+          icon: 'paste_plain',
+          shortcut: 'Ctrl+V',
+          onClick: () => void cmds.paste(),
+        },
+        {
+          label: 'Duplicate',
+          shortcut: 'Ctrl+D',
+          disabled: !state.selected,
+          onClick: cmds.duplicate,
+        },
+        { label: 'Select all', shortcut: 'Ctrl+A', onClick: cmds.selectAll },
+        {
+          label: 'Find…',
+          icon: 'magnifier_zoom_in',
+          shortcut: 'Ctrl+F',
+          onClick: () => setModal('search'),
+        },
+        { label: 'History…', icon: 'clock', onClick: () => setModal('history') },
+        { separator: true },
+        {
+          label: 'Insert block…',
+          icon: 'brick_add',
+          shortcut: 'I',
+          onClick: () => setModal('insert'),
+        },
+        {
+          label: 'Connect a data wire…',
+          icon: 'connect',
+          shortcut: 'W',
+          onClick: () => setModal('wire'),
+        },
+        {
+          label: 'Add comment',
+          icon: 'comment',
+          onClick: () => {
+            const scroller = document.querySelector('.canvas');
+            const x = ((scroller?.scrollLeft ?? 0) + 40) / state.zoom;
+            const y = ((scroller?.scrollTop ?? 0) + 30) / state.zoom;
+            dispatch({ type: 'edit', update: (p) => addComment(p, state.activeTab, x, y) });
+          },
+        },
+        { separator: true },
+        {
           label: 'Delete block',
           icon: 'delete',
           shortcut: 'Del',
@@ -488,6 +621,28 @@ function Studio() {
           onClick: actions.makeMyBlock,
         },
         { label: 'Define variables…', icon: 'tag_red', onClick: () => setModal('variables') },
+      ],
+    },
+    {
+      label: 'View',
+      items: [
+        {
+          label: 'Classic wires',
+          icon: state.view.classicWires ? 'tick' : 'arrow_join',
+          onClick: () =>
+            dispatch({ type: 'view', view: { classicWires: !state.view.classicWires } }),
+        },
+        {
+          label: 'Work Map',
+          icon: state.view.workMap ? 'tick' : 'map',
+          onClick: () => dispatch({ type: 'view', view: { workMap: !state.view.workMap } }),
+        },
+        { separator: true },
+        {
+          label: 'Program outline (text)…',
+          icon: 'page_white_text',
+          onClick: () => setModal('outline'),
+        },
       ],
     },
     {
@@ -559,6 +714,9 @@ function Studio() {
     <EditorContext.Provider value={{ state, dispatch, issues, issuesByBlock }}>
       <SimulatorProvider initialScenario={initialMat}>
         <SimulatorHooks actionsRef={simActions} />
+        <div className="sr-only" aria-live="polite" role="status">
+          {announcement}
+        </div>
         <div className="app-window">
           <div className="title-bar">
             <img src={iconUrl('brick')} alt="" />
@@ -703,6 +861,23 @@ function Studio() {
         )}
         {modal === 'variables' && <VariablesDialog onClose={() => setModal(null)} />}
         {modal === 'about' && <AboutDialog onClose={() => setModal(null)} />}
+        {modal === 'search' && <SearchDialog onClose={() => setModal(null)} />}
+        {modal === 'history' && <HistoryDialog onClose={() => setModal(null)} />}
+        {modal === 'insert' && (
+          <InsertDialog onInsert={cmds.insert} onClose={() => setModal(null)} />
+        )}
+        {modal === 'wire' && <WireDialog onClose={() => setModal(null)} />}
+        {modal === 'outline' && (
+          <MessageDialog
+            title="Program outline"
+            icon="page_white_text"
+            onClose={() => setModal(null)}
+          >
+            <pre className="outline" tabIndex={0} aria-label="Program outline">
+              {describeProgram(state.program)}
+            </pre>
+          </MessageDialog>
+        )}
         {modal !== null && typeof modal === 'object' && (
           <MessageDialog title={modal.title} icon={modal.icon} onClose={() => setModal(null)}>
             {modal.body}

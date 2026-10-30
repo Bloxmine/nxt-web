@@ -14,6 +14,7 @@ import { useEditor } from '../editor/EditorContext';
 import { parsePlug, WiringContext, type WireEnd } from '../editor/wiring';
 import { iconUrl } from '../lib/icons';
 import { Sequence, sequenceBeam } from './SequenceView';
+import { Comments, useMarquee, WorkMap } from './CanvasExtras';
 import { WireLayer } from './WireLayer';
 
 const NODE_HALF = 11;
@@ -29,6 +30,9 @@ export function Canvas({
   const { state, dispatch } = useEditor();
   const root = state.activeTab;
   const content = useRef<HTMLDivElement>(null);
+  const scroller = useRef<HTMLDivElement>(null);
+  const marquee = useMarquee(content, state.zoom);
+  const classic = state.view.classicWires;
   const [pending, setPending] = useState<(WireEnd & { x: number; y: number }) | null>(null);
   const [toast, setToast] = useState<string | null>(null);
   // Dragging a beam's start node downwards creates a parallel beam below it.
@@ -182,22 +186,44 @@ export function Canvas({
           </div>
         ))}
       </div>
-      <div className="canvas" onClick={() => dispatch({ type: 'select', id: null })}>
+      <div
+        ref={scroller}
+        className="canvas"
+        onClick={() => dispatch({ type: 'select', id: null })}
+        onPointerDown={marquee.onPointerDown}
+      >
         <WiringContext.Provider value={wiring}>
           <div
             ref={content}
-            className={`canvas-content ${pending ? 'wiring' : ''}`}
+            className={`canvas-content ${pending ? 'wiring' : ''} ${classic ? 'classic-wires' : ''}`}
             style={{ transform: `scale(${state.zoom})` }}
           >
-            <WireLayer
-              program={state.program}
-              content={content}
-              zoom={state.zoom}
-              selectedWire={state.selectedWire}
-              pending={pending}
-              types={wireTypes}
-              onSelectWire={(id) => dispatch({ type: 'selectWire', id })}
-            />
+            {(classic ? (['visual', 'hit'] as const) : (['all'] as const)).map((part) => (
+              <WireLayer
+                key={part}
+                part={part}
+                classic={classic}
+                program={state.program}
+                content={content}
+                zoom={state.zoom}
+                selectedWire={state.selectedWire}
+                pending={pending}
+                types={wireTypes}
+                onSelectWire={(id) => dispatch({ type: 'selectWire', id })}
+              />
+            ))}
+            <Comments zoom={state.zoom} />
+            {marquee.box && (
+              <div
+                className="marquee"
+                style={{
+                  left: marquee.box.x,
+                  top: marquee.box.y,
+                  width: marquee.box.w,
+                  height: marquee.box.h,
+                }}
+              />
+            )}
             {beamDrag && beamDrag.toY > beamDrag.y && (
               <div
                 className={`beam-ghost ${beamDrag.toY - beamDrag.y > 30 ? 'ok' : ''}`}
@@ -268,6 +294,9 @@ export function Canvas({
           </div>
         )}
       </div>
+      {state.view.workMap && (
+        <WorkMap scroller={scroller} content={content} version={state.program} />
+      )}
       {overlay}
     </div>
   );

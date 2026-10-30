@@ -137,10 +137,11 @@ function useBlockProps(block: Block) {
   const debugClass = `${debug.active.has(block.id) ? 'sim-active' : ''} ${debug.breakpoints.has(block.id) ? 'has-breakpoint' : ''}`;
   return {
     debugClass,
-    selected: state.selected === block.id,
+    selected: state.selected === block.id || state.extra.includes(block.id),
     issues,
     hasError: issues.some((i) => i.severity === 'error'),
     handlers: {
+      'data-block-id': block.id,
       draggable: true,
       onDragStart: (e: React.DragEvent) => {
         e.stopPropagation();
@@ -149,7 +150,8 @@ function useBlockProps(block: Block) {
       onDragEnd: endDrag,
       onClick: (e: MouseEvent) => {
         e.stopPropagation();
-        dispatch({ type: 'select', id: block.id });
+        // Ctrl/Cmd/Shift+click adds to (or removes from) the selection.
+        dispatch({ type: 'select', id: block.id, toggle: e.ctrlKey || e.metaKey || e.shiftKey });
       },
       onKeyDown: (e: React.KeyboardEvent) => {
         if (e.target !== e.currentTarget) return;
