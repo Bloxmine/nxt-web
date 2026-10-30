@@ -1,7 +1,7 @@
 # Compatibility with classic NXT-G (.rbt) programs
 
 Goal: open programs made with the original NXT 2.0 software and get the same program in
-NXT Web Studio, block for block. File → Open (or dropping a file on the window) accepts
+NXT Web Studio, block for block. File → Open accepts
 `.rbt` files. The importer lives in `packages/nxt-rbt`.
 
 There is no published specification for this format. Everything below was worked out from

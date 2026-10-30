@@ -56,7 +56,7 @@ import { describeBlock, describeProgram, editCommands } from './editor/commands'
 import { installTouchSupport } from './editor/touch';
 import { editorReducer, initialState, selectedIds } from './editor/store';
 import { checkBrowserSupport } from './lib/browserSupport';
-import { openProjectFile, readProgramFile, saveProjectFile, type SavedFile } from './lib/files';
+import { openProjectFile, saveProjectFile, type SavedFile } from './lib/files';
 import { iconUrl } from './lib/icons';
 import { loadValue, saveValue } from './lib/storage';
 import { CHALLENGES } from '@nxt/sim';
@@ -142,10 +142,6 @@ function Studio() {
   const { issues, issuesByBlock } = useIssues(state);
   const brick = useBrick();
   const [modal, setModal] = useState<Modal>(null);
-  /** True while a file is dragged over the window. */
-  const [dropping, setDropping] = useState(false);
-  /** A dropped picture or sound, handed to the picture editor or sound recorder. */
-  const [droppedFile, setDroppedFile] = useState<File | null>(null);
   const [ready, setReady] = useState(false);
   const fileHandle = useRef<SavedFile>(null);
   // The original NXT-G file, when the program was opened from one (for Save back).
@@ -318,17 +314,6 @@ function Studio() {
         const result = await openProjectFile();
         if (!result) return;
         fileHandle.current = result.handle;
-        showOpened(result);
-      } catch (e) {
-        message('Could not open', 'exclamation', e instanceof Error ? e.message : String(e));
-      }
-    },
-    openFile: async (file: File) => {
-      if (!confirmDiscard()) return;
-      void saveVersion(state.program, 'Before opening another program');
-      try {
-        const result = await readProgramFile(file);
-        fileHandle.current = null;
         showOpened(result);
       } catch (e) {
         message('Could not open', 'exclamation', e instanceof Error ? e.message : String(e));
@@ -677,56 +662,19 @@ function Studio() {
     }
   }, []);
 
-  // Drop a file anywhere on the window: programs open, pictures go to the picture
-  // editor and sounds to the sound recorder.
+  // Files are opened with the buttons, not by dropping them. Refuse file drops so the
+  // browser doesn't navigate away to show the file (and lose the program).
   useEffect(() => {
-    // Drags that start in the page (blocks from the palette, whose icons Chrome also
-    // offers as image files) are never files to open; only drags from outside are.
-    let internal = false;
-    const start = () => {
-      internal = true;
-    };
-    const end = () => {
-      internal = false;
-    };
-    const isFileDrag = (e: DragEvent) =>
-      !internal && (e.dataTransfer?.types.includes('Files') ?? false);
-    const over = (e: DragEvent) => {
-      if (!isFileDrag(e)) return;
+    const refuse = (e: DragEvent) => {
+      if (!e.dataTransfer?.types.includes('Files')) return;
       e.preventDefault();
-      setDropping(true);
+      e.dataTransfer.dropEffect = 'none';
     };
-    const leave = (e: DragEvent) => {
-      if (e.relatedTarget === null) setDropping(false);
-    };
-    const drop = (e: DragEvent) => {
-      setDropping(false);
-      if (!isFileDrag(e)) return end();
-      e.preventDefault();
-      const file = e.dataTransfer?.files[0];
-      if (!file) return;
-      const name = file.name.toLowerCase();
-      if (file.type.startsWith('image/') || name.endsWith('.ric')) {
-        setDroppedFile(file);
-        setModal('picture');
-      } else if (file.type.startsWith('audio/') || name.endsWith('.rso')) {
-        setDroppedFile(file);
-        setModal('recorder');
-      } else {
-        void actionsRef.current.openFile(file);
-      }
-    };
-    window.addEventListener('dragstart', start, true);
-    window.addEventListener('dragend', end, true);
-    window.addEventListener('dragover', over);
-    window.addEventListener('dragleave', leave);
-    window.addEventListener('drop', drop);
+    window.addEventListener('dragover', refuse);
+    window.addEventListener('drop', refuse);
     return () => {
-      window.removeEventListener('dragstart', start, true);
-      window.removeEventListener('dragend', end, true);
-      window.removeEventListener('dragover', over);
-      window.removeEventListener('dragleave', leave);
-      window.removeEventListener('drop', drop);
+      window.removeEventListener('dragover', refuse);
+      window.removeEventListener('drop', refuse);
     };
   }, []);
 
@@ -1308,29 +1256,8 @@ function Studio() {
         )}
         {modal === 'robot' && <RobotSetupDialog onClose={() => setModal(null)} />}
         {modal === 'shortcuts' && <ShortcutsDialog onClose={() => setModal(null)} />}
-        {modal === 'recorder' && (
-          <SoundRecorder
-            initialFile={droppedFile}
-            onClose={() => {
-              setDroppedFile(null);
-              setModal(null);
-            }}
-          />
-        )}
-        {modal === 'picture' && (
-          <PictureEditor
-            initialFile={droppedFile}
-            onClose={() => {
-              setDroppedFile(null);
-              setModal(null);
-            }}
-          />
-        )}
-        {dropping && (
-          <div className="drop-hint" aria-hidden="true">
-            <span>Drop to open: programs (.rbt, .rbtx, project), pictures or sounds</span>
-          </div>
-        )}
+        {modal === 'recorder' && <SoundRecorder onClose={() => setModal(null)} />}
+        {modal === 'picture' && <PictureEditor onClose={() => setModal(null)} />}
         {modal === 'challenges' && (
           <ChallengesDialog onPlay={playChallenge} onClose={() => setModal(null)} />
         )}

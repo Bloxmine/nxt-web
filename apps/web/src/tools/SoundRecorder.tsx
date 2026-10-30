@@ -48,14 +48,7 @@ function drawWave(canvas: HTMLCanvasElement, rec: Recording, start: number, end:
  * Tools → Sound recorder: record from the microphone, trim, listen to how it will sound
  * on the brick, then save it as an .rso file or send it to the brick.
  */
-export function SoundRecorder({
-  onClose,
-  initialFile,
-}: {
-  onClose(): void;
-  /** A sound or .rso file to start with (for example one dropped on the window). */
-  initialFile?: File | null;
-}) {
+export function SoundRecorder({ onClose }: { onClose(): void }) {
   const brick = useBrick();
   const [state, setState] = useState<'idle' | 'recording' | 'working'>('idle');
   const [elapsed, setElapsed] = useState(0);
@@ -99,13 +92,6 @@ export function SoundRecorder({
       setState('idle');
     }
   }
-
-  const startFile = useRef(initialFile);
-  useEffect(() => {
-    if (startFile.current) void load(startFile.current);
-    // Only once, when the recorder opens.
-    startFile.current = null;
-  }, []);
 
   const record = async () => {
     setMessage(null);

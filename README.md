@@ -36,7 +36,7 @@ the brick's screen, a sound recorder (microphone → .rso) and a picture editor 
 
 **Works offline:** once loaded, the app can be installed and runs without a network.
 
-**Opens original NXT-G programs:** File → Open (or drop a file on the window) accepts `.rbt`
+**Opens original NXT-G programs:** File → Open accepts `.rbt`
 files from the NXT 2.0 software. See [docs/rbt-compat.md](docs/rbt-compat.md).
 
 ## Requirements

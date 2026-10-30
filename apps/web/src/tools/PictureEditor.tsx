@@ -26,14 +26,7 @@ const ZOOM = 6;
  * Tools → Picture editor: draw a black-and-white picture for the brick's screen (up to
  * 100 × 64) and save it as an .ric file for the Display block.
  */
-export function PictureEditor({
-  onClose,
-  initialFile,
-}: {
-  onClose(): void;
-  /** A picture or .ric file to start with (for example one dropped on the window). */
-  initialFile?: File | null;
-}) {
+export function PictureEditor({ onClose }: { onClose(): void }) {
   const brick = useBrick();
   const [bitmap, setBitmap] = useState(() => pic.blank());
   const [history, setHistory] = useState<pic.Bitmap[]>([]);
@@ -192,14 +185,6 @@ export function PictureEditor({
       });
     }
   }
-
-  const startFile = useRef(initialFile);
-  useEffect(() => {
-    if (startFile.current) void load(startFile.current);
-    startFile.current = null;
-    // Only once, when the editor opens.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
 
   const upload = async () => {
     if (!brick.client) return;
