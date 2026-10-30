@@ -8,6 +8,7 @@ import { Dialog } from './Dialog';
 export function VariablesDialog({ onClose }: { onClose(): void }) {
   const { state, dispatch } = useEditor();
   const [name, setName] = useState('');
+  const [newType, setNewType] = useState<'number' | 'logic' | 'text'>('number');
   const names = state.program.variables.map((v) => v.name);
   const trimmed = name.trim();
   const invalid = trimmed === '' || names.includes(trimmed) || trimmed.startsWith('__');
@@ -50,7 +51,7 @@ export function VariablesDialog({ onClose }: { onClose(): void }) {
             {state.program.variables.map((v) => (
               <tr key={v.name}>
                 <td>{v.name}</td>
-                <td>Number</td>
+                <td>{v.type === 'logic' ? 'Logic' : v.type === 'text' ? 'Text' : 'Number'}</td>
                 <td style={{ textAlign: 'right' }}>
                   <button
                     type="button"
@@ -92,7 +93,7 @@ export function VariablesDialog({ onClose }: { onClose(): void }) {
             type: 'edit',
             update: (p) => ({
               ...p,
-              variables: [...p.variables, { name: trimmed, type: 'number' }],
+              variables: [...p.variables, { name: trimmed, type: newType }],
             }),
           });
           setName('');
@@ -106,6 +107,15 @@ export function VariablesDialog({ onClose }: { onClose(): void }) {
           maxLength={20}
           onChange={(e) => setName(e.target.value)}
         />
+        <select
+          aria-label="New variable type"
+          value={newType}
+          onChange={(e) => setNewType(e.target.value as 'number' | 'logic' | 'text')}
+        >
+          <option value="number">Number</option>
+          <option value="logic">Logic</option>
+          <option value="text">Text</option>
+        </select>
         <button type="submit" className="btn" disabled={invalid}>
           <img src={iconUrl('tag_red')} alt="" />
           Create

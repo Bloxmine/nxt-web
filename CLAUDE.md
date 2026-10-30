@@ -30,7 +30,7 @@ code layout and dependency rules in [docs/architecture.md](docs/architecture.md)
 2. Before coding a phase, restate its goal and plan in a few lines, and list anything that needs a decision.
 3. Prefer small commits with clear messages; keep `main` green (lint, typecheck, test, build).
 4. Write tests with the code, not after. Anything touching bytes needs a fixture or golden test.
-5. Do not invent protocol details. Take opcodes, packet layouts, and file formats from the documents in `docs/spec/`. If a document is missing, stop and ask the human to add it.
+5. Do not invent protocol details. Take opcodes, packet layouts, and file formats from the documents in `docs/spec/`. If a document is missing, stop and ask the human to add it. Exception: the `.rbt` format has no published spec; it is reverse-engineered from real files and documented in docs/rbt-compat.md (with confidence per field). Prefer evidence from files over the plan when they disagree.
 6. Keep core packages free of DOM and browser APIs. Only `apps/web` and the transport implementations touch them.
 7. When a phase needs real hardware, write the checklist in `docs/hardware-tests.md`, then stop and ask the human to run it.
 8. Do not add dependencies without a one-line justification in the PR or commit message.
@@ -48,7 +48,7 @@ code layout and dependency rules in [docs/architecture.md](docs/architecture.md)
 - [x] Phase 0: Scaffolding (waiting on: manual browser check)
 - [ ] Phase 1: NXT protocol over WebUSB — code done; waiting on docs/hardware-tests.md Phase 1
 - [ ] Phase 2: Classic editor and block set — done except workspace search; Blockly mode later
-- [ ] .rbt import — container reader done; instances and diagram next (docs/rbt-compat.md)
+- [x] .rbt import — all 15 corpus programs import; remaining unknown fields in docs/rbt-compat.md
 - [ ] Phase 3: Compiler to .rxe bytecode
 - [ ] Phase 4: Upload, run, and live monitoring
 - [ ] Phase 5: File manager, firmware tools, and Bluetooth

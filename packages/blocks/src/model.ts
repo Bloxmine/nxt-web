@@ -11,6 +11,18 @@ export type MotorPort = 'A' | 'B' | 'C';
 export type SensorPort = 1 | 2 | 3 | 4;
 export type Compare = '<' | '>';
 
+/** NXT 2.0 color sensor colors, in the sensor's own numbering (1–6). */
+export type ColorName = 'black' | 'blue' | 'green' | 'yellow' | 'red' | 'white';
+export const COLOR_NAMES: readonly ColorName[] = [
+  'black',
+  'blue',
+  'green',
+  'yellow',
+  'red',
+  'white',
+];
+export type LampColor = 'red' | 'green' | 'blue';
+
 /** How long a motor runs. */
 export type Duration =
   { unit: 'unlimited' } | { unit: 'degrees' | 'rotations' | 'seconds'; value: number };
@@ -28,11 +40,29 @@ export type Condition =
       value: number;
       unit: 'degrees' | 'rotations';
     }
-  | { source: 'timer'; compare: Compare; seconds: number }
-  | { source: 'button'; button: 'left' | 'right' | 'enter'; action: 'pressed' | 'released' }
+  | {
+      source: 'color';
+      port: SensorPort;
+      /** "range": is the color inside/outside a range; "light": light level with a lamp color. */
+      mode: 'range' | 'light';
+      inside: boolean;
+      from: ColorName;
+      to: ColorName;
+      compare: Compare;
+      value: number;
+      lamp: LampColor | 'none';
+    }
+  | { source: 'timer'; timer?: 1 | 2 | 3; compare: Compare; seconds: number }
+  | {
+      source: 'button';
+      button: 'left' | 'right' | 'enter';
+      action: 'pressed' | 'released' | 'bumped';
+    }
   | { source: 'variable'; name: string; compare: Compare | '='; value: number }
   /** A logic value wired into the block's "condition" plug (Loop and Switch only). */
-  | { source: 'logic' };
+  | { source: 'logic' }
+  /** A number or text wired into a Switch, choosing one of several cases. */
+  | { source: 'value'; valueType: 'number' | 'text' };
 
 export type ConditionSource = Condition['source'];
 
@@ -83,8 +113,10 @@ export interface SoundBlock extends Base {
 
 export interface DisplayBlock extends Base {
   kind: 'display';
-  action: 'text' | 'variable' | 'reset';
+  action: 'text' | 'variable' | 'image' | 'reset';
   text: string;
+  /** Image file on the brick (without ".ric") for the "image" action. */
+  image?: string;
   /** Variable whose value to show when action is "variable". */
   variable: string;
   /** 0..99 pixels from the left. */
@@ -112,11 +144,21 @@ export interface LoopBlock extends Base {
   body: Block[];
 }
 
+export interface SwitchCase {
+  /** Value that selects this case (number or text). */
+  value: number | string;
+  blocks: Block[];
+}
+
 export interface SwitchBlock extends Base {
   kind: 'switch';
   condition: Condition;
   whenTrue: Block[];
   whenFalse: Block[];
+  /** For value switches: the cases, in order. */
+  cases?: SwitchCase[];
+  /** For value switches: index of the default case. */
+  defaultCase?: number;
 }
 
 export interface StopBlock extends Base {
@@ -130,6 +172,15 @@ export interface ResetRotationBlock extends Base {
 
 export interface ResetTimerBlock extends Base {
   kind: 'resetTimer';
+  timer?: 1 | 2 | 3;
+}
+
+/** Turns the NXT 2.0 color sensor's lamp on (in a color) or off. */
+export interface ColorLampBlock extends Base {
+  kind: 'colorLamp';
+  port: SensorPort;
+  on: boolean;
+  color: LampColor;
 }
 
 export interface VariableBlock extends Base {
@@ -137,12 +188,14 @@ export interface VariableBlock extends Base {
   name: string;
   action: 'read' | 'set' | 'change';
   value: number;
+  /** Type of the variable (defaults to number). Logic/text variables can only be read or set. */
+  valueType?: VariableType;
 }
 
 /** Reads a sensor and outputs its value and a yes/no comparison. */
 export interface SensorBlock extends Base {
   kind: 'sensor';
-  condition: Exclude<Condition, { source: 'variable' } | { source: 'logic' }>;
+  condition: Exclude<Condition, { source: 'variable' } | { source: 'logic' } | { source: 'value' }>;
 }
 
 export interface MathBlock extends Base {
@@ -210,6 +263,7 @@ export type Block =
   | StopBlock
   | ResetRotationBlock
   | ResetTimerBlock
+  | ColorLampBlock
   | VariableBlock
   | MyBlockCall
   | SensorBlock
@@ -230,9 +284,12 @@ export interface MyBlockDefinition {
   body: Block[];
 }
 
+/** Variable value types, as in the original: number, logic (yes/no) or text. */
+export type VariableType = 'number' | 'logic' | 'text';
+
 export interface VariableDefinition {
   name: string;
-  type: 'number';
+  type: VariableType;
 }
 
 /** Value types carried by plugs and wires. */

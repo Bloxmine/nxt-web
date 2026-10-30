@@ -8,7 +8,15 @@ import type {
   Stmt,
   ValueType,
 } from '@nxt/compiler';
-import type { Block, Condition, DataType, Duration, MotorPort, Program } from './model.js';
+import {
+  COLOR_NAMES,
+  type Block,
+  type Condition,
+  type DataType,
+  type Duration,
+  type MotorPort,
+  type Program,
+} from './model.js';
 import { findPlug, plugsOf } from './plugs.js';
 import { walkProgram } from './tree.js';
 import { conditionOf, sensorKindOf, validateProgram } from './validate.js';
@@ -21,7 +29,8 @@ export class LoweringError extends Error {
   }
 }
 
-const TIMER_VAR = '__timer';
+/** Hidden variable holding the tick count when timer `n` (1–3) was last reset. */
+const timerVar = (n: number) => `__timer${n}`;
 const MOTOR_INDEX: Record<MotorPort, OutputPort> = { A: 0, B: 1, C: 2 };
 const VALUE_TYPE: Record<DataType, ValueType> = {
   number: 'number',
@@ -76,15 +85,33 @@ export function lowerProgram(program: Program): IrProgram {
   }
 
   const sensors: Partial<Record<InputPort, SensorKind>> = {};
-  let usesTimer = false;
+  const timers = new Set<number>();
+  // Ports where the color sensor is used in more than one mode: the mode is
+  // switched right before each reading.
+  const colorKinds = new Map<InputPort, Set<SensorKind>>();
   walkProgram(program, (block) => {
     const c = conditionOf(block);
     if (c) {
       const s = sensorKindOf(c);
-      if (s) sensors[(s.port - 1) as InputPort] = s.kind;
-      if (c.source === 'timer') usesTimer = true;
+      if (s) {
+        const port = (s.port - 1) as InputPort;
+        sensors[port] ??= s.kind;
+        if (s.kind.startsWith('color')) {
+          const set = colorKinds.get(port) ?? new Set<SensorKind>();
+          set.add(s.kind);
+          colorKinds.set(port, set);
+        }
+      }
+      if (c.source === 'timer') timers.add(c.timer ?? 1);
     }
-    if (block.kind === 'resetTimer') usesTimer = true;
+    if (block.kind === 'resetTimer') timers.add(block.timer ?? 1);
+    if (block.kind === 'colorLamp') {
+      const port = (block.port - 1) as InputPort;
+      sensors[port] ??= 'colorNone';
+      const set = colorKinds.get(port) ?? new Set<SensorKind>();
+      set.add('colorNone');
+      colorKinds.set(port, set);
+    }
     for (const plug of plugsOf(block)) {
       if (plug.output && usedOutputs.has(`${block.id}:${plug.name}`)) {
         hidden.set(wireVariable(block.id, plug.name), VALUE_TYPE[plug.type]);
@@ -116,18 +143,29 @@ export function lowerProgram(program: Program): IrProgram {
       case 'light':
       case 'sound':
       case 'ultrasonic':
+      case 'color':
         return { kind: 'sensor', port: (c.port - 1) as InputPort };
       case 'rotation':
         return { kind: 'motorDegrees', port: MOTOR_INDEX[c.port] };
       case 'timer':
-        return bin('-', { kind: 'tick' }, v(TIMER_VAR));
+        return bin('-', { kind: 'tick' }, v(timerVar(c.timer ?? 1)));
       case 'button':
         return { kind: 'button', button: c.button };
       case 'variable':
         return v(c.name);
       case 'logic':
+      case 'value':
         return bool(false);
     }
+  };
+
+  /** Statements to put before reading a condition (color sensor mode switch). */
+  const prepare = (c: Condition, source: string): Stmt[] => {
+    const s = sensorKindOf(c);
+    if (!s || !s.kind.startsWith('color')) return [];
+    const port = (s.port - 1) as InputPort;
+    if ((colorKinds.get(port)?.size ?? 0) < 2) return [];
+    return [{ kind: 'setSensor', port, sensor: s.kind, source }];
   };
 
   /** The configured threshold of a condition, in the units `reading` returns. */
@@ -143,6 +181,8 @@ export function lowerProgram(program: Program): IrProgram {
       case 'sound':
       case 'variable':
         return c.value;
+      case 'color':
+        return c.mode === 'light' ? c.value : 0;
       default:
         return 0;
     }
@@ -159,6 +199,20 @@ export function lowerProgram(program: Program): IrProgram {
         return c.action === 'released' ? not(reading(c)) : reading(c);
       case 'logic':
         return input(block, 'condition', bool(false));
+      case 'value':
+        return bool(false);
+      case 'color': {
+        if (c.mode === 'light') return bin(c.compare, reading(c), limit ?? num(c.value));
+        const from = COLOR_NAMES.indexOf(c.from) + 1;
+        const to = COLOR_NAMES.indexOf(c.to) + 1;
+        const r = reading(c);
+        const inRange = bin(
+          'and',
+          bin('>=', r, num(Math.min(from, to))),
+          bin('<=', r, num(Math.max(from, to))),
+        );
+        return c.inside ? inRange : not(inRange);
+      }
       default: {
         const op = c.compare === '=' ? '==' : c.compare;
         return bin(op, reading(c), limit ?? num(threshold(c)));
@@ -197,18 +251,22 @@ export function lowerProgram(program: Program): IrProgram {
       regulated,
       source,
     };
+    // A wired duration replaces the configured amount (same unit).
+    const wiredAmount = inputSource.get(`${block.id}:duration`);
+    const amount = (configured: number, scale: number): Expr =>
+      wiredAmount ? bin('*', v(wiredAmount), num(scale)) : num(Math.round(configured * scale));
     switch (duration.unit) {
       case 'unlimited':
         return [{ ...base, degrees: null, wait: false }];
       case 'degrees':
       case 'rotations': {
-        const degrees = duration.unit === 'rotations' ? duration.value * 360 : duration.value;
-        return [{ ...base, degrees: num(Math.round(degrees)), wait }];
+        const scale = duration.unit === 'rotations' ? 360 : 1;
+        return [{ ...base, degrees: amount(duration.value, scale), wait }];
       }
       case 'seconds':
         return [
           { ...base, degrees: null, wait: false },
-          { kind: 'wait', ms: num(Math.round(duration.value * 1000)), source },
+          { kind: 'wait', ms: amount(duration.value, 1000), source },
           { kind: 'motorStop', ports, mode: nextAction, source },
         ];
     }
@@ -354,6 +412,10 @@ export function lowerProgram(program: Program): IrProgram {
         const out = outputs(block, { x, line, text: textValue, number: numberValue });
         if (block.action === 'reset') return [...out, { kind: 'clearScreen', source }];
         const clear: Stmt[] = block.clear ? [{ kind: 'clearScreen', source }] : [];
+        if (block.action === 'image') {
+          const file = (block.image ?? 'Smile 01').replace(/\.ric$/i, '') + '.ric';
+          return [...out, ...clear, { kind: 'drawImage', x, line, file, source }];
+        }
         const draw: Stmt =
           block.action === 'text'
             ? { kind: 'drawText', x, line, text: textValue, source }
@@ -365,19 +427,48 @@ export function lowerProgram(program: Program): IrProgram {
           return [{ kind: 'wait', ms: num(Math.round(block.control.seconds * 1000)), source }];
         }
         const c = block.control.condition;
-        if (c.source === 'touch' && c.action === 'bumped') {
-          const pressed = conditionExpr({ ...c, action: 'pressed' }, block);
+        if ((c.source === 'touch' || c.source === 'button') && c.action === 'bumped') {
+          const pressed = conditionExpr({ ...c, action: 'pressed' } as Condition, block);
           return [
             { kind: 'waitUntil', condition: pressed, source },
             { kind: 'waitUntil', condition: not(pressed), source },
           ];
         }
-        return [{ kind: 'waitUntil', condition: conditionExpr(c, block), source }];
+        return [
+          ...prepare(c, source),
+          { kind: 'waitUntil', condition: conditionExpr(c, block), source },
+        ];
       }
       case 'loop':
         return loopStatements(block);
-      case 'switch':
+      case 'switch': {
+        if (block.cases && block.condition.source === 'value') {
+          // Value switch: compare the wired value with each case in turn.
+          const selector = newTemp();
+          hidden.set(selector, block.condition.valueType === 'text' ? 'text' : 'number');
+          const fallback = block.condition.valueType === 'text' ? text('') : num(0);
+          const def = block.defaultCase ?? block.cases.length - 1;
+          let chain: Stmt[] = lowerSequence(block.cases[def]?.blocks ?? []);
+          for (let i = block.cases.length - 1; i >= 0; i--) {
+            if (i === def) continue;
+            const c = block.cases[i]!;
+            const value = typeof c.value === 'number' ? num(c.value) : text(c.value);
+            chain = [
+              {
+                kind: 'if',
+                condition: bin('==', v(selector), value),
+                then: lowerSequence(c.blocks),
+                else: chain,
+              },
+            ];
+          }
+          return [
+            { kind: 'set', name: selector, value: input(block, 'condition', fallback), source },
+            ...chain,
+          ];
+        }
         return [
+          ...prepare(block.condition, source),
           {
             kind: 'if',
             condition: conditionExpr(block.condition, block),
@@ -386,12 +477,24 @@ export function lowerProgram(program: Program): IrProgram {
             source,
           },
         ];
+      }
+      case 'colorLamp': {
+        const port = (block.port - 1) as InputPort;
+        const sensor: SensorKind = !block.on
+          ? 'colorNone'
+          : block.color === 'red'
+            ? 'colorRed'
+            : block.color === 'green'
+              ? 'colorGreen'
+              : 'colorBlue';
+        return [{ kind: 'setSensor', port, sensor, source }];
+      }
       case 'stop':
         return [{ kind: 'stop', source }];
       case 'resetRotation':
         return [{ kind: 'resetMotor', port: MOTOR_INDEX[block.port], source }];
       case 'resetTimer':
-        return [{ kind: 'set', name: TIMER_VAR, value: { kind: 'tick' }, source }];
+        return [{ kind: 'set', name: timerVar(block.timer ?? 1), value: { kind: 'tick' }, source }];
       case 'variable': {
         const value = input(block, 'value', num(block.value));
         const write: Stmt[] =
@@ -412,11 +515,14 @@ export function lowerProgram(program: Program): IrProgram {
       case 'sensor': {
         const c = block.condition;
         const trigger = input(block, 'trigger', num(threshold(c)));
-        return outputs(block, {
-          trigger,
-          yes: conditionExpr(c, block, trigger),
-          value: reading(c),
-        });
+        return [
+          ...prepare(c, source),
+          ...outputs(block, {
+            trigger,
+            yes: conditionExpr(c, block, trigger),
+            value: reading(c),
+          }),
+        ];
       }
       case 'math': {
         const a = input(block, 'a', num(block.a));
@@ -468,14 +574,17 @@ export function lowerProgram(program: Program): IrProgram {
   }));
   const main = lowerSequence(program.body);
   const parallel = program.parallel.filter((lane) => lane.length > 0).map(lowerSequence);
-  if (usesTimer) {
-    main.unshift({ kind: 'set', name: TIMER_VAR, value: { kind: 'tick' } });
-    hidden.set(TIMER_VAR, 'number');
+  for (const n of [...timers].sort().reverse()) {
+    main.unshift({ kind: 'set', name: timerVar(n), value: { kind: 'tick' } });
+    hidden.set(timerVar(n), 'number');
   }
 
   return {
     variables: [
-      ...program.variables.map((x) => ({ name: x.name, type: x.type })),
+      ...program.variables.map((x) => ({
+        name: x.name,
+        type: (x.type === 'logic' ? 'boolean' : x.type) as ValueType,
+      })),
       ...[...hidden].map(([name, type]) => ({ name, type })),
     ],
     sensors,

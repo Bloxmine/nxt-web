@@ -208,6 +208,9 @@ importers:
       '@nxt/protocol':
         specifier: workspace:*
         version: link:../../packages/nxt-protocol
+      '@nxt/rbt':
+        specifier: workspace:*
+        version: link:../../packages/nxt-rbt
       '@nxt/transport':
         specifier: workspace:*
         version: link:../../packages/nxt-transport
@@ -262,6 +265,10 @@ importers:
         version: link:../nxt-transport
 
   packages/nxt-rbt:
+    dependencies:
+      '@nxt/blocks':
+        specifier: workspace:*
+        version: link:../blocks
     devDependencies:
       '@types/node':
         specifier: ^24.19.2

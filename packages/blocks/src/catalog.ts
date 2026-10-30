@@ -10,7 +10,7 @@ export interface PaletteEntry {
   key: string;
   label: string;
   category: Category;
-  /** Icon name (FatCow icon file name without extension). */
+  /** Icon name (FatCow icon file name without extension). Unique per entry. */
   icon: string;
   help: string;
   create(): Block;
@@ -27,16 +27,30 @@ export function defaultCondition(source: ConditionSource): Condition {
       return { source, port: 2, compare: '>', value: 50, dba: false };
     case 'ultrasonic':
       return { source, port: 4, compare: '<', value: 50, unit: 'cm' };
+    case 'color':
+      return {
+        source,
+        port: 3,
+        mode: 'range',
+        inside: true,
+        from: 'red',
+        to: 'red',
+        compare: '>',
+        value: 50,
+        lamp: 'red',
+      };
     case 'rotation':
       return { source, port: 'A', compare: '>', value: 1, unit: 'rotations' };
     case 'timer':
-      return { source, compare: '>', seconds: 5 };
+      return { source, timer: 1, compare: '>', seconds: 5 };
     case 'button':
       return { source, button: 'enter', action: 'pressed' };
     case 'variable':
       return { source, name: 'Number 1', compare: '>', value: 0 };
     case 'logic':
       return { source };
+    case 'value':
+      return { source, valueType: 'number' };
   }
 }
 
@@ -104,7 +118,9 @@ export function createBlock(kind: BlockKind): Block {
     case 'resetRotation':
       return { id, kind, port: 'A' };
     case 'resetTimer':
-      return { id, kind };
+      return { id, kind, timer: 1 };
+    case 'colorLamp':
+      return { id, kind, port: 3, on: true, color: 'red' };
     case 'variable':
       return { id, kind, name: 'Number 1', action: 'set', value: 0 };
     case 'myBlock':
@@ -150,17 +166,35 @@ const entry = (
   create: () => Block,
 ): PaletteEntry => ({ key, label, category, icon, help, create });
 
-/** Icon for each condition source. */
+/** Icon for each sensor source on sensor blocks, switches and loops. */
 export const CONDITION_ICONS: Record<ConditionSource, string> = {
   touch: 'hand_point',
   light: 'lightbulb',
   sound: 'microphone',
   ultrasonic: 'eye',
+  color: 'color_wheel',
   rotation: 'arrow_rotate_clockwise',
   timer: 'stopwatch_start',
   button: 'joystick',
   variable: 'tag_red',
   logic: 'arrow_join',
+  value: 'chart_bullseye',
+};
+
+/** Icon for Wait blocks, distinct from the sensor block icons. */
+export const WAIT_ICONS: Record<ConditionSource | 'time', string> = {
+  time: 'hourglass',
+  touch: 'hand_point_090',
+  light: 'lightbulb_off',
+  sound: 'sound_wave',
+  ultrasonic: 'eye_half',
+  color: 'color_picker',
+  rotation: 'arrow_rotate_anticlockwise',
+  timer: 'clock',
+  button: 'button_navigation',
+  variable: 'tag_red',
+  logic: 'arrow_join',
+  value: 'chart_bullseye',
 };
 
 /** Every palette entry, keyed by `key`. */
@@ -188,14 +222,22 @@ export const PALETTE: Record<string, PaletteEntry> = Object.fromEntries(
       'Shows text or a number on the brick screen.',
       () => createBlock('display'),
     ),
-    entry('wait-time', 'Wait: time', 'flow', 'hourglass', 'Waits a number of seconds.', () =>
+    entry(
+      'color-lamp',
+      'Color Lamp',
+      'action',
+      'color_adjustment',
+      'Turns the color sensor lamp on in red, green or blue, or off.',
+      () => createBlock('colorLamp'),
+    ),
+    entry('wait-time', 'Wait: time', 'flow', WAIT_ICONS.time, 'Waits a number of seconds.', () =>
       createBlock('wait'),
     ),
     entry(
       'wait-touch',
       'Wait: touch',
       'flow',
-      'hand_point',
+      WAIT_ICONS.touch,
       'Waits until the touch sensor is pressed, released or bumped.',
       waitFor('touch'),
     ),
@@ -203,7 +245,7 @@ export const PALETTE: Record<string, PaletteEntry> = Object.fromEntries(
       'wait-light',
       'Wait: light',
       'flow',
-      'lightbulb',
+      WAIT_ICONS.light,
       'Waits until the light sensor reads above or below a level.',
       waitFor('light'),
     ),
@@ -211,7 +253,7 @@ export const PALETTE: Record<string, PaletteEntry> = Object.fromEntries(
       'wait-sound',
       'Wait: sound',
       'flow',
-      'microphone',
+      WAIT_ICONS.sound,
       'Waits until it is louder or quieter than a level.',
       waitFor('sound'),
     ),
@@ -219,15 +261,23 @@ export const PALETTE: Record<string, PaletteEntry> = Object.fromEntries(
       'wait-ultrasonic',
       'Wait: distance',
       'flow',
-      'eye',
+      WAIT_ICONS.ultrasonic,
       'Waits until the ultrasonic sensor sees something nearer or farther than a distance.',
       waitFor('ultrasonic'),
+    ),
+    entry(
+      'wait-color',
+      'Wait: color',
+      'flow',
+      WAIT_ICONS.color,
+      'Waits until the color sensor sees a color (or light level).',
+      waitFor('color'),
     ),
     entry(
       'wait-rotation',
       'Wait: rotation',
       'flow',
-      'arrow_rotate_clockwise',
+      WAIT_ICONS.rotation,
       'Waits until a motor has turned a number of degrees or rotations.',
       waitFor('rotation'),
     ),
@@ -235,16 +285,16 @@ export const PALETTE: Record<string, PaletteEntry> = Object.fromEntries(
       'wait-timer',
       'Wait: timer',
       'flow',
-      'stopwatch_start',
-      'Waits until the timer passes a number of seconds.',
+      WAIT_ICONS.timer,
+      'Waits until a timer passes a number of seconds.',
       waitFor('timer'),
     ),
     entry(
       'wait-button',
       'Wait: NXT button',
       'flow',
-      'joystick',
-      'Waits until a button on the brick is pressed or released.',
+      WAIT_ICONS.button,
+      'Waits until a button on the brick is pressed, released or bumped.',
       waitFor('button'),
     ),
     entry(
@@ -260,7 +310,7 @@ export const PALETTE: Record<string, PaletteEntry> = Object.fromEntries(
       'Switch',
       'flow',
       'arrow_switch',
-      'Runs the top or bottom branch depending on a condition.',
+      'Runs one branch depending on a condition or a value.',
       () => createBlock('switch'),
     ),
     entry('stop', 'Stop', 'flow', 'stop', 'Ends the program.', () => createBlock('stop')),
@@ -268,7 +318,7 @@ export const PALETTE: Record<string, PaletteEntry> = Object.fromEntries(
       'sensor-touch',
       'Touch sensor',
       'sensor',
-      'hand_point',
+      CONDITION_ICONS.touch,
       'Outputs whether the touch sensor is pressed.',
       () => createSensorBlock('touch'),
     ),
@@ -276,7 +326,7 @@ export const PALETTE: Record<string, PaletteEntry> = Object.fromEntries(
       'sensor-light',
       'Light sensor',
       'sensor',
-      'lightbulb',
+      CONDITION_ICONS.light,
       'Outputs the light level (0–100) and whether it passes the trigger point.',
       () => createSensorBlock('light'),
     ),
@@ -284,7 +334,7 @@ export const PALETTE: Record<string, PaletteEntry> = Object.fromEntries(
       'sensor-sound',
       'Sound sensor',
       'sensor',
-      'microphone',
+      CONDITION_ICONS.sound,
       'Outputs the sound level (0–100) and whether it passes the trigger point.',
       () => createSensorBlock('sound'),
     ),
@@ -292,15 +342,23 @@ export const PALETTE: Record<string, PaletteEntry> = Object.fromEntries(
       'sensor-ultrasonic',
       'Ultrasonic sensor',
       'sensor',
-      'eye',
+      CONDITION_ICONS.ultrasonic,
       'Outputs the distance and whether it passes the trigger point.',
       () => createSensorBlock('ultrasonic'),
+    ),
+    entry(
+      'sensor-color',
+      'Color sensor',
+      'sensor',
+      CONDITION_ICONS.color,
+      'NXT 2.0 color sensor: outputs the color seen (1–6) or a light level.',
+      () => createSensorBlock('color'),
     ),
     entry(
       'sensor-rotation',
       'Rotation sensor',
       'sensor',
-      'arrow_rotate_clockwise',
+      CONDITION_ICONS.rotation,
       "Outputs a motor's position in degrees.",
       () => createSensorBlock('rotation'),
     ),
@@ -308,7 +366,7 @@ export const PALETTE: Record<string, PaletteEntry> = Object.fromEntries(
       'sensor-timer',
       'Timer',
       'sensor',
-      'stopwatch_start',
+      CONDITION_ICONS.timer,
       'Outputs the time since the timer was reset, in milliseconds.',
       () => createSensorBlock('timer'),
     ),
@@ -316,7 +374,7 @@ export const PALETTE: Record<string, PaletteEntry> = Object.fromEntries(
       'sensor-button',
       'NXT buttons',
       'sensor',
-      'joystick',
+      CONDITION_ICONS.button,
       'Outputs whether a button on the brick is pressed.',
       () => createSensorBlock('button'),
     ),
@@ -324,7 +382,7 @@ export const PALETTE: Record<string, PaletteEntry> = Object.fromEntries(
       'reset-rotation',
       'Reset rotation',
       'sensor',
-      'arrow_rotate_clockwise',
+      'compass',
       "Resets a motor's rotation counter to zero.",
       () => createBlock('resetRotation'),
     ),
@@ -332,8 +390,8 @@ export const PALETTE: Record<string, PaletteEntry> = Object.fromEntries(
       'reset-timer',
       'Reset timer',
       'sensor',
-      'stopwatch_start',
-      'Resets the timer to zero.',
+      'stopwatch_finish',
+      'Resets a timer to zero.',
       () => createBlock('resetTimer'),
     ),
     entry(
@@ -408,12 +466,13 @@ export const WAIT_PRESETS = [
   'wait-light',
   'wait-sound',
   'wait-ultrasonic',
+  'wait-color',
   'wait-rotation',
   'wait-timer',
   'wait-button',
 ];
 
-/** The "Complete" palette: categories with their entries. */
+/** The "Complete" palette: categories with their entries. Category icons are unique too. */
 export const COMPLETE_PALETTE: {
   category: Category;
   label: string;
@@ -423,18 +482,19 @@ export const COMPLETE_PALETTE: {
   {
     category: 'action',
     label: 'Action',
-    icon: 'cog',
-    entries: ['move', 'motor', 'sound', 'display'],
+    icon: 'lightning',
+    entries: ['move', 'motor', 'sound', 'display', 'color-lamp'],
   },
   {
     category: 'sensor',
     label: 'Sensor',
-    icon: 'hand_point',
+    icon: 'radar_chart',
     entries: [
       'sensor-touch',
       'sensor-light',
       'sensor-sound',
       'sensor-ultrasonic',
+      'sensor-color',
       'sensor-rotation',
       'sensor-timer',
       'sensor-button',
@@ -445,16 +505,21 @@ export const COMPLETE_PALETTE: {
   {
     category: 'flow',
     label: 'Flow',
-    icon: 'arrow_refresh',
+    icon: 'arrow_branch',
     entries: [...WAIT_PRESETS, 'loop', 'switch', 'stop'],
   },
   {
     category: 'data',
     label: 'Data',
-    icon: 'calculator',
+    icon: 'database',
     entries: ['logic', 'math', 'compare', 'range', 'random', 'variable'],
   },
-  { category: 'advanced', label: 'Advanced', icon: 'font', entries: ['number-to-text', 'text'] },
+  {
+    category: 'advanced',
+    label: 'Advanced',
+    icon: 'application_xp_terminal',
+    entries: ['number-to-text', 'text'],
+  },
 ];
 
 /** Category of a placed block, used for its colour. */
@@ -464,6 +529,7 @@ export function categoryOf(block: Block): Category {
     case 'motor':
     case 'sound':
     case 'display':
+    case 'colorLamp':
       return 'action';
     case 'sensor':
     case 'resetRotation':
@@ -486,7 +552,7 @@ export function categoryOf(block: Block): Category {
   }
 }
 
-/** Icon for a placed block. */
+/** Icon for a placed block (matches its palette entry). */
 export function iconOf(block: Block): string {
   switch (block.kind) {
     case 'move':
@@ -497,10 +563,12 @@ export function iconOf(block: Block): string {
       return 'sound';
     case 'display':
       return 'monitor';
+    case 'colorLamp':
+      return 'color_adjustment';
     case 'wait':
       return block.control.type === 'time'
-        ? 'hourglass'
-        : CONDITION_ICONS[block.control.condition.source];
+        ? WAIT_ICONS.time
+        : WAIT_ICONS[block.control.condition.source];
     case 'loop':
       return 'arrow_refresh';
     case 'switch':
@@ -508,9 +576,9 @@ export function iconOf(block: Block): string {
     case 'stop':
       return 'stop';
     case 'resetRotation':
-      return 'arrow_rotate_clockwise';
+      return 'compass';
     case 'resetTimer':
-      return 'stopwatch_start';
+      return 'stopwatch_finish';
     case 'variable':
       return 'tag_red';
     case 'myBlock':
@@ -539,6 +607,7 @@ const SENSOR_LABELS: Record<SensorSource, string> = {
   light: 'Light sensor',
   sound: 'Sound sensor',
   ultrasonic: 'Ultrasonic sensor',
+  color: 'Color sensor',
   rotation: 'Rotation sensor',
   timer: 'Timer',
   button: 'NXT buttons',
@@ -551,6 +620,8 @@ export function labelOf(block: Block): string {
       return 'Reset rotation';
     case 'resetTimer':
       return 'Reset timer';
+    case 'colorLamp':
+      return 'Color Lamp';
     case 'myBlock':
       return 'My Block';
     case 'sensor':

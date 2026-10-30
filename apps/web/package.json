@@ -18,7 +18,8 @@
     "@nxt/protocol": "workspace:*",
     "@nxt/transport": "workspace:*",
     "react": "^19.3.1",
-    "react-dom": "^19.3.1"
+    "react-dom": "^19.3.1",
+    "@nxt/rbt": "workspace:*"
   },
   "devDependencies": {
     "@tailwindcss/vite": "^4.3.3",

@@ -8,11 +8,17 @@ function helpFor(block: Block): string {
       ? block.control.type === 'time'
         ? 'wait-time'
         : `wait-${block.control.condition.source}`
-      : block.kind === 'resetRotation'
-        ? 'reset-rotation'
-        : block.kind === 'resetTimer'
-          ? 'reset-timer'
-          : block.kind;
+      : block.kind === 'sensor'
+        ? `sensor-${block.condition.source}`
+        : block.kind === 'resetRotation'
+          ? 'reset-rotation'
+          : block.kind === 'resetTimer'
+            ? 'reset-timer'
+            : block.kind === 'colorLamp'
+              ? 'color-lamp'
+              : block.kind === 'numberToText'
+                ? 'number-to-text'
+                : block.kind;
   return (
     PALETTE[key]?.help ?? (block.kind === 'myBlock' ? 'A block you made from other blocks.' : '')
   );

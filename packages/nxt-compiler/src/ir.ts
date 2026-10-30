@@ -14,7 +14,19 @@ export type InputPort = 0 | 1 | 2 | 3;
 
 /** How a sensor port is configured, decided once at program start. */
 export type SensorKind =
-  'touch' | 'lightActive' | 'lightAmbient' | 'soundDb' | 'soundDba' | 'ultrasonic';
+  | 'touch'
+  | 'lightActive'
+  | 'lightAmbient'
+  | 'soundDb'
+  | 'soundDba'
+  | 'ultrasonic'
+  /** NXT 2.0 color sensor: reads the color seen, 1 (black) to 6 (white). */
+  | 'colorFull'
+  /** NXT 2.0 color sensor as a light sensor with a red, green, blue or no lamp. */
+  | 'colorRed'
+  | 'colorGreen'
+  | 'colorBlue'
+  | 'colorNone';
 
 /** Value types. */
 export type ValueType = 'number' | 'boolean' | 'text';
@@ -74,10 +86,13 @@ export type Stmt = StmtBase &
       }
     | { kind: 'motorStop'; ports: OutputPort[]; mode: 'brake' | 'coast' }
     | { kind: 'resetMotor'; port: OutputPort }
+    /** Reconfigure a sensor port while running (e.g. the color lamp). */
+    | { kind: 'setSensor'; port: InputPort; sensor: SensorKind }
     | { kind: 'tone'; frequency: Expr; durationMs: Expr; volume: Expr; wait: boolean }
     | { kind: 'soundFile'; file: string; loop: boolean; volume: Expr; wait: boolean }
     | { kind: 'stopSound' }
     | { kind: 'clearScreen' }
+    | { kind: 'drawImage'; x: Expr; line: Expr; file: string }
     | { kind: 'drawText'; x: Expr; line: Expr; text: Expr }
     | { kind: 'drawNumber'; x: Expr; line: Expr; value: Expr }
     | { kind: 'wait'; ms: Expr }

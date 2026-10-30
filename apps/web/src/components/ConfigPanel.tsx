@@ -350,11 +350,23 @@ function BlockFields({ block, update, program, onEditVariables }: FieldsProps) {
               options={[
                 ['text', 'Text'],
                 ['variable', 'Number variable'],
+                ['image', 'Image'],
                 ['reset', 'Clear screen'],
               ]}
               onChange={(action) => update({ action })}
             />
           </Field>
+          {block.action === 'image' && (
+            <Field label="File" icon="monitor_window">
+              <input
+                className="text-input"
+                aria-label="Image file name"
+                value={block.image ?? 'Smile 01'}
+                maxLength={15}
+                onChange={(e) => update({ image: e.target.value })}
+              />
+            </Field>
+          )}
           {block.action === 'text' && (
             <Field label="Text" icon="text">
               <input
@@ -530,17 +542,42 @@ function BlockFields({ block, update, program, onEditVariables }: FieldsProps) {
             <Select
               label="Switch on"
               value={block.condition.source}
-              options={[...CONDITION_OPTIONS, ['logic', 'Logic (wired value)']]}
-              onChange={(v) => update({ condition: defaultCondition(v) })}
+              options={[
+                ...CONDITION_OPTIONS,
+                ['logic', 'Logic (wired value)'],
+                ['value', 'Value (wired number or text)'],
+              ]}
+              onChange={(v) =>
+                update(
+                  v === 'value'
+                    ? ({
+                        condition: defaultCondition(v),
+                        cases: [
+                          { value: 0, blocks: [] },
+                          { value: 1, blocks: [] },
+                        ],
+                        defaultCase: 0,
+                      } as Partial<Block>)
+                    : ({ condition: defaultCondition(v), cases: undefined } as Partial<Block>),
+                )
+              }
             />
           </Field>
-          <ConditionFields
-            id={block.id}
-            condition={block.condition}
-            variables={variableOptions}
-            onChange={(condition) => update({ condition })}
-          />
-          <p style={{ margin: 0, color: '#555' }}>Top branch runs when true, bottom when false.</p>
+          {block.condition.source === 'value' ? (
+            <CaseFields block={block} update={update} />
+          ) : (
+            <>
+              <ConditionFields
+                id={block.id}
+                condition={block.condition}
+                variables={variableOptions}
+                onChange={(condition) => update({ condition, cases: undefined } as Partial<Block>)}
+              />
+              <p style={{ margin: 0, color: '#555' }}>
+                Top branch runs when true, bottom when false.
+              </p>
+            </>
+          )}
         </>
       );
     case 'resetRotation':
@@ -595,7 +632,56 @@ function BlockFields({ block, update, program, onEditVariables }: FieldsProps) {
     case 'stop':
       return <p>Ends the program when reached.</p>;
     case 'resetTimer':
-      return <p>Resets the timer to zero.</p>;
+      return (
+        <Field label="Timer" icon="stopwatch_finish">
+          <Radios
+            name={`rt-${block.id}`}
+            value={String(block.timer ?? 1)}
+            options={[
+              ['1', '1'],
+              ['2', '2'],
+              ['3', '3'],
+            ]}
+            onChange={(t) => update({ timer: Number(t) as 1 | 2 | 3 })}
+          />
+        </Field>
+      );
+    case 'colorLamp':
+      return (
+        <>
+          <Field label="Port" icon="connect">
+            <Radios
+              name={`lp-${block.id}`}
+              value={String(block.port)}
+              options={SENSOR_PORTS.map(([n, t]) => [String(n), t] as const)}
+              onChange={(p) => update({ port: Number(p) as SensorPort })}
+            />
+          </Field>
+          <Field label="Action" icon="color_adjustment">
+            <Radios
+              name={`lo-${block.id}`}
+              value={block.on ? 'on' : 'off'}
+              options={[
+                ['on', 'On'],
+                ['off', 'Off'],
+              ]}
+              onChange={(v) => update({ on: v === 'on' })}
+            />
+          </Field>
+          <Field label="Color">
+            <Radios
+              name={`lc-${block.id}`}
+              value={block.color}
+              options={[
+                ['red', 'Red'],
+                ['green', 'Green'],
+                ['blue', 'Blue'],
+              ]}
+              onChange={(color) => update({ color })}
+            />
+          </Field>
+        </>
+      );
     case 'sensor':
       return (
         <>
@@ -627,6 +713,7 @@ const SENSOR_BLOCK_OPTIONS = [
   ['light', 'Light sensor'],
   ['sound', 'Sound sensor'],
   ['ultrasonic', 'Ultrasonic sensor'],
+  ['color', 'Color sensor'],
   ['rotation', 'Rotation sensor'],
   ['timer', 'Timer'],
   ['button', 'NXT buttons'],
@@ -637,11 +724,102 @@ const CONDITION_OPTIONS = [
   ['light', 'Light sensor'],
   ['sound', 'Sound sensor'],
   ['ultrasonic', 'Ultrasonic sensor'],
+  ['color', 'Color sensor'],
   ['rotation', 'Rotation sensor'],
   ['timer', 'Timer'],
   ['button', 'NXT buttons'],
   ['variable', 'Variable'],
 ] as const satisfies readonly (readonly [ConditionSource, string])[];
+
+const COLOR_OPTIONS = [
+  ['black', 'Black'],
+  ['blue', 'Blue'],
+  ['green', 'Green'],
+  ['yellow', 'Yellow'],
+  ['red', 'Red'],
+  ['white', 'White'],
+] as const;
+
+/** Case values and default case of a value switch. */
+function CaseFields({
+  block,
+  update,
+}: {
+  block: Extract<Block, { kind: 'switch' }>;
+  update(patch: Partial<Block>): void;
+}) {
+  const cases = block.cases ?? [];
+  const text = block.condition.source === 'value' && block.condition.valueType === 'text';
+  const setCases = (next: typeof cases, defaultCase = block.defaultCase ?? 0) =>
+    update({ cases: next, defaultCase: Math.min(defaultCase, next.length - 1) } as Partial<Block>);
+  return (
+    <>
+      <Field label="Type">
+        <Radios
+          name={`vt-${block.id}`}
+          value={text ? 'text' : 'number'}
+          options={[
+            ['number', 'Number'],
+            ['text', 'Text'],
+          ]}
+          onChange={(valueType) =>
+            update({ condition: { source: 'value', valueType } } as Partial<Block>)
+          }
+        />
+      </Field>
+      <Field label="Cases" icon="chart_bullseye">
+        <div style={{ display: 'flex', gap: 4, flexWrap: 'wrap', alignItems: 'center' }}>
+          {cases.map((c, i) => (
+            <span key={i} style={{ display: 'inline-flex', alignItems: 'center', gap: 2 }}>
+              <input
+                type="radio"
+                name={`def-${block.id}`}
+                title="Default case"
+                aria-label={`Make case ${i + 1} the default`}
+                checked={(block.defaultCase ?? 0) === i}
+                onChange={() => setCases(cases, i)}
+              />
+              <input
+                className="num-input"
+                aria-label={`Case ${i + 1} value`}
+                value={String(c.value)}
+                onChange={(e) =>
+                  setCases(
+                    cases.map((x, k) =>
+                      k === i
+                        ? { ...x, value: text ? e.target.value : Number(e.target.value) || 0 }
+                        : x,
+                    ),
+                  )
+                }
+              />
+            </span>
+          ))}
+          <button
+            type="button"
+            className="btn"
+            style={{ minWidth: 0 }}
+            onClick={() => setCases([...cases, { value: text ? '' : cases.length, blocks: [] }])}
+          >
+            + Case
+          </button>
+          <button
+            type="button"
+            className="btn"
+            style={{ minWidth: 0 }}
+            disabled={cases.length <= 2}
+            onClick={() => setCases(cases.slice(0, -1))}
+          >
+            − Case
+          </button>
+        </div>
+      </Field>
+      <p style={{ margin: 0, color: '#555' }}>
+        Wire a value into the switch plug. The marked case runs when no value matches.
+      </p>
+    </>
+  );
+}
 
 const NOTES = [
   ['262', 'C4'],
@@ -819,22 +997,36 @@ function ConditionFields({
       );
     case 'timer':
       return (
-        <Field label="Until" icon="stopwatch_start">
-          <Select
-            label="Compare"
-            value={c.compare}
-            options={COMPARE}
-            onChange={(compare) => onChange({ ...c, compare })}
-          />
-          <NumberInput
-            label="Seconds"
-            value={c.seconds}
-            min={0}
-            step={0.1}
-            onChange={(seconds) => onChange({ ...c, seconds })}
-          />
-          seconds
-        </Field>
+        <>
+          <Field label="Timer" icon="stopwatch_start">
+            <Radios
+              name={`tm-${id}`}
+              value={String(c.timer ?? 1)}
+              options={[
+                ['1', '1'],
+                ['2', '2'],
+                ['3', '3'],
+              ]}
+              onChange={(t) => onChange({ ...c, timer: Number(t) as 1 | 2 | 3 })}
+            />
+          </Field>
+          <Field label="Until">
+            <Select
+              label="Compare"
+              value={c.compare}
+              options={COMPARE}
+              onChange={(compare) => onChange({ ...c, compare })}
+            />
+            <NumberInput
+              label="Seconds"
+              value={c.seconds}
+              min={0}
+              step={0.1}
+              onChange={(seconds) => onChange({ ...c, seconds })}
+            />
+            seconds
+          </Field>
+        </>
       );
     case 'button':
       return (
@@ -858,10 +1050,87 @@ function ConditionFields({
               options={[
                 ['pressed', 'Pressed'],
                 ['released', 'Released'],
+                ['bumped', 'Bumped'],
               ]}
               onChange={(action) => onChange({ ...c, action })}
             />
           </Field>
+        </>
+      );
+    case 'value':
+      return null;
+    case 'color':
+      return (
+        <>
+          {port}
+          <Field label="Mode" icon="color_wheel">
+            <Radios
+              name={`cm-${id}`}
+              value={c.mode}
+              options={[
+                ['range', 'Color'],
+                ['light', 'Light level'],
+              ]}
+              onChange={(mode) => onChange({ ...c, mode })}
+            />
+          </Field>
+          {c.mode === 'range' ? (
+            <Field label="Until">
+              <Select
+                label="Inside or outside"
+                value={c.inside ? 'inside' : 'outside'}
+                options={[
+                  ['inside', 'Inside range'],
+                  ['outside', 'Outside range'],
+                ]}
+                onChange={(v) => onChange({ ...c, inside: v === 'inside' })}
+              />
+              <Select
+                label="From color"
+                value={c.from}
+                options={COLOR_OPTIONS}
+                onChange={(from) => onChange({ ...c, from })}
+              />
+              to
+              <Select
+                label="To color"
+                value={c.to}
+                options={COLOR_OPTIONS}
+                onChange={(to) => onChange({ ...c, to })}
+              />
+            </Field>
+          ) : (
+            <>
+              <Field label="Until">
+                <Select
+                  label="Compare"
+                  value={c.compare}
+                  options={COMPARE}
+                  onChange={(compare) => onChange({ ...c, compare })}
+                />
+                <Slider
+                  label="Level"
+                  min={0}
+                  max={100}
+                  value={c.value}
+                  onChange={(value) => onChange({ ...c, value })}
+                />
+              </Field>
+              <Field label="Lamp">
+                <Select
+                  label="Lamp color"
+                  value={c.lamp}
+                  options={[
+                    ['red', 'Red'],
+                    ['green', 'Green'],
+                    ['blue', 'Blue'],
+                    ['none', 'None'],
+                  ]}
+                  onChange={(lamp) => onChange({ ...c, lamp })}
+                />
+              </Field>
+            </>
+          )}
         </>
       );
     case 'variable':

@@ -1,4 +1,5 @@
 import { PROJECT_EXTENSION, parseProject, serializeProject, type Program } from '@nxt/blocks';
+import { importRbt } from '@nxt/rbt';
 
 // File System Access API types are not in the DOM lib yet.
 interface FileHandle {
@@ -11,28 +12,58 @@ type PickerWindow = Window & {
   showSaveFilePicker?: (options: object) => Promise<FileHandle>;
 };
 
-const pickerTypes = [
+const saveTypes = [
   {
     description: 'NXT Web Studio project',
     accept: { 'application/json': [PROJECT_EXTENSION, '.json'] },
+  },
+];
+const openTypes = [
+  {
+    description: 'NXT programs (.nxtproj.json, .rbt)',
+    accept: {
+      'application/json': [PROJECT_EXTENSION, '.json'],
+      'application/octet-stream': ['.rbt'],
+    },
   },
 ];
 
 /** A file the project was opened from or saved to, so Save can overwrite it. */
 export type SavedFile = FileHandle | null;
 
+/** A program read from a file, with any notes from importing it. */
+export interface OpenedProgram {
+  program: Program;
+  handle: SavedFile;
+  /** Notes about things that could not be carried over (imported .rbt files). */
+  warnings: string[];
+  /** True when the file was an original NXT-G program (.rbt). */
+  imported: boolean;
+}
+
 function isAbort(error: unknown): boolean {
   return error instanceof DOMException && error.name === 'AbortError';
 }
 
-/** Lets the user pick a project file. Returns null if they cancel. */
-export async function openProjectFile(): Promise<{ program: Program; handle: SavedFile } | null> {
+/** Reads a project (.nxtproj.json) or an original NXT-G program (.rbt). */
+export async function readProgramFile(file: File): Promise<Omit<OpenedProgram, 'handle'>> {
+  if (/\.rbt$/i.test(file.name)) {
+    const { program, warnings } = importRbt(new Uint8Array(await file.arrayBuffer()), file.name);
+    return { program, warnings, imported: true };
+  }
+  return { program: parseProject(await file.text()), warnings: [], imported: false };
+}
+
+/** Lets the user pick a project or .rbt program. Returns null if they cancel. */
+export async function openProjectFile(): Promise<OpenedProgram | null> {
   const w = window as PickerWindow;
   if (w.showOpenFilePicker) {
     try {
-      const [handle] = await w.showOpenFilePicker({ types: pickerTypes });
+      const [handle] = await w.showOpenFilePicker({ types: openTypes });
       if (!handle) return null;
-      return { program: parseProject(await (await handle.getFile()).text()), handle };
+      const opened = await readProgramFile(await handle.getFile());
+      // Imported .rbt files are saved as new projects, never overwritten.
+      return { ...opened, handle: opened.imported ? null : handle };
     } catch (error) {
       if (isAbort(error)) return null;
       throw error;
@@ -41,11 +72,11 @@ export async function openProjectFile(): Promise<{ program: Program; handle: Sav
   const file = await new Promise<File | null>((resolve) => {
     const input = document.createElement('input');
     input.type = 'file';
-    input.accept = `${PROJECT_EXTENSION},.json`;
+    input.accept = `${PROJECT_EXTENSION},.json,.rbt`;
     input.onchange = () => resolve(input.files?.[0] ?? null);
     input.click();
   });
-  return file ? { program: parseProject(await file.text()), handle: null } : null;
+  return file ? { ...(await readProgramFile(file)), handle: null } : null;
 }
 
 /**
@@ -66,7 +97,7 @@ export async function saveProjectFile(
           ? handle
           : await w.showSaveFilePicker({
               suggestedName: `${program.name}${PROJECT_EXTENSION}`,
-              types: pickerTypes,
+              types: saveTypes,
             });
       const writable = await target.createWritable();
       await writable.write(text);

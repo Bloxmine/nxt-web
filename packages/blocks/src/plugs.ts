@@ -33,11 +33,13 @@ export function plugsOf(block: Block): Plug[] {
         plug('direction', 'Direction', 'logic', true),
         plug('steering', 'Steering', 'number', true),
         plug('power', 'Power', 'number', true),
+        plug('duration', 'Duration', 'number', true),
       ];
     case 'motor':
       return [
         plug('direction', 'Direction', 'logic', true),
         plug('power', 'Power', 'number', true),
+        plug('duration', 'Duration', 'number', true),
       ];
     case 'sound':
       return [plug('frequency', 'Tone', 'number', true), plug('volume', 'Volume', 'number', true)];
@@ -57,15 +59,22 @@ export function plugsOf(block: Block): Plug[] {
       return plugs;
     }
     case 'switch':
-      return block.condition.source === 'logic'
-        ? [plug('condition', 'Value', 'logic', true, false)]
-        : [];
+      if (block.condition.source === 'logic')
+        return [plug('condition', 'Value', 'logic', true, false)];
+      if (block.condition.source === 'value') {
+        const type = block.condition.valueType === 'text' ? 'text' : 'number';
+        return [plug('condition', 'Value', type, true, false)];
+      }
+      return [];
     case 'variable':
-      return [plug('value', 'Value', 'number', block.action !== 'read')];
+      return [plug('value', 'Value', block.valueType ?? 'number', block.action !== 'read')];
     case 'sensor': {
       const c = block.condition;
       if (c.source === 'touch' || c.source === 'button')
         return [plug('yes', 'Yes / No', 'logic', false)];
+      if (c.source === 'color' && c.mode === 'range') {
+        return [plug('yes', 'Yes / No', 'logic', false), plug('value', 'Color', 'number', false)];
+      }
       return [
         plug('trigger', 'Trigger', 'number', true),
         plug('yes', 'Yes / No', 'logic', false),

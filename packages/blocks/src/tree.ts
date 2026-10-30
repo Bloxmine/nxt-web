@@ -2,7 +2,8 @@ import type { Block, Program } from './model.js';
 import { findPlug } from './plugs.js';
 
 /** Which nested sequence of a container block. */
-export type Branch = 'body' | 'whenTrue' | 'whenFalse';
+/** Which nested sequence: loop body, switch true/false branch, or value-switch case n. */
+export type Branch = 'body' | 'whenTrue' | 'whenFalse' | `case:${number}`;
 
 /**
  * Points at one sequence of blocks: the root of the main program or of a My
@@ -22,6 +23,9 @@ export const MAIN: SeqRef = { root: 'main', parent: null, branch: 'body' };
 export function childSequences(block: Block): { branch: Branch; blocks: Block[] }[] {
   if (block.kind === 'loop') return [{ branch: 'body', blocks: block.body }];
   if (block.kind === 'switch') {
+    if (block.cases) {
+      return block.cases.map((c, i) => ({ branch: `case:${i}` as Branch, blocks: c.blocks }));
+    }
     return [
       { branch: 'whenTrue', blocks: block.whenTrue },
       { branch: 'whenFalse', blocks: block.whenFalse },
@@ -34,6 +38,10 @@ function withChild(block: Block, branch: Branch, blocks: Block[]): Block {
   if (block.kind === 'loop' && branch === 'body') return { ...block, body: blocks };
   if (block.kind === 'switch' && branch === 'whenTrue') return { ...block, whenTrue: blocks };
   if (block.kind === 'switch' && branch === 'whenFalse') return { ...block, whenFalse: blocks };
+  if (block.kind === 'switch' && block.cases && branch.startsWith('case:')) {
+    const i = Number(branch.slice(5));
+    return { ...block, cases: block.cases.map((c, k) => (k === i ? { ...c, blocks } : c)) };
+  }
   throw new Error(`Block ${block.id} has no "${branch}" branch`);
 }
 

@@ -38,7 +38,7 @@ import { VariablesDialog } from './components/VariablesDialog';
 import { EditorContext, useIssues } from './editor/EditorContext';
 import { editorReducer, initialState } from './editor/store';
 import { checkBrowserSupport } from './lib/browserSupport';
-import { openProjectFile, saveProjectFile, type SavedFile } from './lib/files';
+import { openProjectFile, readProgramFile, saveProjectFile, type SavedFile } from './lib/files';
 import { iconUrl } from './lib/icons';
 import { loadValue, saveValue } from './lib/storage';
 
@@ -102,6 +102,31 @@ function Studio() {
 
   const message = (title: string, icon: string, body: ReactNode) => setModal({ title, icon, body });
 
+  const showOpened = (result: { program: Program; warnings: string[]; imported: boolean }) => {
+    dispatch({ type: 'load', program: result.program });
+    if (!result.imported) return;
+    message(
+      'Program imported',
+      result.warnings.length ? 'error' : 'tick',
+      <>
+        <p style={{ marginTop: 0 }}>
+          <strong>{result.program.name}</strong> was opened from an NXT-G program (.rbt). Saving
+          creates a new project file; the original is not changed.
+        </p>
+        {result.warnings.length > 0 && (
+          <>
+            <p>Some parts could not be carried over exactly:</p>
+            <ul style={{ paddingLeft: 18 }}>
+              {result.warnings.map((w, i) => (
+                <li key={i}>{w}</li>
+              ))}
+            </ul>
+          </>
+        )}
+      </>,
+    );
+  };
+
   const actions = {
     newProgram: () => {
       if (!confirmDiscard()) return;
@@ -114,7 +139,17 @@ function Studio() {
         const result = await openProjectFile();
         if (!result) return;
         fileHandle.current = result.handle;
-        dispatch({ type: 'load', program: result.program });
+        showOpened(result);
+      } catch (e) {
+        message('Could not open', 'exclamation', e instanceof Error ? e.message : String(e));
+      }
+    },
+    openFile: async (file: File) => {
+      if (!confirmDiscard()) return;
+      try {
+        const result = await readProgramFile(file);
+        fileHandle.current = null;
+        showOpened(result);
       } catch (e) {
         message('Could not open', 'exclamation', e instanceof Error ? e.message : String(e));
       }
@@ -263,6 +298,26 @@ function Studio() {
     }
   }, []);
 
+  // Drop a .rbt or project file anywhere on the window to open it.
+  useEffect(() => {
+    const isFileDrag = (e: DragEvent) => e.dataTransfer?.types.includes('Files') ?? false;
+    const over = (e: DragEvent) => {
+      if (isFileDrag(e)) e.preventDefault();
+    };
+    const drop = (e: DragEvent) => {
+      if (!isFileDrag(e)) return;
+      e.preventDefault();
+      const file = e.dataTransfer?.files[0];
+      if (file) void actionsRef.current.openFile(file);
+    };
+    window.addEventListener('dragover', over);
+    window.addEventListener('drop', drop);
+    return () => {
+      window.removeEventListener('dragover', over);
+      window.removeEventListener('drop', drop);
+    };
+  }, []);
+
   useEffect(() => {
     window.addEventListener('keydown', onKeyDown);
     return () => window.removeEventListener('keydown', onKeyDown);
@@ -273,7 +328,12 @@ function Studio() {
       label: 'File',
       items: [
         { label: 'New', icon: 'page_white_add', onClick: actions.newProgram },
-        { label: 'Open…', icon: 'folder', shortcut: 'Ctrl+O', onClick: () => void actions.open() },
+        {
+          label: 'Open… (.nxtproj, .rbt)',
+          icon: 'folder',
+          shortcut: 'Ctrl+O',
+          onClick: () => void actions.open(),
+        },
         { label: 'Save', icon: 'diskette', shortcut: 'Ctrl+S', onClick: () => void actions.save() },
         { label: 'Save As…', shortcut: 'Ctrl+Shift+S', onClick: () => void actions.save(true) },
         { label: 'Rename program…', onClick: actions.renameProgram },

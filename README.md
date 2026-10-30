@@ -13,6 +13,9 @@ The editor follows the classic NXT 2.0 software: a sequence beam with blocks, lo
 switches, fold-out data hubs with wires, parallel beams, a configuration panel and a
 controller. Try `?example=distance` or `?example=parallel` in the URL.
 
+**Opens original NXT-G programs:** File → Open (or drop a file on the window) accepts `.rbt`
+files from the NXT 2.0 software. See [docs/rbt-compat.md](docs/rbt-compat.md).
+
 ## Requirements
 
 - Chrome, Edge, Brave or Opera (current version) on Linux or macOS. Firefox and Safari lack WebUSB.

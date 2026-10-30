@@ -15,6 +15,8 @@ export function portsLabel(block: Block): string {
     case 'switch':
     case 'sensor':
       return conditionPort(block.condition);
+    case 'colorLamp':
+      return String(block.port);
     default:
       return '';
   }
@@ -50,7 +52,13 @@ export function conditionText(c: Condition): string {
     case 'rotation':
       return `${c.compare} ${c.value}${c.unit === 'degrees' ? '°' : ' rot'}`;
     case 'timer':
-      return `${c.compare} ${c.seconds} s`;
+      return `T${c.timer ?? 1} ${c.compare} ${c.seconds} s`;
+    case 'color':
+      return c.mode === 'light'
+        ? `${c.lamp} ${c.compare} ${c.value}%`
+        : `${c.inside ? '' : 'not '}${c.from}${c.to !== c.from ? `–${c.to}` : ''}`;
+    case 'value':
+      return c.valueType === 'text' ? 'text' : 'number';
     case 'button':
       return `${c.button} ${c.action}`;
     case 'variable':
@@ -78,6 +86,7 @@ export function blockSummary(block: Block): string {
       return block.action === 'tone' ? `♪ ${block.frequency} Hz` : `♪ ${block.file}`;
     case 'display':
       if (block.action === 'reset') return 'reset';
+      if (block.action === 'image') return `▣ ${block.image ?? ''}`;
       return block.action === 'text' ? `"${block.text}"` : `# ${block.variable}`;
     case 'wait':
       return block.control.type === 'time'
@@ -93,6 +102,8 @@ export function blockSummary(block: Block): string {
       return block.action === 'set' ? `= ${block.value}` : `+= ${block.value}`;
     case 'myBlock':
       return '';
+    case 'colorLamp':
+      return block.on ? `● ${block.color}` : 'off';
     case 'sensor':
       return 'port' in block.condition
         ? `port ${block.condition.port}`

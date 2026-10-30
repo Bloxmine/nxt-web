@@ -32,7 +32,8 @@ const SWITCH_TOP = 3 + 4; // frame border + branch padding
 
 function itemBeam(block: Block): number {
   if (block.kind === 'loop') return LOOP_TOP + sequenceBeam(block.body);
-  if (block.kind === 'switch') return SWITCH_TOP + sequenceBeam(block.whenTrue);
+  if (block.kind === 'switch')
+    return SWITCH_TOP + sequenceBeam(block.cases?.[0]?.blocks ?? block.whenTrue);
   return TILE_BEAM;
 }
 
@@ -355,8 +356,39 @@ function LoopView({ block, root }: { block: LoopBlock; root: string }) {
 function SwitchView({ block, root }: { block: SwitchBlock; root: string }) {
   const { selected, issues, handlers } = useBlockProps(block);
   const plugs = plugsOf(block);
-  const topBeam = sequenceBeam(block.whenTrue);
-  const bottomBeam = sequenceBeam(block.whenFalse);
+  // Value switches have one branch per case; others a true and a false branch.
+  const branches: {
+    branch: SeqRef['branch'];
+    blocks: Block[];
+    mark: React.ReactNode;
+    title: string;
+  }[] = block.cases
+    ? block.cases.map((c, i) => ({
+        branch: `case:${i}` as SeqRef['branch'],
+        blocks: c.blocks,
+        title: `Case ${String(c.value)}${(block.defaultCase ?? 0) === i ? ' (default)' : ''}`,
+        mark: (
+          <span className="case-mark">
+            {(block.defaultCase ?? 0) === i ? '★' : ''}
+            {String(c.value)}
+          </span>
+        ),
+      }))
+    : [
+        {
+          branch: 'whenTrue',
+          blocks: block.whenTrue,
+          title: 'When true',
+          mark: <img src={iconUrl('tick')} alt="True" />,
+        },
+        {
+          branch: 'whenFalse',
+          blocks: block.whenFalse,
+          title: 'When false',
+          mark: <img src={iconUrl('cross')} alt="False" />,
+        },
+      ];
+  const topBeam = sequenceBeam(branches[0]?.blocks ?? []);
   return (
     <div
       {...handlers}
@@ -378,24 +410,18 @@ function SwitchView({ block, root }: { block: SwitchBlock; root: string }) {
         ))}
       </div>
       <div className="switch-branches">
-        <div className="switch-branch">
-          <span className="branch-mark" title="When true" style={{ marginTop: topBeam - 8 }}>
-            <img src={iconUrl('tick')} alt="True" />
-          </span>
-          <Sequence
-            seqRef={{ root, parent: block.id, branch: 'whenTrue' }}
-            blocks={block.whenTrue}
-          />
-        </div>
-        <div className="switch-branch">
-          <span className="branch-mark" title="When false" style={{ marginTop: bottomBeam - 8 }}>
-            <img src={iconUrl('cross')} alt="False" />
-          </span>
-          <Sequence
-            seqRef={{ root, parent: block.id, branch: 'whenFalse' }}
-            blocks={block.whenFalse}
-          />
-        </div>
+        {branches.map((b) => (
+          <div key={b.branch} className="switch-branch">
+            <span
+              className="branch-mark"
+              title={b.title}
+              style={{ marginTop: sequenceBeam(b.blocks) - 8 }}
+            >
+              {b.mark}
+            </span>
+            <Sequence seqRef={{ root, parent: block.id, branch: b.branch }} blocks={b.blocks} />
+          </div>
+        ))}
       </div>
       <div className="switch-bar end" />
     </div>

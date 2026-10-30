@@ -21,6 +21,20 @@ export function sensorKindOf(c: Condition): { port: SensorPort; kind: SensorKind
       return { port: c.port, kind: c.dba ? 'soundDba' : 'soundDb' };
     case 'ultrasonic':
       return { port: c.port, kind: 'ultrasonic' };
+    case 'color':
+      return {
+        port: c.port,
+        kind:
+          c.mode === 'range'
+            ? 'colorFull'
+            : c.lamp === 'red'
+              ? 'colorRed'
+              : c.lamp === 'green'
+                ? 'colorGreen'
+                : c.lamp === 'blue'
+                  ? 'colorBlue'
+                  : 'colorNone',
+      };
     default:
       return null;
   }
@@ -42,6 +56,11 @@ const SENSOR_NAMES: Record<SensorKind, string> = {
   soundDb: 'sound sensor (dB)',
   soundDba: 'sound sensor (dBA)',
   ultrasonic: 'ultrasonic sensor',
+  colorFull: 'color sensor (color mode)',
+  colorRed: 'color sensor (red lamp)',
+  colorGreen: 'color sensor (green lamp)',
+  colorBlue: 'color sensor (blue lamp)',
+  colorNone: 'color sensor (no lamp)',
 };
 
 /** Checks a program for mistakes. Returns an empty list when it is fine to run. */
@@ -56,7 +75,9 @@ export function validateProgram(program: Program): Issue[] {
     const sensor = sensorKindOf(c);
     if (sensor) {
       const existing = sensorPorts.get(sensor.port);
-      if (existing && existing !== sensor.kind) {
+      // The color sensor may switch modes (lamp colors) on the same port.
+      const bothColor = existing?.startsWith('color') && sensor.kind.startsWith('color');
+      if (existing && existing !== sensor.kind && !bothColor) {
         add(
           block.id,
           `Port ${sensor.port} is already used as a ${SENSOR_NAMES[existing]}; it can't also be a ${SENSOR_NAMES[sensor.kind]}.`,
@@ -73,6 +94,13 @@ export function validateProgram(program: Program): Issue[] {
     }
     if ((c.source === 'light' || c.source === 'sound') && (c.value < 0 || c.value > 100)) {
       add(block.id, 'Level must be between 0 and 100.');
+    }
+    if (c.source === 'value') {
+      if (block.kind !== 'switch')
+        add(block.id, 'Only a Switch can choose between cases by value.');
+      else if (!wireInto(program, block.id, 'condition')) {
+        add(block.id, 'Wire a number or text into this Switch’s plug.');
+      }
     }
     if (c.source === 'logic') {
       if (block.kind === 'wait') add(block.id, 'Wait blocks cannot use a wired value.');
