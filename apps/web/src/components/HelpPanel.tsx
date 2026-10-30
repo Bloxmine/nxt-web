@@ -18,7 +18,13 @@ function helpFor(block: Block): string {
               ? 'color-lamp'
               : block.kind === 'numberToText'
                 ? 'number-to-text'
-                : block.kind;
+                : block.kind === 'file'
+                  ? 'file-access'
+                  : block.kind === 'sendMessage'
+                    ? 'send-message'
+                    : block.kind === 'receiveMessage'
+                      ? 'receive-message'
+                      : block.kind;
   return (
     PALETTE[key]?.help ?? (block.kind === 'myBlock' ? 'A block you made from other blocks.' : '')
   );

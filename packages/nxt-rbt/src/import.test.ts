@@ -136,3 +136,106 @@ describe.skipIf(files.length === 0)('importing real .rbt programs (local only)',
     expect(lamps.slice(0, 3).map((l) => l.color)).toEqual(['green', 'blue', 'green']);
   });
 });
+
+describe.skipIf(files.length === 0)('NXT 2.0 color sensor and file programs (local only)', () => {
+  it.skipIf(!has('CheckoutScan.rbt'))(
+    'CheckoutScan: calibration texts on lines 3–6 and light-mode color sensor',
+    () => {
+      const { program, warnings } = load('CheckoutScan.rbt');
+      expect(warnings).toEqual([]);
+      const texts = program.body.filter((b) => b.kind === 'display').slice(0, 4) as Extract<
+        Block,
+        { kind: 'display' }
+      >[];
+      expect(texts.map((t) => [t.text, t.line, t.clear])).toEqual([
+        ['Cover sensor', 3, true],
+        ['with Calibration', 4, false],
+        ['Plate, and', 5, false],
+        ['Press Enter.', 6, false],
+      ]);
+      const color = program.body.find((b) => b.kind === 'sensor') as Extract<
+        Block,
+        { kind: 'sensor' }
+      >;
+      expect(color.condition).toMatchObject({
+        source: 'color',
+        port: 3,
+        mode: 'light',
+        lamp: 'red',
+      });
+    },
+  );
+
+  it.skipIf(!has('DataLogLight.rbt'))('DataLogLight: delete, write header, log, close', () => {
+    const { program, warnings } = load('DataLogLight.rbt');
+    expect(warnings).toEqual([]);
+    const files = (b: Block[]): Extract<Block, { kind: 'file' }>[] =>
+      b.flatMap((x) => (x.kind === 'file' ? [x] : x.kind === 'loop' ? files(x.body) : []));
+    expect(files(program.body).map((f) => [f.action, f.file])).toEqual([
+      ['delete', 'ScanData'],
+      ['write', 'ScanData'],
+      ['write', 'ScanData'],
+      ['close', 'ScanData'],
+    ]);
+    expect(program.body.find((b) => b.kind === 'constant')).toMatchObject({ number: 4000 });
+  });
+
+  it.skipIf(!has('LightMeter.rbt'))('LightMeter: bar graph lines and wired lamp colour', () => {
+    const { program, warnings } = load('LightMeter.rbt');
+    expect(warnings).toEqual([]);
+    const loop = program.body.find((b) => b.kind === 'loop') as Extract<Block, { kind: 'loop' }>;
+    const lines = loop.body.filter(
+      (b) => b.kind === 'display' && b.action === 'drawing',
+    ) as Extract<Block, { kind: 'display' }>[];
+    expect(lines.map((l) => [l.shape, l.y, l.endY])).toEqual([
+      ['line', 30, 30],
+      ['line', 31, 31],
+      ['line', 32, 32],
+    ]);
+    const sensor = loop.body.find((b) => b.kind === 'sensor')!;
+    expect(
+      program.wires
+        .filter((w) => w.to.block === sensor.id)
+        .map((w) => w.to.plug)
+        .sort(),
+    ).toEqual(['lamp', 'light']);
+  });
+});
+
+describe.skipIf(files.length === 0)('Bluetooth remote programs (local only)', () => {
+  it.skipIf(!has('5ButtonRemote.rbt') || !has('5ButtonSteer.rbt'))(
+    'remote sends to the mailboxes the robot reads',
+    async () => {
+      const { walkProgram } = await import('@nxt/blocks');
+      const mailboxes = (name: string, kind: 'sendMessage' | 'receiveMessage') => {
+        const set = new Set<number>();
+        walkProgram(load(name).program, (b) => {
+          if (b.kind === kind) set.add(b.mailbox);
+        });
+        return [...set].sort();
+      };
+      expect(mailboxes('5ButtonRemote.rbt', 'sendMessage')).toEqual([1, 2]);
+      expect(mailboxes('5ButtonSteer.rbt', 'receiveMessage')).toEqual([1, 2]);
+    },
+  );
+
+  it.skipIf(!has('ColorRace.rbt'))('color switch cases are colors 1–6', () => {
+    let values: (number | string)[] = [];
+    walk(load('ColorRace.rbt').program.body, (b) => {
+      if (b.kind === 'switch' && b.cases) values = b.cases.map((c) => c.value);
+    });
+    expect(values).toEqual([1, 2, 3, 4, 5, 6]);
+  });
+});
+
+function walk(blocks: Block[], fn: (b: Block) => void): void {
+  for (const b of blocks) {
+    fn(b);
+    if (b.kind === 'loop') walk(b.body, fn);
+    if (b.kind === 'switch') {
+      walk(b.whenTrue, fn);
+      walk(b.whenFalse, fn);
+      for (const c of b.cases ?? []) walk(c.blocks, fn);
+    }
+  }
+}

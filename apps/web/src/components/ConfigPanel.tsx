@@ -351,11 +351,77 @@ function BlockFields({ block, update, program, onEditVariables }: FieldsProps) {
                 ['text', 'Text'],
                 ['variable', 'Number variable'],
                 ['image', 'Image'],
+                ['drawing', 'Drawing'],
                 ['reset', 'Clear screen'],
               ]}
               onChange={(action) => update({ action })}
             />
           </Field>
+          {block.action === 'drawing' && (
+            <>
+              <Field label="Shape">
+                <Radios
+                  name={`ds-${block.id}`}
+                  value={block.shape ?? 'line'}
+                  options={[
+                    ['point', 'Point'],
+                    ['line', 'Line'],
+                    ['circle', 'Circle'],
+                  ]}
+                  onChange={(shape) => update({ shape })}
+                />
+              </Field>
+              <Field label="From">
+                X
+                <NumberInput
+                  label="X"
+                  value={block.x}
+                  min={0}
+                  max={99}
+                  onChange={(x) => update({ x })}
+                />
+                Y
+                <NumberInput
+                  label="Y"
+                  value={block.y ?? 0}
+                  min={0}
+                  max={63}
+                  onChange={(y) => update({ y })}
+                />
+              </Field>
+              {(block.shape ?? 'line') === 'line' && (
+                <Field label="To">
+                  X
+                  <NumberInput
+                    label="End X"
+                    value={block.endX ?? 0}
+                    min={0}
+                    max={99}
+                    onChange={(endX) => update({ endX })}
+                  />
+                  Y
+                  <NumberInput
+                    label="End Y"
+                    value={block.endY ?? 0}
+                    min={0}
+                    max={63}
+                    onChange={(endY) => update({ endY })}
+                  />
+                </Field>
+              )}
+              {block.shape === 'circle' && (
+                <Field label="Radius">
+                  <NumberInput
+                    label="Radius"
+                    value={block.radius ?? 5}
+                    min={0}
+                    max={63}
+                    onChange={(radius) => update({ radius })}
+                  />
+                </Field>
+              )}
+            </>
+          )}
           {block.action === 'image' && (
             <Field label="File" icon="monitor_window">
               <input
@@ -387,7 +453,7 @@ function BlockFields({ block, update, program, onEditVariables }: FieldsProps) {
               />
             </Field>
           )}
-          {block.action !== 'reset' && (
+          {block.action !== 'reset' && block.action !== 'drawing' && (
             <>
               <Field label="Position">
                 X
@@ -645,6 +711,181 @@ function BlockFields({ block, update, program, onEditVariables }: FieldsProps) {
             onChange={(t) => update({ timer: Number(t) as 1 | 2 | 3 })}
           />
         </Field>
+      );
+    case 'file':
+      return (
+        <>
+          <Field label="Action" icon="page_white_text">
+            <Radios
+              name={`fa-${block.id}`}
+              value={block.action}
+              options={[
+                ['read', 'Read'],
+                ['write', 'Write'],
+                ['close', 'Close'],
+                ['delete', 'Delete'],
+              ]}
+              onChange={(action) => update({ action })}
+            />
+          </Field>
+          <Field label="Name">
+            <input
+              className="text-input"
+              aria-label="File name"
+              value={block.file}
+              maxLength={15}
+              onChange={(e) => update({ file: e.target.value })}
+            />
+          </Field>
+          {(block.action === 'read' || block.action === 'write') && (
+            <Field label="Type">
+              <Radios
+                name={`ft-${block.id}`}
+                value={block.type}
+                options={[
+                  ['text', 'Text'],
+                  ['number', 'Number'],
+                ]}
+                onChange={(type) => update({ type })}
+              />
+            </Field>
+          )}
+          {block.action === 'write' && (
+            <Field label="Value">
+              {block.type === 'text' ? (
+                <input
+                  className="text-input"
+                  aria-label="Text to write"
+                  value={block.text}
+                  onChange={(e) => update({ text: e.target.value })}
+                />
+              ) : (
+                <NumberInput
+                  label="Number to write"
+                  value={block.number}
+                  onChange={(number) => update({ number })}
+                />
+              )}
+            </Field>
+          )}
+        </>
+      );
+    case 'sendMessage':
+    case 'receiveMessage':
+      return (
+        <>
+          {block.kind === 'sendMessage' && (
+            <Field label="Connection" icon="bluetooth">
+              <Radios
+                name={`mc-${block.id}`}
+                value={String(block.connection)}
+                options={[
+                  ['0', '0 (master)'],
+                  ['1', '1'],
+                  ['2', '2'],
+                  ['3', '3'],
+                ]}
+                onChange={(c) => update({ connection: Number(c) as 0 | 1 | 2 | 3 })}
+              />
+            </Field>
+          )}
+          <Field label="Mailbox" icon={block.kind === 'sendMessage' ? 'email_go' : 'email_open'}>
+            <Select
+              label="Mailbox"
+              value={block.mailbox}
+              options={[1, 2, 3, 4, 5, 6, 7, 8, 9, 10].map((n) => [n, String(n)] as const)}
+              onChange={(mailbox) => update({ mailbox })}
+            />
+          </Field>
+          <Field label="Type">
+            <Radios
+              name={`mt-${block.id}`}
+              value={block.type}
+              options={[
+                ['text', 'Text'],
+                ['number', 'Number'],
+                ['logic', 'Logic'],
+              ]}
+              onChange={(type) => update({ type })}
+            />
+          </Field>
+          {block.kind === 'sendMessage' && (
+            <Field label="Message">
+              {block.type === 'number' && (
+                <NumberInput
+                  label="Message"
+                  value={block.number}
+                  onChange={(number) => update({ number })}
+                />
+              )}
+              {block.type === 'logic' && (
+                <Radios
+                  name={`ml-${block.id}`}
+                  value={block.logic ? 'true' : 'false'}
+                  options={[
+                    ['true', 'True'],
+                    ['false', 'False'],
+                  ]}
+                  onChange={(v) => update({ logic: v === 'true' })}
+                />
+              )}
+              {block.type === 'text' && (
+                <input
+                  className="text-input"
+                  aria-label="Message"
+                  value={block.text}
+                  maxLength={58}
+                  onChange={(e) => update({ text: e.target.value })}
+                />
+              )}
+            </Field>
+          )}
+        </>
+      );
+    case 'constant':
+      return (
+        <>
+          <Field label="Type" icon="anchor">
+            <Radios
+              name={`ct-${block.id}`}
+              value={block.valueType}
+              options={[
+                ['number', 'Number'],
+                ['logic', 'Logic'],
+                ['text', 'Text'],
+              ]}
+              onChange={(valueType) => update({ valueType })}
+            />
+          </Field>
+          <Field label="Value">
+            {block.valueType === 'number' && (
+              <NumberInput
+                label="Value"
+                value={block.number}
+                onChange={(number) => update({ number })}
+              />
+            )}
+            {block.valueType === 'logic' && (
+              <Radios
+                name={`cv-${block.id}`}
+                value={block.logic ? 'true' : 'false'}
+                options={[
+                  ['true', 'True'],
+                  ['false', 'False'],
+                ]}
+                onChange={(v) => update({ logic: v === 'true' })}
+              />
+            )}
+            {block.valueType === 'text' && (
+              <input
+                className="text-input"
+                aria-label="Value"
+                value={block.text}
+                onChange={(e) => update({ text: e.target.value })}
+              />
+            )}
+          </Field>
+        </>
       );
     case 'colorLamp':
       return (

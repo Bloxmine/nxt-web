@@ -36,6 +36,7 @@ const SENSOR_TEMPLATES = new Set([
   'NXT Buttons',
   'Color Sensor',
   'FP Color Sensor',
+  'Color Detector',
 ]);
 
 const LOOP_CONTROL = /^Loop(Cnt|Term)/;
@@ -108,7 +109,7 @@ const PLUG_NAMES: Record<string, Record<string, string>> = {
   move: { Power: 'power', Steering: 'steering', Direction: 'direction', Goal: 'duration' },
   motor: { Power: 'power', Direction: 'direction', Goal: 'duration' },
   sound: { Tone: 'frequency', Volume: 'volume' },
-  display: { Text: 'text', X: 'x', Y: 'line' },
+  display: { Text: 'text', X: 'x', Y: 'y', 'End X': 'endX', 'End Y': 'endY', Radius: 'radius' },
   variable: { Value: 'value' },
   sensor: {
     Boolean: 'yes',
@@ -119,6 +120,10 @@ const PLUG_NAMES: Record<string, Record<string, string>> = {
     Intensity: 'value',
     Color: 'value',
     Threshold: 'trigger',
+    'Trigger Point': 'trigger',
+    'Detected Color Number': 'value',
+    'Lamp Color': 'lamp',
+    Floodlight: 'light',
   },
   compare: { A: 'a', B: 'b', Boolean: 'result' },
   math: { A: 'a', B: 'b', Value: 'result' },
@@ -126,6 +131,29 @@ const PLUG_NAMES: Record<string, Record<string, string>> = {
   range: { A: 'low', B: 'high', Value: 'value', Boolean: 'result' },
   numberToText: { Number: 'number', Text: 'text' },
   text: { A: 'a', B: 'b', C: 'c', String: 'result' },
+  file: {
+    Filename: 'filename',
+    'Text In': 'text',
+    'Text Out': 'text',
+    'Number In': 'number',
+    'Number Out': 'number',
+    Error: 'error',
+    'File Size': 'size',
+  },
+  constant: { Value: 'value' },
+  sendMessage: {
+    Mailbox: 'mailbox',
+    'Number In': 'value',
+    'Boolean In': 'value',
+    'String In': 'value',
+  },
+  receiveMessage: {
+    Mailbox: 'mailbox',
+    'Message Received': 'received',
+    'Number Out': 'value',
+    'Boolean Out': 'value',
+    'String Out': 'value',
+  },
 };
 
 /** Converts a decoded .rbt program into the editor's Program model. */
@@ -245,6 +273,12 @@ export function convertRbt(rbt: RbtProgram): ImportResult {
     const sources = sourcesOf(target);
     const src = sources[0] ? rbt.nodes.get(sources[0].owner) : undefined;
     if (!src || !isSensor(src)) continue;
+    // Stays a visible block (wired into the structure) when it has wired inputs
+    // or picks between more than two cases (e.g. a color switch, one case per color).
+    const wiredInputs = (termsByOwner.get(src.ptr) ?? []).some(
+      (t) => !t.output && !t.name?.startsWith('Sequence') && sourcesOf(t).length > 0,
+    );
+    if (wiredInputs || (node.kind === 'switch' && node.diagrams.length > 2)) continue;
     const others = (termsByOwner.get(src.ptr) ?? [])
       .filter((t) => t.output && !t.name?.startsWith('Sequence'))
       .flatMap((t) => reach(t.ptr))
@@ -292,6 +326,29 @@ export function convertRbt(rbt: RbtProgram): ImportResult {
           timer: (t >= 1 && t <= 3 ? t : 1) as 1 | 2 | 3,
           compare: '>',
           seconds: d.f64(0xd4, 5),
+        };
+      }
+      case 'Color Detector': {
+        // NXT 2.0 Color Sensor block: typed settings tag.
+        const c = cfg(inst, 'ColorDetectorBlockConfig');
+        const names = ['black', 'blue', 'green', 'yellow', 'red', 'white'] as const;
+        const lampName = str(c?.[''], 'Red').toLowerCase();
+        const lamp =
+          c?.['Generate Light?'] === false
+            ? 'none'
+            : lampName === 'green' || lampName === 'blue'
+              ? lampName
+              : 'red';
+        return {
+          source: 'color',
+          port: sensorPort(Number(str(c?.['Plug Selector'], '3'))),
+          mode: num(c?.['Mode'], 0) === 1 ? 'light' : 'range',
+          inside: c?.['Inside Outside Range'] !== false,
+          from: names[num(c?.['Color Range A'], 5) - 1] ?? 'red',
+          to: names[num(c?.['Color Range B'], 5) - 1] ?? 'red',
+          compare: c?.['Polarity'] === false ? '<' : '>',
+          value: num(c?.['Trigger Point'], 50),
+          lamp,
         };
       }
       case 'NXT Buttons': {
@@ -389,21 +446,93 @@ export function convertRbt(rbt: RbtProgram): ImportResult {
         } as Block;
       }
       case 'Display': {
-        const textLen = d.u32(0xc0);
-        const hasText = textLen > 0 && textLen < 200 && d.ok(0xc4, textLen);
-        const textValue = hasText ? d.r.text(0xc4, textLen) : '';
-        const fileAt = d.find([0x53], 0xc0); // not used: image name search below
-        void fileAt;
-        const imageMatch = /([A-Za-z][A-Za-z0-9 _]{1,14} \d\d)/.exec(
-          d.r.text(0xc0, Math.min(200, d.r.length - 0xc0)),
-        );
-        return {
+        // Defaults (sparse: empty/zero values are left out):
+        //   [text: u32 length + chars] [clear: 01] I16 range, u16 ?, u16 function,
+        //   4 I16 ranges, coordinates (u16 each, non-zero only), file name.
+        let p = 0xc0;
+        let textValue = '';
+        const len = d.u32(p);
+        if (len > 0 && len < 120 && d.ok(p + 4, len) && !startsWith(d, p, [0x80, 0, 0x7f, 0xff])) {
+          textValue = d.r.text(p + 4, len);
+          p += 4 + len;
+        }
+        let clear = false;
+        if (d.ok(p, 1) && d.r.u8(p) === 1) {
+          clear = true;
+          p += 1;
+        }
+        const I16_RANGE = [0x80, 0, 0x7f, 0xff, 0, 0];
+        if (startsWith(d, p, I16_RANGE)) p += 6;
+        p += 2; // u16, purpose unknown (4 or 10)
+        // Display function, left out when 0 (image).
+        let fn = 0;
+        if (!startsWith(d, p, I16_RANGE)) {
+          fn = d.u16(p);
+          p += 2;
+        }
+        while (startsWith(d, p, I16_RANGE)) p += 6;
+        const values: number[] = [];
+        while (d.ok(p, 6) && values.length < 6) {
+          const maybeLen = d.u32(p);
+          if (
+            maybeLen > 0 &&
+            maybeLen < 20 &&
+            d.ok(p + 4, maybeLen) &&
+            /^[\x20-\x7e]+$/.test(d.r.text(p + 4, maybeLen))
+          )
+            break;
+          values.push(d.u16(p));
+          p += 2;
+        }
+        const nameLen = d.u32(p);
+        const image =
+          nameLen > 0 && nameLen < 20 && d.ok(p + 4, nameLen)
+            ? d.r.text(p + 4, nameLen)
+            : 'Smile 01';
+        // Function: 0 image, 1 text, 2 point, 3 line, 4 circle, 5 clear screen.
+        const drawing = fn >= 2 && fn <= 4;
+        let x = 0;
+        let y = 0;
+        let endX = 0;
+        let endY = 0;
+        let radius = 0;
+        const at = (k: number) => values[k] ?? 0;
+        if (values.length >= 4) {
+          x = at(0);
+          y = at(1);
+          endX = at(2);
+          endY = at(3);
+          radius = at(4);
+        } else if (values.length === 3) {
+          // One of X/Y is zero and left out: text keeps X (checked on CheckoutScan),
+          // drawings keep Y (checked on LightMeter's bar graph).
+          if (drawing) y = at(0);
+          else x = at(0);
+          endX = at(1);
+          endY = at(2);
+        } else if (values.length === 2) {
+          endX = at(0);
+          endY = at(1);
+        } else if (values.length === 1) {
+          x = at(0);
+        }
+        const block = {
           ...createBlock('display'),
-          action: hasText ? 'text' : imageMatch ? 'image' : 'text',
+          action: fn === 0 ? 'image' : fn === 5 ? 'reset' : drawing ? 'drawing' : 'text',
           text: textValue,
-          ...(imageMatch && !hasText ? { image: imageMatch[1] } : {}),
-          clear: true,
-        } as Block;
+          x,
+          line: Math.min(8, Math.max(1, 8 - Math.floor(y / 8))),
+          clear,
+        } as Extract<Block, { kind: 'display' }>;
+        if (fn === 0) block.image = image;
+        if (drawing) {
+          block.shape = fn === 2 ? 'point' : fn === 4 ? 'circle' : 'line';
+          block.y = y;
+          block.endX = endX;
+          block.endY = endY;
+          block.radius = radius;
+        }
+        return block;
       }
       case 'Variable': {
         const name = str(inst.tags.get('VarName') as LvValue, 'Number 1');
@@ -454,6 +583,104 @@ export function convertRbt(rbt: RbtProgram): ImportResult {
         const op = anchor > 2 ? d.u16(anchor - 2) : 0;
         const ops = ['and', 'or', 'xor', 'not'] as const;
         return { ...createBlock('logic'), op: ops[op] ?? 'and', hub: true } as Block;
+      }
+      case 'FP File Access': {
+        // Sparse defaults: optional Text In string, Number In range, file name,
+        // then the action (u16) just before "0000 ffff 0000 0000 0004".
+        let p = 0xc0;
+        let textIn = '';
+        if (!startsWith(d, p, SGL_RANGE.slice(0, 4))) {
+          const len = d.u32(p);
+          if (len < 200 && d.ok(p + 4, len)) {
+            textIn = d.r.text(p + 4, len);
+            p += 4 + len;
+          }
+        }
+        if (startsWith(d, p, SGL_RANGE)) p += 12;
+        const nameLen = d.u32(p);
+        const file =
+          nameLen > 0 && nameLen < 40 && d.ok(p + 4, nameLen) ? d.r.text(p + 4, nameLen) : 'MyFile';
+        const anchor = d.find([0, 0, 0xff, 0xff, 0, 0, 0, 0, 0, 4], p);
+        const action = anchor > 2 ? d.u16(anchor - 2) : 1;
+        const actions = ['read', 'write', 'close', 'delete'] as const;
+        const numberWired =
+          !!term(n.ptr, 'Number In') && sourcesOf(term(n.ptr, 'Number In')!).length > 0;
+        const numberOut = term(n.ptr, 'Number Out');
+        const numberRead = !!numberOut && reach(numberOut.ptr).length > 0;
+        return {
+          ...createBlock('file'),
+          action: actions[action] ?? 'write',
+          file,
+          type: numberWired || numberRead ? 'number' : 'text',
+          text: textIn,
+          hub: true,
+        } as Block;
+      }
+      case 'FP Message Write':
+      case 'FP Message Read': {
+        // Sparse defaults: [connection] mailbox (1–10, one byte each), SGL range,
+        // [number value], then "00 ff" and the message type (0 text, 1 number, 2 logic).
+        const lead: number[] = [];
+        let p = 0xc0;
+        while (lead.length < 2 && d.ok(p, 1) && !startsWith(d, p, SGL_RANGE.slice(0, 4)))
+          lead.push(d.r.u8(p++));
+        const mailbox = lead.length ? lead[lead.length - 1]! : 1;
+        const connection = lead.length === 2 ? lead[0]! : 0;
+        if (startsWith(d, p, SGL_RANGE)) p += 12;
+        let number = 0;
+        if (!startsWith(d, p, [0, 0xff])) {
+          number = d.f32(p);
+          p += 4;
+        }
+        const typeCode = startsWith(d, p, [0, 0xff]) ? d.u16(p + 2) : 1;
+        const types = ['text', 'number', 'logic'] as const;
+        // Wiring decides when the stored type is ambiguous.
+        const wiredType = (['String', 'Number', 'Boolean'] as const).find((k) => {
+          const plug = term(n.ptr, `${k} ${t === 'FP Message Write' ? 'In' : 'Out'}`);
+          return plug && (plug.output ? reach(plug.ptr).length > 0 : sourcesOf(plug).length > 0);
+        });
+        const type = wiredType
+          ? types[['String', 'Number', 'Boolean'].indexOf(wiredType)]!
+          : (types[typeCode] ?? 'number');
+        if (t === 'FP Message Read') {
+          return {
+            ...createBlock('receiveMessage'),
+            mailbox: Math.max(1, mailbox),
+            type,
+            hub: true,
+          } as Block;
+        }
+        return {
+          ...createBlock('sendMessage'),
+          connection: Math.min(3, connection) as 0 | 1 | 2 | 3,
+          mailbox: Math.max(1, mailbox),
+          type,
+          number,
+          hub: true,
+        } as Block;
+      }
+      case 'Constant': {
+        // Defaults: a description string (u32 length + text), then the value.
+        const len = d.u32(0xc0);
+        const p = len < 400 ? 0xc4 + len : 0xc0;
+        const valueTerm = term(n.ptr, 'Value');
+        const type =
+          valueTerm?.slot === undefined ? 0x09 : (inst.plugs[valueTerm.slot]?.type ?? 0x09);
+        const block = { ...createBlock('constant'), hub: true } as Extract<
+          Block,
+          { kind: 'constant' }
+        >;
+        if (type === 0x21) {
+          block.valueType = 'logic';
+          block.logic = d.ok(p, 1) && d.r.u8(p) !== 0;
+        } else if (type === 0x30) {
+          block.valueType = 'text';
+          const tl = d.u32(p);
+          block.text = tl < 200 && d.ok(p + 4, tl) ? d.r.text(p + 4, tl) : '';
+        } else {
+          block.number = d.f32(p);
+        }
+        return block;
       }
       case 'FP Number To Text':
         return { ...createBlock('numberToText'), hub: true } as Block;
@@ -634,7 +861,10 @@ export function convertRbt(rbt: RbtProgram): ImportResult {
       if (condition) sw.condition = condition;
     } else if (valueType !== undefined && valueType !== 0x21 && cases.length >= 2) {
       sw.condition = { source: 'value', valueType: valueType === 0x30 ? 'text' : 'number' };
-      sw.cases = cases.map((blocks, i) => ({ value: i, blocks }));
+      // Color switches count colors from 1 (black) to 6 (white).
+      const selectorSource = selector ? sourcesOf(selector)[0] : undefined;
+      const fromColor = selectorSource?.name === 'Detected Color Number';
+      sw.cases = cases.map((blocks, i) => ({ value: fromColor ? i + 1 : i, blocks }));
       sw.defaultCase = 0;
       sw.whenTrue = [];
       sw.whenFalse = [];

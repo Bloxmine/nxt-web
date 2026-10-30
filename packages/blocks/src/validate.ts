@@ -196,6 +196,16 @@ export function validateProgram(program: Program): Issue[] {
       case 'range':
         if (block.low > block.high) add(block.id, 'Low is larger than high.', 'warning');
         break;
+      case 'sendMessage':
+      case 'receiveMessage':
+        if (block.mailbox < 1 || block.mailbox > 10) add(block.id, 'Mailbox must be 1–10.');
+        break;
+      case 'file':
+        if (block.file.trim() === '' && !wireInto(program, block.id, 'filename'))
+          add(block.id, 'Choose a file name.');
+        else if (block.file.replace(/\.txt$/i, '').length > 15)
+          add(block.id, 'File names can be at most 15 characters.');
+        break;
       case 'myBlock': {
         const def = program.myBlocks.find((m) => m.id === block.ref);
         if (!def) add(block.id, 'This My Block no longer exists.');

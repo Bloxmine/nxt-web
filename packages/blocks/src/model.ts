@@ -113,7 +113,13 @@ export interface SoundBlock extends Base {
 
 export interface DisplayBlock extends Base {
   kind: 'display';
-  action: 'text' | 'variable' | 'image' | 'reset';
+  action: 'text' | 'variable' | 'image' | 'drawing' | 'reset';
+  /** Drawing: what to draw (x/y in pixels; y = 0 is the bottom row). */
+  shape?: 'point' | 'line' | 'circle';
+  y?: number;
+  endX?: number;
+  endY?: number;
+  radius?: number;
   text: string;
   /** Image file on the brick (without ".ric") for the "image" action. */
   image?: string;
@@ -173,6 +179,51 @@ export interface ResetRotationBlock extends Base {
 export interface ResetTimerBlock extends Base {
   kind: 'resetTimer';
   timer?: 1 | 2 | 3;
+}
+
+/** Reads, writes, closes or deletes a file on the brick. */
+export interface FileBlock extends Base {
+  kind: 'file';
+  action: 'read' | 'write' | 'close' | 'delete';
+  /** File name on the brick (".txt" is added if missing). */
+  file: string;
+  /** Read or write text or numbers. */
+  type: 'text' | 'number';
+  /** Value to write (when not wired). */
+  text: string;
+  number: number;
+  /** Bytes to reserve when the file is created (0 = let the brick decide). */
+  size?: number;
+}
+
+/** Sends a Bluetooth message to another brick's mailbox. */
+export interface SendMessageBlock extends Base {
+  kind: 'sendMessage';
+  /** 0 = to the master; 1–3 = to that slave connection. */
+  connection: 0 | 1 | 2 | 3;
+  /** Mailbox 1–10. */
+  mailbox: number;
+  type: VariableType;
+  number: number;
+  logic: boolean;
+  text: string;
+}
+
+/** Reads the newest message from one of this brick's mailboxes. */
+export interface ReceiveMessageBlock extends Base {
+  kind: 'receiveMessage';
+  /** Mailbox 1–10. */
+  mailbox: number;
+  type: VariableType;
+}
+
+/** Outputs a fixed number, yes/no value or text. */
+export interface ConstantBlock extends Base {
+  kind: 'constant';
+  valueType: VariableType;
+  number: number;
+  logic: boolean;
+  text: string;
 }
 
 /** Turns the NXT 2.0 color sensor's lamp on (in a color) or off. */
@@ -264,6 +315,10 @@ export type Block =
   | ResetRotationBlock
   | ResetTimerBlock
   | ColorLampBlock
+  | FileBlock
+  | ConstantBlock
+  | SendMessageBlock
+  | ReceiveMessageBlock
   | VariableBlock
   | MyBlockCall
   | SensorBlock

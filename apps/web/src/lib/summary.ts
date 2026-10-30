@@ -87,6 +87,7 @@ export function blockSummary(block: Block): string {
     case 'display':
       if (block.action === 'reset') return 'reset';
       if (block.action === 'image') return `▣ ${block.image ?? ''}`;
+      if (block.action === 'drawing') return `✎ ${block.shape ?? 'line'}`;
       return block.action === 'text' ? `"${block.text}"` : `# ${block.variable}`;
     case 'wait':
       return block.control.type === 'time'
@@ -102,6 +103,18 @@ export function blockSummary(block: Block): string {
       return block.action === 'set' ? `= ${block.value}` : `+= ${block.value}`;
     case 'myBlock':
       return '';
+    case 'file':
+      return `${block.action} ${block.file}`;
+    case 'sendMessage':
+      return `→ ${block.connection} ✉${block.mailbox}`;
+    case 'receiveMessage':
+      return `✉${block.mailbox} ${block.type}`;
+    case 'constant':
+      return block.valueType === 'logic'
+        ? String(block.logic)
+        : block.valueType === 'text'
+          ? `"${block.text}"`
+          : String(block.number);
     case 'colorLamp':
       return block.on ? `● ${block.color}` : 'off';
     case 'sensor':

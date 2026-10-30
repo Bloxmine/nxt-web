@@ -86,13 +86,32 @@ export type Stmt = StmtBase &
       }
     | { kind: 'motorStop'; ports: OutputPort[]; mode: 'brake' | 'coast' }
     | { kind: 'resetMotor'; port: OutputPort }
+    /** Bluetooth mailbox message to another brick. */
+    | { kind: 'messageWrite'; connection: number; mailbox: Expr; valueType: ValueType; value: Expr }
+    /** Read a mailbox: sets `received` (boolean) and, when a message was there, `target`. */
+    | { kind: 'messageRead'; mailbox: Expr; valueType: ValueType; target: string; received: string }
     /** Reconfigure a sensor port while running (e.g. the color lamp). */
     | { kind: 'setSensor'; port: InputPort; sensor: SensorKind }
     | { kind: 'tone'; frequency: Expr; durationMs: Expr; volume: Expr; wait: boolean }
     | { kind: 'soundFile'; file: string; loop: boolean; volume: Expr; wait: boolean }
     | { kind: 'stopSound' }
     | { kind: 'clearScreen' }
+    /** File on the brick. Reads store the value in `target`. */
+    | {
+        kind: 'file';
+        action: 'read' | 'write' | 'close' | 'delete';
+        file: Expr;
+        valueType: 'text' | 'number';
+        value?: Expr;
+        target?: string;
+        /** Write: bytes to reserve when creating the file. */
+        size?: Expr;
+      }
     | { kind: 'drawImage'; x: Expr; line: Expr; file: string }
+    /** Shapes; coordinates in pixels, y = 0 at the bottom. */
+    | { kind: 'drawPoint'; x: Expr; y: Expr }
+    | { kind: 'drawLine'; x: Expr; y: Expr; endX: Expr; endY: Expr }
+    | { kind: 'drawCircle'; x: Expr; y: Expr; radius: Expr }
     | { kind: 'drawText'; x: Expr; line: Expr; text: Expr }
     | { kind: 'drawNumber'; x: Expr; line: Expr; value: Expr }
     | { kind: 'wait'; ms: Expr }

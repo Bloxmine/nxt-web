@@ -12,14 +12,16 @@ inferred rather than certain, the confidence table says so.
 
 `pnpm fetch:nxtprograms` downloads the NXT 2.0 programs published on
 [nxtprograms.com](https://www.nxtprograms.com/index2.html) into
-`fixtures/external/nxtprograms/` (15 `.rbt` files from 24 projects; the others come as
-zips). Their [usage policy](https://www.nxtprograms.com/copyright.html) allows personal
+`fixtures/external/nxtprograms/` (36 `.rbt` files from 24 projects, including programs
+unpacked from the projects' zip downloads). Their [usage policy](https://www.nxtprograms.com/copyright.html) allows personal
 use but not redistribution, so the folder is git-ignored. Tests that need the files skip
 when it is empty (as in CI).
 
-**Status: all 15 programs import, validate and lower to IR.** Behaviour checks against
-the projects' published descriptions (BumperCar, GuitarTones, Drive_Test, Explorer,
-ForkliftTest) pass. Remaining notes per file are listed at the end.
+**Status: all 36 programs import, validate and lower to IR.** The only remaining note is a
+loop in ForkliftTest that is not connected to any beam (the original never runs it). Behaviour
+checks against the projects' descriptions pass for BumperCar, GuitarTones, Drive_Test,
+Explorer, ForkliftTest, CheckoutScan, DataLogLight, LightMeter, 5ButtonRemote/5ButtonSteer
+and ColorRace.
 
 ## File structure
 

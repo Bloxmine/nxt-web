@@ -48,7 +48,10 @@ export function plugsOf(block: Block): Plug[] {
         plug('text', 'Text', 'text', true),
         plug('number', 'Number', 'number', true),
         plug('x', 'X', 'number', true),
-        plug('line', 'Line', 'number', true),
+        plug('y', 'Y', 'number', true),
+        plug('endX', 'End X', 'number', true),
+        plug('endY', 'End Y', 'number', true),
+        plug('radius', 'Radius', 'number', true),
       ];
     case 'loop': {
       const plugs: Plug[] = [];
@@ -58,6 +61,27 @@ export function plugsOf(block: Block): Plug[] {
       if (block.showCounter) plugs.push(plug('count', 'Count', 'number', false));
       return plugs;
     }
+    case 'file':
+      return [
+        plug('filename', 'Filename', 'text', true),
+        plug('text', 'Text', 'text', block.action === 'write'),
+        plug('number', 'Number', 'number', block.action === 'write'),
+        plug('size', 'File size', 'number', true),
+        plug('error', 'Error', 'logic', false),
+      ];
+    case 'sendMessage':
+      return [
+        plug('mailbox', 'Mailbox', 'number', true),
+        plug('value', 'Message', block.type, true),
+      ];
+    case 'receiveMessage':
+      return [
+        plug('mailbox', 'Mailbox', 'number', true),
+        plug('received', 'Received', 'logic', false),
+        plug('value', 'Message', block.type, false),
+      ];
+    case 'constant':
+      return [plug('value', 'Value', block.valueType, false)];
     case 'switch':
       if (block.condition.source === 'logic')
         return [plug('condition', 'Value', 'logic', true, false)];
@@ -72,6 +96,15 @@ export function plugsOf(block: Block): Plug[] {
       const c = block.condition;
       if (c.source === 'touch' || c.source === 'button')
         return [plug('yes', 'Yes / No', 'logic', false)];
+      if (c.source === 'color' && c.mode === 'light') {
+        return [
+          plug('trigger', 'Trigger', 'number', true),
+          plug('lamp', 'Lamp color', 'number', true, false),
+          plug('light', 'Lamp on', 'logic', true, false),
+          plug('yes', 'Yes / No', 'logic', false),
+          plug('value', 'Value', 'number', false),
+        ];
+      }
       if (c.source === 'color' && c.mode === 'range') {
         return [plug('yes', 'Yes / No', 'logic', false), plug('value', 'Color', 'number', false)];
       }

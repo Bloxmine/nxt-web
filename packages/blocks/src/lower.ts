@@ -406,12 +406,37 @@ export function lowerProgram(program: Program): IrProgram {
       }
       case 'display': {
         const x = input(block, 'x', num(block.x));
-        const line = input(block, 'line', num(block.line));
+        // Text lines 1–8 sit at y = 56, 48 … 0 pixels (y = 0 is the bottom row).
+        const yPixels = block.y ?? (8 - block.line) * 8;
+        const y = input(block, 'y', num(yPixels));
+        const wiredY = inputSource.get(`${block.id}:y`);
+        const line = wiredY ? bin('-', num(8), bin('/', v(wiredY), num(8))) : num(block.line);
         const textValue = input(block, 'text', text(block.text));
         const numberValue = input(block, 'number', v(block.variable));
-        const out = outputs(block, { x, line, text: textValue, number: numberValue });
+        const endX = input(block, 'endX', num(block.endX ?? 0));
+        const endY = input(block, 'endY', num(block.endY ?? 0));
+        const radius = input(block, 'radius', num(block.radius ?? 0));
+        const out = outputs(block, {
+          x,
+          y,
+          endX,
+          endY,
+          radius,
+          text: textValue,
+          number: numberValue,
+        });
         if (block.action === 'reset') return [...out, { kind: 'clearScreen', source }];
         const clear: Stmt[] = block.clear ? [{ kind: 'clearScreen', source }] : [];
+        if (block.action === 'drawing') {
+          const shape = block.shape ?? 'line';
+          const draw: Stmt =
+            shape === 'point'
+              ? { kind: 'drawPoint', x, y, source }
+              : shape === 'circle'
+                ? { kind: 'drawCircle', x, y, radius, source }
+                : { kind: 'drawLine', x, y, endX, endY, source };
+          return [...out, ...clear, draw];
+        }
         if (block.action === 'image') {
           const file = (block.image ?? 'Smile 01').replace(/\.ric$/i, '') + '.ric';
           return [...out, ...clear, { kind: 'drawImage', x, line, file, source }];
@@ -478,6 +503,88 @@ export function lowerProgram(program: Program): IrProgram {
           },
         ];
       }
+      case 'file': {
+        const name = block.file.toLowerCase().endsWith('.txt') ? block.file : `${block.file}.txt`;
+        const file = input(block, 'filename', text(name));
+        if (block.action === 'read') {
+          const target = newTemp();
+          hidden.set(target, block.type === 'text' ? 'text' : 'number');
+          return [
+            { kind: 'file', action: 'read', file, valueType: block.type, target, source },
+            ...outputs(block, {
+              filename: file,
+              text: block.type === 'text' ? v(target) : text(''),
+              number: block.type === 'number' ? v(target) : num(0),
+              error: bool(false),
+            }),
+          ];
+        }
+        if (block.action === 'write') {
+          const value =
+            block.type === 'text'
+              ? input(block, 'text', text(block.text))
+              : input(block, 'number', num(block.number));
+          return [
+            ...outputs(block, { filename: file, error: bool(false) }),
+            {
+              kind: 'file',
+              action: 'write',
+              file,
+              valueType: block.type,
+              value,
+              size: input(block, 'size', num(block.size ?? 0)),
+              source,
+            },
+          ];
+        }
+        return [
+          ...outputs(block, { filename: file, error: bool(false) }),
+          { kind: 'file', action: block.action, file, valueType: block.type, source },
+        ];
+      }
+      case 'sendMessage': {
+        const type: ValueType = block.type === 'logic' ? 'boolean' : block.type;
+        const fallback =
+          block.type === 'logic'
+            ? bool(block.logic)
+            : block.type === 'text'
+              ? text(block.text)
+              : num(block.number);
+        const mailbox = input(block, 'mailbox', num(block.mailbox));
+        const value = input(block, 'value', fallback);
+        return [
+          ...outputs(block, { mailbox, value }),
+          {
+            kind: 'messageWrite',
+            connection: block.connection,
+            mailbox,
+            valueType: type,
+            value,
+            source,
+          },
+        ];
+      }
+      case 'receiveMessage': {
+        const type: ValueType = block.type === 'logic' ? 'boolean' : block.type;
+        const target = newTemp();
+        hidden.set(target, type);
+        const received = newTemp();
+        hidden.set(received, 'boolean');
+        const mailbox = input(block, 'mailbox', num(block.mailbox));
+        return [
+          { kind: 'messageRead', mailbox, valueType: type, target, received, source },
+          ...outputs(block, { mailbox, received: v(received), value: v(target) }),
+        ];
+      }
+      case 'constant':
+        return outputs(block, {
+          value:
+            block.valueType === 'logic'
+              ? bool(block.logic)
+              : block.valueType === 'text'
+                ? text(block.text)
+                : num(block.number),
+        });
       case 'colorLamp': {
         const port = (block.port - 1) as InputPort;
         const sensor: SensorKind = !block.on
@@ -515,8 +622,41 @@ export function lowerProgram(program: Program): IrProgram {
       case 'sensor': {
         const c = block.condition;
         const trigger = input(block, 'trigger', num(threshold(c)));
+        // Color sensor with a wired lamp colour / lamp on: pick the mode at run time.
+        const lampWire = inputSource.get(`${block.id}:lamp`);
+        const lightWire = inputSource.get(`${block.id}:light`);
+        const lamp: Stmt[] = [];
+        if (c.source === 'color' && c.mode === 'light' && (lampWire || lightWire)) {
+          const port = (c.port - 1) as InputPort;
+          const set = (sensor: SensorKind): Stmt => ({ kind: 'setSensor', port, sensor, source });
+          const colour = lampWire ? v(lampWire) : num(['red', 'green', 'blue'].indexOf(c.lamp));
+          const byColour: Stmt = {
+            kind: 'if',
+            condition: bin('==', colour, num(0)),
+            then: [set('colorRed')],
+            else: [
+              {
+                kind: 'if',
+                condition: bin('==', colour, num(1)),
+                then: [set('colorGreen')],
+                else: [set('colorBlue')],
+              },
+            ],
+          };
+          lamp.push(
+            lightWire
+              ? { kind: 'if', condition: v(lightWire), then: [byColour], else: [set('colorNone')] }
+              : byColour,
+          );
+          const set2 = colorKinds.get(port) ?? new Set<SensorKind>();
+          ['colorRed', 'colorGreen', 'colorBlue', 'colorNone'].forEach((k) =>
+            set2.add(k as SensorKind),
+          );
+          colorKinds.set(port, set2);
+        }
         return [
-          ...prepare(c, source),
+          ...lamp,
+          ...(lamp.length ? [] : prepare(c, source)),
           ...outputs(block, {
             trigger,
             yes: conditionExpr(c, block, trigger),

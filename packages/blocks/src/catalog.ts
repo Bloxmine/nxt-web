@@ -121,6 +121,33 @@ export function createBlock(kind: BlockKind): Block {
       return { id, kind, timer: 1 };
     case 'colorLamp':
       return { id, kind, port: 3, on: true, color: 'red' };
+    case 'file':
+      return {
+        id,
+        kind,
+        hub: true,
+        action: 'write',
+        file: 'MyFile',
+        type: 'text',
+        text: '',
+        number: 0,
+      };
+    case 'constant':
+      return { id, kind, hub: true, valueType: 'number', number: 0, logic: false, text: '' };
+    case 'sendMessage':
+      return {
+        id,
+        kind,
+        hub: true,
+        connection: 1,
+        mailbox: 1,
+        type: 'number',
+        number: 0,
+        logic: false,
+        text: '',
+      };
+    case 'receiveMessage':
+      return { id, kind, hub: true, mailbox: 1, type: 'number' };
     case 'variable':
       return { id, kind, name: 'Number 1', action: 'set', value: 0 };
     case 'myBlock':
@@ -450,6 +477,38 @@ export const PALETTE: Record<string, PaletteEntry> = Object.fromEntries(
       'Turns a number into text, for the Display block.',
       () => createBlock('numberToText'),
     ),
+    entry(
+      'constant',
+      'Constant',
+      'data',
+      'anchor',
+      'Outputs a fixed number, yes/no value or text.',
+      () => createBlock('constant'),
+    ),
+    entry(
+      'send-message',
+      'Send Message',
+      'advanced',
+      'email_go',
+      'Sends a number, yes/no value or text to a mailbox on another brick over Bluetooth.',
+      () => createBlock('sendMessage'),
+    ),
+    entry(
+      'receive-message',
+      'Receive Message',
+      'advanced',
+      'email_open',
+      'Reads the newest message from one of this brick’s mailboxes.',
+      () => createBlock('receiveMessage'),
+    ),
+    entry(
+      'file-access',
+      'File Access',
+      'advanced',
+      'page_white_text',
+      'Reads, writes, closes or deletes a text or number file on the brick.',
+      () => createBlock('file'),
+    ),
     entry('text', 'Text', 'advanced', 'font', 'Joins up to three pieces of text.', () =>
       createBlock('text'),
     ),
@@ -512,13 +571,13 @@ export const COMPLETE_PALETTE: {
     category: 'data',
     label: 'Data',
     icon: 'database',
-    entries: ['logic', 'math', 'compare', 'range', 'random', 'variable'],
+    entries: ['logic', 'math', 'compare', 'range', 'random', 'variable', 'constant'],
   },
   {
     category: 'advanced',
     label: 'Advanced',
     icon: 'application_xp_terminal',
-    entries: ['number-to-text', 'text'],
+    entries: ['number-to-text', 'text', 'file-access', 'send-message', 'receive-message'],
   },
 ];
 
@@ -544,7 +603,12 @@ export function categoryOf(block: Block): Category {
       return 'data';
     case 'numberToText':
     case 'text':
+    case 'file':
+    case 'sendMessage':
+    case 'receiveMessage':
       return 'advanced';
+    case 'constant':
+      return 'data';
     case 'myBlock':
       return 'custom';
     default:
@@ -599,6 +663,14 @@ export function iconOf(block: Block): string {
       return 'textfield';
     case 'text':
       return 'font';
+    case 'file':
+      return 'page_white_text';
+    case 'constant':
+      return 'anchor';
+    case 'sendMessage':
+      return 'email_go';
+    case 'receiveMessage':
+      return 'email_open';
   }
 }
 
@@ -622,6 +694,12 @@ export function labelOf(block: Block): string {
       return 'Reset timer';
     case 'colorLamp':
       return 'Color Lamp';
+    case 'file':
+      return 'File Access';
+    case 'sendMessage':
+      return 'Send Message';
+    case 'receiveMessage':
+      return 'Receive Message';
     case 'myBlock':
       return 'My Block';
     case 'sensor':
