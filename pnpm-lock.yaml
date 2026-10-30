@@ -211,6 +211,9 @@ importers:
       '@nxt/rbt':
         specifier: workspace:*
         version: link:../../packages/nxt-rbt
+      '@nxt/sim':
+        specifier: workspace:*
+        version: link:../../packages/nxt-sim
       '@nxt/transport':
         specifier: workspace:*
         version: link:../../packages/nxt-transport

@@ -16,10 +16,11 @@
     "@nxt/blocks": "workspace:*",
     "@nxt/compiler": "workspace:*",
     "@nxt/protocol": "workspace:*",
+    "@nxt/rbt": "workspace:*",
+    "@nxt/sim": "workspace:*",
     "@nxt/transport": "workspace:*",
     "react": "^19.3.1",
-    "react-dom": "^19.3.1",
-    "@nxt/rbt": "workspace:*"
+    "react-dom": "^19.3.1"
   },
   "devDependencies": {
     "@tailwindcss/vite": "^4.3.3",

@@ -19,6 +19,7 @@ import {
 import { Fragment, useState, type MouseEvent } from 'react';
 import { currentDrag, endDrag, startDrag } from '../editor/drag';
 import { useEditor } from '../editor/EditorContext';
+import { useDebugView } from '../sim/SimulatorContext';
 import { useWiring } from '../editor/wiring';
 import { iconUrl } from '../lib/icons';
 import { blockSummary, conditionText, portsLabel } from '../lib/summary';
@@ -131,8 +132,11 @@ function Slot({
 
 function useBlockProps(block: Block) {
   const { state, dispatch, issuesByBlock } = useEditor();
+  const debug = useDebugView();
   const issues = issuesByBlock.get(block.id) ?? [];
+  const debugClass = `${debug.active.has(block.id) ? 'sim-active' : ''} ${debug.breakpoints.has(block.id) ? 'has-breakpoint' : ''}`;
   return {
+    debugClass,
     selected: state.selected === block.id,
     issues,
     hasError: issues.some((i) => i.severity === 'error'),
@@ -223,7 +227,7 @@ function HubRow({ block, plug }: { block: Block; plug: Plug }) {
 
 function BlockTile({ block }: { block: Block }) {
   const { state, dispatch } = useEditor();
-  const { selected, issues, hasError, handlers } = useBlockProps(block);
+  const { selected, issues, hasError, handlers, debugClass } = useBlockProps(block);
   const myBlock =
     block.kind === 'myBlock' ? state.program.myBlocks.find((m) => m.id === block.ref) : undefined;
   const label = myBlock?.name ?? labelOf(block);
@@ -252,7 +256,7 @@ function BlockTile({ block }: { block: Block }) {
         aria-label={`${label} block${summary ? `: ${summary}` : ''}`}
         aria-pressed={selected}
         title={label}
-        className={`block cat-${categoryOf(block)} kind-${block.kind} ${selected ? 'selected' : ''} ${hasError ? 'has-error' : ''}`}
+        className={`block cat-${categoryOf(block)} kind-${block.kind} ${selected ? 'selected' : ''} ${hasError ? 'has-error' : ''} ${debugClass}`}
         onDoubleClick={() => myBlock && dispatch({ type: 'openTab', tab: myBlock.id })}
       >
         <IssueBadge issues={issues} />
@@ -325,7 +329,7 @@ function loopCapContent(block: LoopBlock) {
 }
 
 function LoopView({ block, root }: { block: LoopBlock; root: string }) {
-  const { selected, issues, handlers } = useBlockProps(block);
+  const { selected, issues, handlers, debugClass } = useBlockProps(block);
   const plugs = plugsOf(block);
   const beam = sequenceBeam(block.body);
   return (
@@ -333,7 +337,7 @@ function LoopView({ block, root }: { block: LoopBlock; root: string }) {
       {...handlers}
       role="group"
       aria-label="Loop"
-      className={`loop ${selected ? 'selected' : ''}`}
+      className={`loop ${selected ? 'selected' : ''} ${debugClass}`}
       title="Loop"
     >
       <IssueBadge issues={issues} />
@@ -354,7 +358,7 @@ function LoopView({ block, root }: { block: LoopBlock; root: string }) {
 }
 
 function SwitchView({ block, root }: { block: SwitchBlock; root: string }) {
-  const { selected, issues, handlers } = useBlockProps(block);
+  const { selected, issues, handlers, debugClass } = useBlockProps(block);
   const plugs = plugsOf(block);
   // Value switches have one branch per case; others a true and a false branch.
   const branches: {
@@ -394,7 +398,7 @@ function SwitchView({ block, root }: { block: SwitchBlock; root: string }) {
       {...handlers}
       role="group"
       aria-label={`Switch on ${block.condition.source}: ${conditionText(block.condition)}`}
-      className={`switch ${selected ? 'selected' : ''}`}
+      className={`switch ${selected ? 'selected' : ''} ${debugClass}`}
       title="Switch"
     >
       <IssueBadge issues={issues} />

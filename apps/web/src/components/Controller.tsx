@@ -3,6 +3,7 @@ import { iconUrl } from '../lib/icons';
 interface Props {
   connected: boolean;
   onNxtWindow(): void;
+  onSimulate(): void;
   onDownload(): void;
   onRun(): void;
   onStop(): void;
@@ -13,6 +14,7 @@ interface Props {
 export function Controller({
   connected,
   onNxtWindow,
+  onSimulate,
   onDownload,
   onRun,
   onStop,
@@ -73,6 +75,15 @@ export function Controller({
         style={{ gridColumn: 3, gridRow: 2 }}
       >
         <img src={iconUrl('control_stop')} alt="" />
+      </button>
+      <button
+        type="button"
+        title="Run in the simulator (F5)"
+        aria-label="Run in the simulator"
+        onClick={onSimulate}
+        className="ctl-btn sim"
+      >
+        <img src={iconUrl('car')} alt="" /> Simulate
       </button>
     </div>
   );

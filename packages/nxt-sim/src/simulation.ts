@@ -9,7 +9,7 @@ import type {
 } from '@nxt/compiler';
 import { Lcd } from './lcd.js';
 import { idleMotor, isBusy, startMotors, stepMotor, stopMotors, type Motor } from './motors.js';
-import { World, type Scenario } from './world.js';
+import { World, type Pose, type Scenario } from './world.js';
 
 /** A value held in a variable. */
 export type Value = number | boolean | string;
@@ -193,6 +193,25 @@ export class Simulation {
     this.stepping = true;
     this.status = 'running';
     this.advance(maxMs);
+  }
+
+  /** Presses or releases a brick button. */
+  setButton(button: ButtonName, down: boolean): void {
+    this.buttons[button] = down;
+  }
+
+  /** Sets what the sound sensor hears (0–100). */
+  setSoundLevel(level: number): void {
+    this.world.soundLevel = level;
+  }
+
+  /** Moves the robot (for example when the user drags it); clears its trail. */
+  placeRobot(pose: Partial<Pose>): void {
+    const next = { ...this.world.pose, ...pose };
+    next.heading = ((next.heading % 360) + 360) % 360;
+    this.world.pose = next;
+    this.world.trail.length = 0;
+    this.world.trail.push([next.x, next.y]);
   }
 
   /** Puts a message into a mailbox (1–10), as if another brick had sent it. */

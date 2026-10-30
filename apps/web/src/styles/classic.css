@@ -1875,3 +1875,316 @@ input[type='range'] {
   min-width: 20px;
   padding: 0 2px;
 }
+
+/* ---------- Simulator ---------- */
+
+.controller {
+  grid-template-rows: 34px 52px 26px;
+}
+
+.ctl-btn.sim {
+  grid-column: 1 / -1;
+  grid-row: 3;
+  display: flex;
+  gap: 5px;
+  justify-content: center;
+  font-weight: bold;
+  font-size: 11px;
+  color: #333;
+}
+
+.sim-window {
+  position: fixed;
+  z-index: 40;
+  display: flex;
+  flex-direction: column;
+  width: min(700px, calc(100vw - 16px));
+  max-height: calc(100vh - 16px);
+  border: 1px solid #0b3a8c;
+  border-radius: 8px 8px 3px 3px;
+  background: var(--chrome);
+  box-shadow: 4px 6px 16px rgba(0, 0, 0, 0.45);
+  overflow: auto;
+}
+
+.sim-window > .title-bar {
+  cursor: move;
+  touch-action: none;
+}
+
+.sim-toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 2px;
+  padding: 3px 4px;
+  border-bottom: 1px solid var(--chrome-dark);
+  background: linear-gradient(#fbfbf8, #e3e0cf);
+}
+
+.sim-toolbar .tool-btn {
+  display: inline-flex;
+  align-items: center;
+  width: auto;
+  gap: 4px;
+  padding: 0 6px;
+  white-space: nowrap;
+}
+
+.sim-field {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  margin: 0 4px;
+}
+
+.sim-field img {
+  width: 16px;
+  height: 16px;
+}
+
+.sim-status {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 12px;
+  padding: 3px 8px;
+  font-size: 11px;
+  border-bottom: 1px solid var(--chrome-dark);
+  background: #f6f5ee;
+}
+
+.sim-status.running span:first-child {
+  color: #1d7a12;
+  font-weight: bold;
+}
+
+.sim-status.paused span:first-child {
+  color: #b85d00;
+  font-weight: bold;
+}
+
+.sim-status.error span:first-child {
+  color: var(--error);
+  font-weight: bold;
+}
+
+.sim-stale {
+  color: #8a5a00;
+}
+
+.sim-active-list {
+  color: var(--text-muted);
+}
+
+.sim-main {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  padding: 8px;
+}
+
+.sim-mat {
+  flex: 1 1 300px;
+  min-width: 0;
+}
+
+.sim-mat canvas {
+  display: block;
+  width: 100%;
+  height: auto;
+  border: 1px solid var(--border-dark);
+  border-radius: 3px;
+  touch-action: none;
+}
+
+.sim-hint,
+.sim-muted {
+  margin: 4px 0 0;
+  font-size: 11px;
+  color: var(--text-muted);
+}
+
+/* The brick: white plastic with a recessed screen and the four buttons. */
+.sim-brick {
+  display: flex;
+  flex: 0 0 216px;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+  padding: 10px 8px;
+  border: 2px solid #8a8a8a;
+  border-radius: 22px;
+  background: linear-gradient(#ffffff, #dcdcdc);
+  box-shadow:
+    inset 0 1px 0 #fff,
+    1px 2px 4px rgba(0, 0, 0, 0.3);
+}
+
+.sim-lcd-frame {
+  padding: 5px;
+  border: 1px solid #6b6b6b;
+  border-radius: 4px;
+  background: #8b8f86;
+  box-shadow: inset 1px 1px 3px rgba(0, 0, 0, 0.5);
+}
+
+.sim-lcd-frame canvas {
+  display: block;
+  image-rendering: pixelated;
+}
+
+.sim-buttons {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.sim-btn {
+  border: 1px solid #666;
+  cursor: pointer;
+}
+
+.sim-btn.enter {
+  width: 34px;
+  height: 34px;
+  border-radius: 6px;
+  background: linear-gradient(#ff9d3b, #e06f00);
+}
+
+.sim-btn.left,
+.sim-btn.right {
+  width: 30px;
+  height: 22px;
+  background: linear-gradient(#e6e6e6, #a9a9a9);
+}
+
+.sim-btn.left {
+  clip-path: polygon(0 50%, 100% 0, 100% 100%);
+}
+
+.sim-btn.right {
+  clip-path: polygon(0 0, 100% 50%, 0 100%);
+}
+
+.sim-btn.cancel {
+  width: 34px;
+  height: 14px;
+  border-radius: 4px;
+  background: linear-gradient(#777, #444);
+}
+
+.sim-btn:active {
+  filter: brightness(0.85);
+}
+
+.sim-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 11px;
+}
+
+.sim-table th {
+  width: 1%;
+  padding: 1px 4px;
+  text-align: left;
+  white-space: nowrap;
+  color: var(--text-muted);
+}
+
+.sim-table td {
+  padding: 1px 4px;
+}
+
+.sim-table td.num {
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+
+.sim-table.readouts {
+  border-top: 1px solid #c8c8c8;
+}
+
+.sim-slider {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  width: 100%;
+  font-size: 11px;
+}
+
+.sim-slider input {
+  flex: 1;
+  min-width: 0;
+}
+
+.sim-bottom {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+  gap: 8px;
+  padding: 0 8px 8px;
+}
+
+.sim-bottom .groupbox {
+  margin: 0;
+  min-width: 0;
+}
+
+.sim-mail {
+  display: flex;
+  gap: 4px;
+}
+
+.sim-mail .text-input {
+  flex: 1;
+  min-width: 0;
+}
+
+.sim-log {
+  margin: 4px 0 0;
+  padding-left: 16px;
+  font-size: 11px;
+  color: var(--text-muted);
+}
+
+/* Debugger marks in the editor. */
+.block.sim-active,
+.loop.sim-active,
+.switch.sim-active {
+  box-shadow:
+    0 0 0 3px #ffd400,
+    0 0 12px 4px rgba(255, 196, 0, 0.85);
+}
+
+.block.has-breakpoint,
+.loop.has-breakpoint,
+.switch.has-breakpoint {
+  position: relative;
+}
+
+.block.has-breakpoint::after,
+.loop.has-breakpoint > .loop-cap:first-of-type::after,
+.switch.has-breakpoint > .switch-bar::after {
+  content: '';
+  position: absolute;
+  top: -5px;
+  left: -5px;
+  width: 11px;
+  height: 11px;
+  border: 1px solid #7a0000;
+  border-radius: 50%;
+  background: radial-gradient(circle at 35% 35%, #ff8a8a, #d40000 60%, #8e0000);
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.4);
+  z-index: 7;
+  pointer-events: none;
+}
+
+.wire-value rect {
+  fill: #fffbe0;
+  stroke: #b49a00;
+  stroke-width: 0.8;
+}
+
+.wire-value text {
+  font: 10px var(--font-ui);
+  fill: #222;
+}

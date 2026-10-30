@@ -41,9 +41,20 @@ import { checkBrowserSupport } from './lib/browserSupport';
 import { openProjectFile, readProgramFile, saveProjectFile, type SavedFile } from './lib/files';
 import { iconUrl } from './lib/icons';
 import { loadValue, saveValue } from './lib/storage';
+import { SimulatorProvider, useSimulator, type SimulatorControls } from './sim/SimulatorContext';
+import { SimulatorWindow } from './sim/SimulatorWindow';
 
 const support = checkBrowserSupport(navigator);
 const AUTOSAVE_KEY = 'autosave';
+/** The simulator mat each example is meant for. */
+const EXAMPLE_MATS: Record<string, string> = {
+  square: 'square',
+  avoid: 'walls',
+  line: 'oval',
+  bumper: 'walls',
+  distance: 'walls',
+  parallel: 'square',
+};
 
 type Modal =
   'nxt' | 'variables' | 'about' | { title: string; icon: string; body: ReactNode } | null;
@@ -73,6 +84,9 @@ function Studio() {
   const [modal, setModal] = useState<Modal>(null);
   const [ready, setReady] = useState(false);
   const fileHandle = useRef<SavedFile>(null);
+  // Simulator controls, filled in by <SimulatorHooks> inside the provider.
+  const simActions = useRef<SimulatorControls | null>(null);
+  const [initialMat, setInitialMat] = useState('empty');
   const connected = brick.state === 'connected';
 
   // Restore the last session, then autosave every change.
@@ -81,8 +95,10 @@ function Studio() {
     const exampleKey = new URLSearchParams(window.location.search).get('example');
     const example = EXAMPLES.find((e) => e.key === exampleKey);
     void loadValue<unknown>(AUTOSAVE_KEY).then((saved) => {
-      if (example) dispatch({ type: 'load', program: example.create() });
-      else if (isProgram(saved)) dispatch({ type: 'load', program: normalizeProgram(saved) });
+      if (example) {
+        dispatch({ type: 'load', program: example.create() });
+        setInitialMat(EXAMPLE_MATS[example.key] ?? 'empty');
+      } else if (isProgram(saved)) dispatch({ type: 'load', program: normalizeProgram(saved) });
       setReady(true);
     });
   }, []);
@@ -167,6 +183,8 @@ function Studio() {
       if (!example || !confirmDiscard()) return;
       fileHandle.current = null;
       dispatch({ type: 'load', program: example.create() });
+      const mat = EXAMPLE_MATS[key];
+      if (mat) simActions.current?.setScenario(mat);
     },
     renameProgram: () => {
       const name = window.prompt('Program name:', state.program.name);
@@ -258,6 +276,15 @@ function Studio() {
       );
     },
     stop: () => void brick.stopEverything(),
+    simulate: () => {
+      const sim = simActions.current;
+      if (!sim) return;
+      sim.setOpen(true);
+      sim.run();
+    },
+    toggleBreakpoint: () => {
+      if (state.selected) simActions.current?.toggleBreakpoint(state.selected);
+    },
   };
 
   const actionsRef = useRef(actions);
@@ -287,6 +314,12 @@ function Studio() {
     } else if (e.key === 'Delete' || e.key === 'Backspace') {
       e.preventDefault();
       a.deleteSelected();
+    } else if (e.key === 'F9') {
+      e.preventDefault();
+      a.toggleBreakpoint();
+    } else if (e.key === 'F5') {
+      e.preventDefault();
+      a.simulate();
     } else if (e.key === 'Escape') {
       dispatch({ type: 'select', id: null });
     } else if (mod && (e.key === '=' || e.key === '+')) {
@@ -418,6 +451,24 @@ function Studio() {
       ],
     },
     {
+      label: 'Simulator',
+      items: [
+        { label: 'Run in simulator', icon: 'car', shortcut: 'F5', onClick: actions.simulate },
+        {
+          label: 'Show simulator',
+          icon: 'map',
+          onClick: () => simActions.current?.setOpen(true),
+        },
+        {
+          label: 'Toggle breakpoint',
+          icon: 'bug',
+          shortcut: 'F9',
+          disabled: !state.selected,
+          onClick: actions.toggleBreakpoint,
+        },
+      ],
+    },
+    {
       label: 'Help',
       items: [
         { label: 'About NXT Web Studio', icon: 'information', onClick: () => setModal('about') },
@@ -429,148 +480,173 @@ function Studio() {
 
   return (
     <EditorContext.Provider value={{ state, dispatch, issues, issuesByBlock }}>
-      <div className="app-window">
-        <div className="title-bar">
-          <img src={iconUrl('brick')} alt="" />
-          NXT Web Studio
-          <span className="doc">
-            — {state.program.name}
-            {state.dirty ? '*' : ''}
-          </span>
-        </div>
-        <MenuBar menus={menus} />
-        <Toolbar
-          onBrickClick={() => setModal('nxt')}
-          groups={[
-            {
-              buttons: [
-                {
-                  key: 'new',
-                  label: 'New program',
-                  icon: 'page_white_add',
-                  onClick: actions.newProgram,
-                },
-                {
-                  key: 'open',
-                  label: 'Open (Ctrl+O)',
-                  icon: 'folder',
-                  onClick: () => void actions.open(),
-                },
-                {
-                  key: 'save',
-                  label: 'Save (Ctrl+S)',
-                  icon: 'diskette',
-                  onClick: () => void actions.save(),
-                },
-              ],
-            },
-            {
-              buttons: [
-                {
-                  key: 'undo',
-                  label: 'Undo (Ctrl+Z)',
-                  icon: 'arrow_undo',
-                  disabled: state.past.length === 0,
-                  onClick: () => dispatch({ type: 'undo' }),
-                },
-                {
-                  key: 'redo',
-                  label: 'Redo (Ctrl+Y)',
-                  icon: 'arrow_redo',
-                  disabled: state.future.length === 0,
-                  onClick: () => dispatch({ type: 'redo' }),
-                },
-                {
-                  key: 'delete',
-                  label: 'Delete block (Del)',
-                  icon: 'delete',
-                  disabled: !state.selected && !state.selectedWire,
-                  onClick: actions.deleteSelected,
-                },
-              ],
-            },
-            {
-              optional: true,
-              buttons: [
-                {
-                  key: 'zoomin',
-                  label: 'Zoom in',
-                  icon: 'magnifier_zoom_in',
-                  onClick: () => actions.zoom(0.1),
-                },
-                {
-                  key: 'zoomout',
-                  label: 'Zoom out',
-                  icon: 'magnifier_zoom_out',
-                  onClick: () => actions.zoom(-0.1),
-                },
-              ],
-            },
-            {
-              optional: true,
-              buttons: [
-                {
-                  key: 'myblock',
-                  label: 'Make a new My Block',
-                  icon: 'brick_add',
-                  disabled: !state.selected,
-                  onClick: actions.makeMyBlock,
-                },
-                {
-                  key: 'vars',
-                  label: 'Define variables',
-                  icon: 'tag_red',
-                  onClick: () => setModal('variables'),
-                },
-                {
-                  key: 'nxt',
-                  label: 'NXT window',
-                  icon: 'monitor_window',
-                  onClick: () => setModal('nxt'),
-                },
-              ],
-            },
-          ]}
-        />
-        <SupportBanner support={support} />
-        <div className="workspace">
-          <Palette />
-          <div className="editor-column">
-            <Canvas
-              onRenameProgram={actions.renameProgram}
-              overlay={
-                <Controller
-                  connected={connected}
-                  onNxtWindow={() => setModal('nxt')}
-                  onDownload={() => actions.download(false)}
-                  onRun={() => actions.download(true)}
-                  onStop={actions.stop}
-                  onConnect={() => (connected ? setModal('nxt') : void brick.connectUsb())}
-                />
-              }
-            />
-            <div className="bottom-area">
-              <ConfigPanel onEditVariables={() => setModal('variables')} />
-              <HelpPanel />
+      <SimulatorProvider initialScenario={initialMat}>
+        <SimulatorHooks actionsRef={simActions} />
+        <div className="app-window">
+          <div className="title-bar">
+            <img src={iconUrl('brick')} alt="" />
+            NXT Web Studio
+            <span className="doc">
+              — {state.program.name}
+              {state.dirty ? '*' : ''}
+            </span>
+          </div>
+          <MenuBar menus={menus} />
+          <Toolbar
+            onBrickClick={() => setModal('nxt')}
+            groups={[
+              {
+                buttons: [
+                  {
+                    key: 'new',
+                    label: 'New program',
+                    icon: 'page_white_add',
+                    onClick: actions.newProgram,
+                  },
+                  {
+                    key: 'open',
+                    label: 'Open (Ctrl+O)',
+                    icon: 'folder',
+                    onClick: () => void actions.open(),
+                  },
+                  {
+                    key: 'save',
+                    label: 'Save (Ctrl+S)',
+                    icon: 'diskette',
+                    onClick: () => void actions.save(),
+                  },
+                ],
+              },
+              {
+                buttons: [
+                  {
+                    key: 'undo',
+                    label: 'Undo (Ctrl+Z)',
+                    icon: 'arrow_undo',
+                    disabled: state.past.length === 0,
+                    onClick: () => dispatch({ type: 'undo' }),
+                  },
+                  {
+                    key: 'redo',
+                    label: 'Redo (Ctrl+Y)',
+                    icon: 'arrow_redo',
+                    disabled: state.future.length === 0,
+                    onClick: () => dispatch({ type: 'redo' }),
+                  },
+                  {
+                    key: 'delete',
+                    label: 'Delete block (Del)',
+                    icon: 'delete',
+                    disabled: !state.selected && !state.selectedWire,
+                    onClick: actions.deleteSelected,
+                  },
+                ],
+              },
+              {
+                optional: true,
+                buttons: [
+                  {
+                    key: 'zoomin',
+                    label: 'Zoom in',
+                    icon: 'magnifier_zoom_in',
+                    onClick: () => actions.zoom(0.1),
+                  },
+                  {
+                    key: 'zoomout',
+                    label: 'Zoom out',
+                    icon: 'magnifier_zoom_out',
+                    onClick: () => actions.zoom(-0.1),
+                  },
+                ],
+              },
+              {
+                optional: true,
+                buttons: [
+                  {
+                    key: 'myblock',
+                    label: 'Make a new My Block',
+                    icon: 'brick_add',
+                    disabled: !state.selected,
+                    onClick: actions.makeMyBlock,
+                  },
+                  {
+                    key: 'vars',
+                    label: 'Define variables',
+                    icon: 'tag_red',
+                    onClick: () => setModal('variables'),
+                  },
+                  {
+                    key: 'nxt',
+                    label: 'NXT window',
+                    icon: 'monitor_window',
+                    onClick: () => setModal('nxt'),
+                  },
+                  {
+                    key: 'sim',
+                    label: 'Run in simulator (F5)',
+                    icon: 'car',
+                    onClick: actions.simulate,
+                  },
+                ],
+              },
+            ]}
+          />
+          <SupportBanner support={support} />
+          <div className="workspace">
+            <Palette />
+            <div className="editor-column">
+              <Canvas
+                onRenameProgram={actions.renameProgram}
+                overlay={
+                  <Controller
+                    connected={connected}
+                    onNxtWindow={() => setModal('nxt')}
+                    onSimulate={actions.simulate}
+                    onDownload={() => actions.download(false)}
+                    onRun={() => actions.download(true)}
+                    onStop={actions.stop}
+                    onConnect={() => (connected ? setModal('nxt') : void brick.connectUsb())}
+                  />
+                }
+              />
+              <div className="bottom-area">
+                <ConfigPanel onEditVariables={() => setModal('variables')} />
+                <HelpPanel />
+              </div>
             </div>
           </div>
         </div>
-      </div>
-      {(modal === 'nxt' || (modal === null && brick.error)) && (
-        <NxtWindow
-          onClose={() => {
-            brick.clearError();
-            setModal(null);
-          }}
-        />
-      )}
-      {modal === 'variables' && <VariablesDialog onClose={() => setModal(null)} />}
-      {modal === 'about' && <AboutDialog onClose={() => setModal(null)} />}
-      {modal !== null && typeof modal === 'object' && (
-        <MessageDialog title={modal.title} icon={modal.icon} onClose={() => setModal(null)}>
-          {modal.body}
-        </MessageDialog>
-      )}
+        {(modal === 'nxt' || (modal === null && brick.error)) && (
+          <NxtWindow
+            onClose={() => {
+              brick.clearError();
+              setModal(null);
+            }}
+          />
+        )}
+        {modal === 'variables' && <VariablesDialog onClose={() => setModal(null)} />}
+        {modal === 'about' && <AboutDialog onClose={() => setModal(null)} />}
+        {modal !== null && typeof modal === 'object' && (
+          <MessageDialog title={modal.title} icon={modal.icon} onClose={() => setModal(null)}>
+            {modal.body}
+          </MessageDialog>
+        )}
+        <SimulatorSlot />
+      </SimulatorProvider>
     </EditorContext.Provider>
   );
+}
+
+/** Hands the simulator controls to <Studio>, which renders the provider. */
+function SimulatorHooks({ actionsRef }: { actionsRef: React.RefObject<SimulatorControls | null> }) {
+  const controls = useSimulator();
+  useLayoutEffect(() => {
+    actionsRef.current = controls;
+  });
+  return null;
+}
+
+function SimulatorSlot() {
+  const { open } = useSimulator();
+  return open ? <SimulatorWindow /> : null;
 }

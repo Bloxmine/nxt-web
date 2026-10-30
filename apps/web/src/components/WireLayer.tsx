@@ -1,6 +1,7 @@
 import type { DataType, Program } from '@nxt/blocks';
 import { useLayoutEffect, useRef, type RefObject } from 'react';
 import type { WireEnd } from '../editor/wiring';
+import { useWireValues } from '../sim/SimulatorContext';
 
 const COLORS: Record<DataType, string> = { number: '#e3b800', logic: '#2f9a2a', text: '#e8711a' };
 
@@ -40,6 +41,8 @@ export function WireLayer({
   types,
 }: Props) {
   const svg = useRef<SVGSVGElement>(null);
+  // While simulating, each wire shows the value it carries next to its output end.
+  const values = useWireValues();
 
   useLayoutEffect(() => {
     // The svg sits directly inside the canvas content; use that rather than the
@@ -65,6 +68,10 @@ export function WireLayer({
       const a = wire && socket(wire.from.block, wire.from.plug, 'out');
       const b = wire && socket(wire.to.block, wire.to.plug, 'in');
       path.setAttribute('d', a && b ? route(a.x, a.y, b.x, b.y) : '');
+      const label = layer.querySelector<SVGGElement>(
+        `g[data-wire-label="${CSS.escape(path.dataset['wire'] ?? '')}"]`,
+      );
+      if (label && a) label.setAttribute('transform', `translate(${a.x + 5},${a.y - 4})`);
     }
 
     const pendingPath = layer.querySelector<SVGPathElement>('path[data-pending]');
@@ -119,6 +126,18 @@ export function WireLayer({
           />
         </g>
       ))}
+      {values &&
+        program.wires.map((wire) => {
+          const text = values.get(wire.id) ?? '';
+          return (
+            <g key={`v${wire.id}`} data-wire-label={wire.id} className="wire-value">
+              <rect x={-2} y={-9} width={text.length * 6 + 4} height={11} rx={2} />
+              <text x={0} y={0}>
+                {text}
+              </text>
+            </g>
+          );
+        })}
       {pending && <path data-pending="" className="wire pending" stroke={COLORS[pending.type]} />}
     </svg>
   );
