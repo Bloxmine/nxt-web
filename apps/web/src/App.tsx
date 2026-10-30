@@ -680,7 +680,17 @@ function Studio() {
   // Drop a file anywhere on the window: programs open, pictures go to the picture
   // editor and sounds to the sound recorder.
   useEffect(() => {
-    const isFileDrag = (e: DragEvent) => e.dataTransfer?.types.includes('Files') ?? false;
+    // Drags that start in the page (blocks from the palette, whose icons Chrome also
+    // offers as image files) are never files to open; only drags from outside are.
+    let internal = false;
+    const start = () => {
+      internal = true;
+    };
+    const end = () => {
+      internal = false;
+    };
+    const isFileDrag = (e: DragEvent) =>
+      !internal && (e.dataTransfer?.types.includes('Files') ?? false);
     const over = (e: DragEvent) => {
       if (!isFileDrag(e)) return;
       e.preventDefault();
@@ -691,7 +701,7 @@ function Studio() {
     };
     const drop = (e: DragEvent) => {
       setDropping(false);
-      if (!isFileDrag(e)) return;
+      if (!isFileDrag(e)) return end();
       e.preventDefault();
       const file = e.dataTransfer?.files[0];
       if (!file) return;
@@ -706,10 +716,14 @@ function Studio() {
         void actionsRef.current.openFile(file);
       }
     };
+    window.addEventListener('dragstart', start, true);
+    window.addEventListener('dragend', end, true);
     window.addEventListener('dragover', over);
     window.addEventListener('dragleave', leave);
     window.addEventListener('drop', drop);
     return () => {
+      window.removeEventListener('dragstart', start, true);
+      window.removeEventListener('dragend', end, true);
       window.removeEventListener('dragover', over);
       window.removeEventListener('dragleave', leave);
       window.removeEventListener('drop', drop);

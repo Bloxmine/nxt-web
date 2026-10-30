@@ -92,7 +92,7 @@ export function Palette() {
                 onDragStart={(e) => startDrag(e, { type: 'myBlock', ref: m.id })}
                 onDragEnd={endDrag}
               >
-                <img src={iconUrl('bricks', 32)} alt="" />
+                <img src={iconUrl('bricks', 32)} alt="" draggable={false} />
               </button>
             ))
           ))}
@@ -167,7 +167,7 @@ function PaletteButton({
       }}
       onDragEnd={endDrag}
     >
-      <img src={iconUrl(entry.icon, 32)} alt="" />
+      <img src={iconUrl(entry.icon, 32)} alt="" draggable={false} />
       {more && <span className="more">▸</span>}
     </button>
   );
