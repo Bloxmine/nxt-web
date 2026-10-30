@@ -12,6 +12,7 @@ documents; code comments cite them (for example `// docs/spec/direct-commands.md
 | `usb.md`             | Appendix 1 p. 24, plus USB IDs cross-checked against nxt-python                       | Done   |
 | `rxe.md`             | Executable File Specification v1.0 (firmware 1.03), file format chapter               | Done   |
 | `media.md`           | MultimediaWiki RSO page; NBC/NXC API RIC macros (community sources)                   | Done   |
+| `display-iomap.md`   | NBC/NXC API docs (display IOMAP offsets, module IDs); nxt-python screenshot tool      | Done   |
 | `vm-opcodes.md`      | Executable File Specification v1.0, instruction reference; Ultrasonic I2C Appendix 7  | Done   |
 
 The Bluetooth Developer Kit is `bdk_download1.zip` and the Software Developer Kit is

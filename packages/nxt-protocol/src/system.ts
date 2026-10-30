@@ -1,7 +1,7 @@
 // System command encoders and reply decoders.
 // Every layout here is from docs/spec/system-commands.md (BDK Appendix 1).
 import { TelegramReader, TelegramWriter } from './bytes.js';
-import { FILE_NAME_FIELD_LENGTH, SystemOpcode, TelegramType } from './constants.js';
+import { Display, FILE_NAME_FIELD_LENGTH, SystemOpcode, TelegramType } from './constants.js';
 
 function system(opcode: number, reply = true): TelegramWriter {
   return new TelegramWriter()
@@ -143,4 +143,31 @@ export function encodeClose(handle: number): Uint8Array {
 /** DELETE (0x85). */
 export function encodeDelete(fileName: string): Uint8Array {
   return system(SystemOpcode.Delete).fileName(fileName).done();
+}
+
+/** READ IO MAP (0x94): `count` bytes at `offset` in a module's IO map. */
+export function encodeReadIoMap(moduleId: number, offset: number, count: number): Uint8Array {
+  return system(SystemOpcode.ReadIoMap).u32(moduleId).u16(offset).u16(count).done();
+}
+
+/** Decodes the data from a READ IO MAP reply (bytes 7–8 count, 9.. data). */
+export function decodeReadIoMap(reply: Uint8Array): Uint8Array {
+  const count = new TelegramReader(reply).u16(7);
+  return reply.slice(9, 9 + count);
+}
+
+/**
+ * Turns the display module's 800-byte screen buffer into one byte per pixel (1 = dark),
+ * rows from the top. Layout: docs/spec/display-iomap.md.
+ */
+export function decodeScreen(buffer: Uint8Array): Uint8Array {
+  const pixels = new Uint8Array(Display.Width * Display.Height);
+  for (let y = 0; y < Display.Height; y++) {
+    const line = (y >> 3) * Display.Width;
+    const bit = 1 << (y & 7);
+    for (let x = 0; x < Display.Width; x++) {
+      pixels[y * Display.Width + x] = (buffer[line + x] ?? 0) & bit ? 1 : 0;
+    }
+  }
+  return pixels;
 }

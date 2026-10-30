@@ -44,6 +44,7 @@ export const SystemOpcode = {
   OpenWriteLinear: 0x89,
   OpenWriteData: 0x8b,
   OpenAppendData: 0x8c,
+  ReadIoMap: 0x94,
   SetBrickName: 0x98,
   GetDeviceInfo: 0x9b,
 } as const;
@@ -168,3 +169,13 @@ export const MAX_READ_CHUNK = MAX_TELEGRAM_LENGTH - 6;
 
 /** Largest WRITE payload: a 64-byte telegram minus type, opcode and handle. */
 export const MAX_WRITE_CHUNK = MAX_TELEGRAM_LENGTH - 3;
+
+/** The screen in the display module's IO map. Source: docs/spec/display-iomap.md. */
+export const Display = {
+  ModuleId: 0x000a0001,
+  NormalOffset: 119,
+  Width: 100,
+  Height: 64,
+  /** Bytes per READ IO MAP request. */
+  Chunk: 32,
+} as const;

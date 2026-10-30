@@ -62,6 +62,8 @@ import { loadValue, saveValue } from './lib/storage';
 import { CHALLENGES } from '@nxt/sim';
 import { SimulatorProvider, useSimulator, type SimulatorControls } from './sim/SimulatorContext';
 import { ChallengesDialog } from './sim/ChallengesDialog';
+import { PictureEditor } from './tools/PictureEditor';
+import { SoundRecorder } from './tools/SoundRecorder';
 import { SimulatorWindow } from './sim/SimulatorWindow';
 
 const support = checkBrowserSupport(navigator);
@@ -96,6 +98,8 @@ type Modal =
   | 'calculator'
   | 'robot'
   | 'challenges'
+  | 'recorder'
+  | 'picture'
   | 'library'
   | 'snippets'
   | 'tutorials'
@@ -854,6 +858,9 @@ function Studio() {
         { label: 'Files on the brick…', icon: 'folder', onClick: () => setModal({ nxt: 'files' }) },
         { label: 'Remote control…', icon: 'joystick', onClick: () => setModal({ nxt: 'remote' }) },
         { label: 'Health check…', icon: 'heart', onClick: () => setModal({ nxt: 'health' }) },
+        { label: 'Brick screen…', icon: 'monitor', onClick: () => setModal({ nxt: 'screen' }) },
+        { label: 'Sound recorder…', icon: 'microphone', onClick: () => setModal('recorder') },
+        { label: 'Picture editor…', icon: 'picture_edit', onClick: () => setModal('picture') },
         { label: 'Data logging…', icon: 'chart_line', onClick: () => setModal('datalog') },
         { label: 'Check program…', icon: 'tick', onClick: () => setModal('checker') },
         {
@@ -1208,6 +1215,8 @@ function Studio() {
           />
         )}
         {modal === 'robot' && <RobotSetupDialog onClose={() => setModal(null)} />}
+        {modal === 'recorder' && <SoundRecorder onClose={() => setModal(null)} />}
+        {modal === 'picture' && <PictureEditor onClose={() => setModal(null)} />}
         {modal === 'challenges' && (
           <ChallengesDialog onPlay={playChallenge} onClose={() => setModal(null)} />
         )}

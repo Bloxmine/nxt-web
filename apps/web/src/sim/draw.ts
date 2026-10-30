@@ -3,7 +3,6 @@ import {
   LCD_WIDTH,
   MAT_COLORS,
   type Challenge,
-  type Lcd,
   type MatShape,
   type Scenario,
   type Simulation,
@@ -267,7 +266,11 @@ function drawRobot(
 }
 
 /** Draws the brick's screen, `size` canvas pixels per screen pixel. */
-export function drawLcd(ctx: CanvasRenderingContext2D, lcd: Lcd, size: number): void {
+export function drawLcd(
+  ctx: CanvasRenderingContext2D,
+  lcd: { pixels: ArrayLike<number> },
+  size: number,
+): void {
   const g = ctx.createLinearGradient(0, 0, 0, LCD_HEIGHT * size);
   g.addColorStop(0, '#c7d6a4');
   g.addColorStop(1, '#a9bf84');

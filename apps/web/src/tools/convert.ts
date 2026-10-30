@@ -11,18 +11,26 @@ export function brickFileName(name: string, extension: string): string {
   return `${base}.${extension}`;
 }
 
-/** Decodes an audio file (WAV, MP3, OGG… whatever the browser plays) into an .rso. */
-export async function audioToRso(file: File, maxSeconds = 8): Promise<Uint8Array> {
+/** Decodes audio (WAV, MP3, OGG, WebM… whatever the browser plays), mixed down to mono. */
+export async function decodeAudio(
+  blob: Blob,
+  maxSeconds = 8,
+): Promise<{ samples: Float32Array; rate: number }> {
   const context = new OfflineAudioContext(1, 1, 44100);
-  const audio = await context.decodeAudioData(await file.arrayBuffer());
-  // Mix down to mono.
+  const audio = await context.decodeAudioData(await blob.arrayBuffer());
   const length = Math.min(audio.length, Math.floor(audio.sampleRate * maxSeconds));
   const mono = new Float32Array(length);
   for (let ch = 0; ch < audio.numberOfChannels; ch++) {
     const data = audio.getChannelData(ch);
     for (let i = 0; i < length; i++) mono[i]! += data[i]! / audio.numberOfChannels;
   }
-  return encodeRso(toPcm8(mono, audio.sampleRate, 8000), 8000);
+  return { samples: mono, rate: audio.sampleRate };
+}
+
+/** Decodes an audio file into an .rso. */
+export async function audioToRso(file: Blob, maxSeconds = 8): Promise<Uint8Array> {
+  const { samples, rate } = await decodeAudio(file, maxSeconds);
+  return encodeRso(toPcm8(samples, rate, 8000), 8000);
 }
 
 /**

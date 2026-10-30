@@ -19,6 +19,18 @@ controller. Try `?example=distance` or `?example=parallel` in the URL.
 buttons, and hear its tones. Running blocks light up and data wires show their values; set
 breakpoints with F9 and step block by block.
 
+Draw your own mats (or use a photo of a real one), play **challenges** with a timer and
+stars, tell the simulator how your robot is built (Tools → Robot setup), and put a second
+brick on the mat that talks to the first over simulated Bluetooth.
+
+**Editor helpers:** a command palette (Ctrl+K), a program checker with tips, a distance and
+turn calculator, snippets, a program library that keeps your work in the browser, guided
+tutorials, an example gallery, a dark theme, a Blockly-style "modern blocks" view, and
+touch support for tablets.
+
+**Brick tools:** files, a live sensor monitor, remote control, data logging, a live copy of
+the brick's screen, a sound recorder (microphone → .rso) and a picture editor (.ric).
+
 **Download:** programs compile to `.rxe` files for the stock firmware and upload over USB
 (or Bluetooth, experimental). Without a brick you can save the `.rxe` file.
 

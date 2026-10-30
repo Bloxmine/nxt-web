@@ -3071,3 +3071,117 @@ svg[display='none'] {
   border: 0;
   background: var(--chrome-dark);
 }
+
+/* NXT window: live brick screen */
+.brick-screen {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+}
+
+.brick-screen canvas {
+  display: block;
+  max-width: 100%;
+  height: auto;
+  image-rendering: pixelated;
+}
+
+.brick-screen-bar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+}
+
+/* Sound recorder */
+.recorder {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 8px;
+}
+
+.recorder-meter {
+  flex: 1;
+  height: 10px;
+  border: 1px solid var(--border);
+  border-radius: 2px;
+  background: #1d2a14;
+  overflow: hidden;
+}
+
+.recorder-meter div {
+  height: 100%;
+  background: linear-gradient(90deg, #6fc24a, #e5d53a 70%, #e0533a);
+}
+
+.recorder-time {
+  min-width: 80px;
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+
+.recorder-wave {
+  display: block;
+  width: 100%;
+  height: 80px;
+  border: 1px solid var(--border-dark);
+  border-radius: 3px;
+}
+
+.recorder-trim {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+  margin: 6px 0;
+}
+
+.recorder-trim label {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.recorder-trim input {
+  flex: 1;
+  min-width: 0;
+}
+
+/* Picture editor */
+.picture-editor {
+  display: flex;
+  gap: 8px;
+  align-items: flex-start;
+}
+
+.picture-canvas {
+  flex: 1;
+  min-width: 0;
+  padding: 8px;
+  border-radius: 6px;
+  background: linear-gradient(#d9d9d9, #b5b5b5);
+}
+
+.picture-canvas canvas {
+  display: block;
+  max-width: 100%;
+  height: auto;
+  margin: 0 auto;
+  border: 2px solid #4a4d48;
+  image-rendering: pixelated;
+  cursor: crosshair;
+  touch-action: none;
+}
+
+@media (max-width: 760px) {
+  .picture-editor {
+    flex-wrap: wrap;
+  }
+  .picture-editor .mat-tools {
+    flex-direction: row;
+  }
+  .picture-editor .mat-props {
+    width: 100%;
+  }
+}

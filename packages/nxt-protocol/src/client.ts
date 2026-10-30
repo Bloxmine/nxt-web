@@ -2,6 +2,7 @@ import type { Transport } from '@nxt/transport';
 import { TelegramReader } from './bytes.js';
 import {
   type ALL_OUTPUTS,
+  Display,
   OutputMode,
   RegulationMode,
   RunState,
@@ -301,6 +302,23 @@ export class NxtClient {
       await sleep(10);
     }
     return 255;
+  }
+
+  /**
+   * Reads what the brick's screen shows: 100 × 64 bytes, 1 = dark pixel, rows from the
+   * top (docs/spec/display-iomap.md).
+   */
+  async readScreen(): Promise<Uint8Array> {
+    const size = (Display.Width * Display.Height) / 8;
+    const buffer = new Uint8Array(size);
+    for (let at = 0; at < size; at += Display.Chunk) {
+      const count = Math.min(Display.Chunk, size - at);
+      const data = s.decodeReadIoMap(
+        await this.call(s.encodeReadIoMap(Display.ModuleId, Display.NormalOffset + at, count)),
+      );
+      buffer.set(data.subarray(0, count), at);
+    }
+    return s.decodeScreen(buffer);
   }
 
   /** Lists files matching a wildcard such as "*.rxe" or "*.*". */

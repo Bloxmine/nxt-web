@@ -130,6 +130,29 @@ describe('direct reply decoders', () => {
 });
 
 describe('system commands', () => {
+  it('READ IO MAP of the display module', () => {
+    // docs/spec/system-commands.md: 2–5 module ID; 6–7 offset; 8–9 byte count.
+    expect([...nxt.encodeReadIoMap(0x000a0001, 119, 32)]).toEqual([
+      0x01, 0x94, 0x01, 0x00, 0x0a, 0x00, 0x77, 0x00, 0x20, 0x00,
+    ]);
+    const reply = Uint8Array.of(0x02, 0x94, 0x00, 0x01, 0x00, 0x0a, 0x00, 0x02, 0x00, 0xaa, 0xbb);
+    expect([...nxt.decodeReadIoMap(reply)]).toEqual([0xaa, 0xbb]);
+  });
+
+  it('decodes the screen buffer: one byte is eight rows of a column, bit 0 on top', () => {
+    const buffer = new Uint8Array(800);
+    buffer[0] = 0b0000_0001; // x 0, y 0
+    buffer[5] = 0b1000_0000; // x 5, y 7
+    buffer[100 + 99] = 0b0000_0010; // x 99, y 9
+    const pixels = nxt.decodeScreen(buffer);
+    const dark = [...pixels.keys()].filter((i) => pixels[i]).map((i) => [i % 100, (i / 100) | 0]);
+    expect(dark).toEqual([
+      [0, 0],
+      [5, 7],
+      [99, 9],
+    ]);
+  });
+
   it('GET FIRMWARE VERSION example from Appendix 1 p. 11', () => {
     // "Byte 3: 0x02, Byte 4: 0x01, Byte 5: 0x03, Byte 6: 0x01 => protocol 1.2, firmware 1.3"
     const v = nxt.decodeGetFirmwareVersion(bytes(0x02, 0x88, 0x00, 0x02, 0x01, 0x03, 0x01));

@@ -97,6 +97,14 @@ confirmed" in [spec/rxe.md](spec/rxe.md). Connect over USB, then:
    moving it over black and white; Save CSV opens in a spreadsheet.
 6. **Calibrate sensor**: select a Wait for light block, Tools → Calibrate sensor, read
    dark and light, Use: the block's trigger value is the midpoint.
+7. **Brick screen** (Tools → Brick screen): the picture matches the brick's own screen
+   (menu text the right way up, not mirrored); it follows when you browse the brick's
+   menus. Note the updates per second over USB and over Bluetooth. Save picture saves a
+   PNG. (Layout from docs/spec/display-iomap.md.)
+8. **Sound recorder** (Tools → Sound recorder): record "hello", trim it, Send to brick;
+   the brick plays it from My Files › Sound files, and a Sound block can use it.
+9. **Picture editor** (Tools → Picture editor): draw text and a box, Send to brick; a
+   Display block with that picture shows it the same way up as in the editor.
 
 ## Recording a capture
 
