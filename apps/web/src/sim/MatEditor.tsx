@@ -358,12 +358,18 @@ export function MatEditor({
     </label>
   );
 
+  /** Closes without saving, after asking when something was drawn or changed. */
+  const discard = () => {
+    if (draft !== mat && !window.confirm('Discard your changes to this mat?')) return;
+    onClose();
+  };
+
   return (
     <Dialog
       title={`Mat editor — ${draft.name}`}
       icon="map_edit"
       width={960}
-      onClose={onClose}
+      onClose={discard}
       footer={
         <>
           {custom && (
@@ -403,7 +409,7 @@ export function MatEditor({
           >
             <img src={iconUrl('page_save')} alt="" /> Save
           </button>
-          <button type="button" className="btn" onClick={onClose}>
+          <button type="button" className="btn" onClick={discard}>
             Cancel
           </button>
         </>

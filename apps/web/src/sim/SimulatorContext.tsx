@@ -272,8 +272,8 @@ export function SimulatorProvider({
         );
         if (verdict.state !== 'running') {
           recordScore(j.challenge.id, verdict);
-          sim.pause();
-          sim2?.pause();
+          sim.stop();
+          sim2?.stop();
           break;
         }
       }
@@ -303,6 +303,14 @@ export function SimulatorProvider({
     frame.current = requestAnimationFrame(loop);
     return () => cancelAnimationFrame(frame.current);
   }, [sim, sim2, live, sync, audio]);
+
+  // Show the robot on its mat as soon as the window opens (and again after the mat,
+  // challenge, second brick or robot changes), before the first run. This sets state
+  // once per change, not in a loop: build() leaves `sim` set or records problems.
+  useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    if (open && !sim) build();
+  }, [open, sim, build]);
 
   const current = useCallback(
     () => (sim && !(stale && sim.status !== 'running' && sim.status !== 'paused') ? sim : build()),

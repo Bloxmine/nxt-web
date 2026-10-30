@@ -588,8 +588,14 @@ function Studio() {
     const typing = target?.closest('input, select, textarea, [contenteditable]') != null;
     // Inside a dialog (or behind a modal one) editor shortcuts must not touch the program.
     const inDialog =
-      target?.closest('.dialog, [role="dialog"]') != null ||
+      target?.closest('.dialog, [role="dialog"]:not(.sim-window)') != null ||
       document.querySelector('.dialog-backdrop:not(.modeless)') !== null;
+    // The simulator window keeps the editor's shortcuts, but uses the arrow keys for the
+    // brick's buttons and must not delete blocks.
+    const inSimulator = target?.closest('.sim-window') != null;
+    if (inSimulator && (e.key.startsWith('Arrow') || e.key === 'Delete' || e.key === 'Backspace')) {
+      return;
+    }
     const mod = e.ctrlKey || e.metaKey;
     const a = actionsRef.current;
     if (mod && e.key.toLowerCase() === 's') {

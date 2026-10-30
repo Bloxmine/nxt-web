@@ -93,6 +93,10 @@ export function TutorialPanel({
   const sim = useSimulator();
   const [index, setIndex] = useState(initialStep);
   const [showHint, setShowHint] = useState(false);
+  /** Steps finished in this session (earlier progress counts as finished). */
+  const [finished, setFinished] = useState<ReadonlySet<number>>(
+    () => new Set(Array.from({ length: initialStep }, (_, i) => i)),
+  );
   const step = tutorial.steps[index]!;
   void sim.tick; // re-check as the simulation runs
   const done = (() => {
@@ -105,6 +109,7 @@ export function TutorialPanel({
   const last = index === tutorial.steps.length - 1;
   const mat = step.mat ? SCENARIOS.find((s) => s.id === step.mat) : undefined;
   const go = (to: number) => {
+    if (done) setFinished((f) => new Set(f).add(index));
     setIndex(to);
     setShowHint(false);
     saveProgress(tutorial.key, to);
@@ -130,7 +135,10 @@ export function TutorialPanel({
       </div>
       <div className="tutorial-progress" aria-hidden="true">
         {tutorial.steps.map((_, i) => (
-          <span key={i} className={i < index ? 'past' : i === index ? 'now' : ''} />
+          <span
+            key={i}
+            className={i === index ? 'now' : finished.has(i) ? 'past' : i < index ? 'skipped' : ''}
+          />
         ))}
       </div>
       <div className="tutorial-body">

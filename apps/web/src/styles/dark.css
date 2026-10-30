@@ -393,8 +393,12 @@
   background: linear-gradient(#34373c, #2a2c30);
   color: var(--text);
 }
+[data-theme='dark'] .sim-brick-tabs {
+  border-color: #4a4d52;
+}
 [data-theme='dark'] .sim-brick-tabs button.active {
-  background: #3a3d42;
+  background: linear-gradient(#4a7cc4, #2c5aa8);
+  color: #fff;
 }
 
 /* Blockly's dropdowns and context menus (outside the workspace). */

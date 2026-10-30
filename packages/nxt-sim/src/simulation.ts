@@ -192,6 +192,11 @@ export class Simulation {
     if (this.status === 'running') this.status = 'paused';
   }
 
+  /** Ends the program now, as if it had finished (motors coast). */
+  stop(): void {
+    if (this.status === 'running' || this.status === 'paused') this.finish();
+  }
+
   /** Runs until any task moves on to another block, then pauses. */
   step(maxMs = 60_000): void {
     if (this.status === 'finished' || this.status === 'error') this.reset();

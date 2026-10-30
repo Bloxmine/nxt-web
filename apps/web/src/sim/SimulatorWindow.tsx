@@ -47,7 +47,8 @@ export function SimulatorWindow() {
   const lcdRef = useRef<HTMLCanvasElement>(null);
   const [pos, setPos] = useState(() => ({
     x: Math.max(8, window.innerWidth - 720),
-    y: Math.max(8, window.innerHeight - 560),
+    // Just below the toolbar, so the whole window fits on most screens.
+    y: Math.max(8, Math.min(90, window.innerHeight - 600)),
   }));
   const [mailbox, setMailbox] = useState(1);
   const [message, setMessage] = useState('');
@@ -111,6 +112,17 @@ export function SimulatorWindow() {
     sim2?.setSoundLevel(sound);
   }, [sim, sim2, sound]);
 
+  // Keep the window on screen when the browser window gets smaller.
+  useEffect(() => {
+    const clamp = () =>
+      setPos((p) => ({
+        x: Math.max(0, Math.min(p.x, window.innerWidth - 120)),
+        y: Math.max(0, Math.min(p.y, window.innerHeight - 40)),
+      }));
+    window.addEventListener('resize', clamp);
+    return () => window.removeEventListener('resize', clamp);
+  }, []);
+
   const press = (button: ButtonName, down: boolean) => {
     shown?.setButton(button, down);
   };
@@ -133,7 +145,8 @@ export function SimulatorWindow() {
   };
 
   // While stopped or paused, drag on the mat to place the robot; the wheel turns it.
-  const editable = sim !== null && s.status !== 'running';
+  // During a challenge only before the start, so the robot can't be carried to the goal.
+  const editable = sim !== null && (s.challenge ? s.status === 'ready' : s.status !== 'running');
   const placeRobot = (e: ReactPointerEvent<HTMLCanvasElement>) => {
     const canvas = e.currentTarget;
     if (!sim || !editable) return;
@@ -211,18 +224,31 @@ export function SimulatorWindow() {
             : s.status === 'error'
               ? `Stopped: ${sim?.error ?? 'error'}`
               : 'Ready';
-  const userVars =
-    brick === 2 && s.second?.kind === 'program'
-      ? s.second.program.variables
-      : state.program.variables;
+  const shownProgram =
+    brick === 2 && s.second?.kind === 'program' ? s.second.program : state.program;
+  // Every new program has a "Number 1" variable; only list it when it is used.
+  const blocksJson = JSON.stringify([
+    shownProgram.body,
+    shownProgram.parallel,
+    shownProgram.myBlocks,
+  ]);
+  const userVars = shownProgram.variables.filter(
+    (v) => v.name !== 'Number 1' || blocksJson.includes(JSON.stringify(v.name)),
+  );
 
   return (
     <div
       className="sim-window"
       role="dialog"
       aria-label="Simulator"
-      style={{ left: pos.x, top: pos.y }}
+      style={{ left: pos.x, top: pos.y, maxHeight: `calc(100vh - ${pos.y + 8}px)` }}
       onKeyDown={(e) => {
+        const target = e.target as HTMLElement;
+        if (e.key === 'Escape' && !target.closest('input, select, textarea, .dialog')) {
+          s.pause();
+          s.setOpen(false);
+          return;
+        }
         const key = { ArrowLeft: 'left', ArrowRight: 'right', Enter: 'enter' }[e.key] as
           ButtonName | undefined;
         if (key && (e.target as HTMLElement).tagName !== 'INPUT') {
@@ -394,9 +420,9 @@ export function SimulatorWindow() {
                 </span>
               )}
               <span className="sim-challenge-message">
-                {result?.state === 'running' && s.status === 'ready'
+                {!result || (result.state === 'running' && s.status === 'ready')
                   ? 'Press Run to start.'
-                  : result?.message}
+                  : result.message}
                 {result && result.state !== 'running' && ' Press Run to try again.'}
               </span>
             </div>
@@ -495,7 +521,7 @@ export function SimulatorWindow() {
         <fieldset className="groupbox">
           <legend>Variables</legend>
           {userVars.length === 0 ? (
-            <p className="sim-muted">No variables defined.</p>
+            <p className="sim-muted">This program uses no variables.</p>
           ) : (
             <table className="sim-table">
               <tbody>
@@ -519,6 +545,7 @@ export function SimulatorWindow() {
               value={secondValue}
               aria-label="Second brick"
               disabled={running}
+              onFocus={() => void listLibrary().then(setLibrary)}
               onChange={(e) => chooseSecond(e.target.value)}
             >
               <option value="">None</option>

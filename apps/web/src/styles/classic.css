@@ -2712,7 +2712,7 @@ p.gallery-meta {
   position: fixed;
   top: 90px;
   right: 16px;
-  z-index: 35;
+  z-index: 45;
   display: flex;
   flex-direction: column;
   width: min(330px, calc(100vw - 32px));
@@ -2742,6 +2742,11 @@ p.gallery-meta {
 
 .tutorial-progress span.now {
   background: #e68b2c;
+}
+
+/* Skipped with Next before it was done. */
+.tutorial-progress span.skipped {
+  background: repeating-linear-gradient(135deg, #8a8a8a 0 3px, var(--chrome-dark) 3px 6px);
 }
 
 .tutorial-body {
@@ -2813,6 +2818,8 @@ p.gallery-meta {
 
 .canvas-frame.modern {
   position: relative;
+  /* Keep the controller's z-index (above Blockly) inside the canvas. */
+  isolation: isolate;
 }
 
 .blockly-host {
@@ -2939,24 +2946,30 @@ svg[display='none'] {
 
 .sim-brick-tabs {
   display: flex;
-  gap: 2px;
-  margin-bottom: 4px;
+  align-self: stretch;
+  margin: 0 6px 2px;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  overflow: hidden;
 }
 
 .sim-brick-tabs button {
   flex: 1;
   padding: 2px 6px;
-  border: 1px solid var(--border);
-  border-radius: 3px 3px 0 0;
+  border: 0;
   background: linear-gradient(var(--chrome-light), var(--chrome));
   font-size: 11px;
   white-space: nowrap;
   cursor: pointer;
 }
 
+.sim-brick-tabs button + button {
+  border-left: 1px solid var(--border);
+}
+
 .sim-brick-tabs button.active {
-  border-bottom-color: transparent;
-  background: var(--chrome-light);
+  background: linear-gradient(#5b8fd6, #2f6fd1);
+  color: #fff;
   font-weight: bold;
 }
 
@@ -3251,4 +3264,12 @@ fieldset.controls.wired {
   color: var(--selection);
   font-style: italic;
   white-space: nowrap;
+}
+
+.sim-toolbar select {
+  max-width: 116px;
+}
+
+.sim-toolbar .sim-field {
+  margin: 0 2px;
 }
