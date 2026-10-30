@@ -79,7 +79,7 @@ nxt-web-studio/
     blocks/              # Blockly block definitions + block-to-IR generators
   docs/
     spec/                # Excerpts from LEGO's published protocol/file-format docs
-    udev/                # 99-nxt.rules and Linux setup notes
+    udev/                # 70-nxt.rules and Linux setup notes
     architecture.md
   fixtures/              # Captured packets, known-good .rxe files
   CLAUDE.md              # Working agreements for Claude Code
@@ -131,7 +131,7 @@ Prove the hardware path end to end before building any editor. This phase ends w
 - [ ] System commands: get firmware version, get device info (name, Bluetooth address, free flash), find first and next, open and close file
 - [ ] A request queue that serialises commands and applies timeouts, so UI code never interleaves packets
 - [ ] Dev-only "Bench" page in `apps/web`: connect, tone, battery, motor sliders, sensor port selectors with live readouts
-- [ ] `docs/udev/99-nxt.rules` and a short Linux permissions guide
+- [ ] `docs/udev/70-nxt.rules` and a short Linux permissions guide
 - [ ] Save real packet captures as fixtures; use them in protocol unit tests
 
 **Acceptance criteria**

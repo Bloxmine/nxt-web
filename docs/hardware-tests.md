@@ -13,7 +13,7 @@ confirm the banner appears.
 ## Phase 1: protocol over USB
 
 Setup: brick with standard firmware (1.2x/1.3x), fresh batteries, USB cable. On Linux,
-install `docs/udev/99-nxt.rules` first.
+install `docs/udev/70-nxt.rules` first.
 
 1. Toolbar → brick status box → **Connect via USB**. Pick the brick in the browser's list.
    - Expected: the status box shows the brick name and battery voltage.
