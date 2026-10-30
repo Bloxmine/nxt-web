@@ -33,6 +33,7 @@ import { NxtWindow, type NxtTab } from './components/NxtWindow';
 import { CalibrateDialog } from './tools/CalibrateDialog';
 import { DataLogDialog } from './tools/DataLogDialog';
 import { saveFile } from './tools/convert';
+import type { PackedFile } from '@nxt/rbt';
 import { Palette } from './components/Palette';
 import { SupportBanner } from './components/SupportBanner';
 import { Toolbar } from './components/Toolbar';
@@ -182,7 +183,12 @@ function Studio() {
 
   const message = (title: string, icon: string, body: ReactNode) => setModal({ title, icon, body });
 
-  const showOpened = (result: { program: Program; warnings: string[]; imported: boolean }) => {
+  const showOpened = (result: {
+    program: Program;
+    warnings: string[];
+    imported: boolean;
+    files?: PackedFile[];
+  }) => {
     dispatch({ type: 'load', program: result.program });
     if (!result.imported) return;
     message(
@@ -190,9 +196,44 @@ function Studio() {
       result.warnings.length ? 'error' : 'tick',
       <>
         <p style={{ marginTop: 0 }}>
-          <strong>{result.program.name}</strong> was opened from an NXT-G program (.rbt). Saving
-          creates a new project file; the original is not changed.
+          <strong>{result.program.name}</strong> was opened from an NXT-G program (
+          {result.files ? 'Pack and Go, .rbtx' : '.rbt'}). Saving creates a new project file; the
+          original is not changed.
         </p>
+        {result.files && result.files.length > 0 && (
+          <>
+            <p>It came with these files, which the program plays or shows from the brick:</p>
+            <ul style={{ paddingLeft: 18 }}>
+              {result.files.map((f) => (
+                <li key={f.name}>
+                  {f.name}{' '}
+                  <button
+                    type="button"
+                    className="btn"
+                    style={{ minWidth: 0 }}
+                    onClick={() => saveFile(f.name, f.bytes)}
+                  >
+                    Save
+                  </button>
+                </li>
+              ))}
+            </ul>
+            {connected && (
+              <button
+                type="button"
+                className="btn"
+                onClick={() =>
+                  void (async () => {
+                    for (const f of result.files ?? [])
+                      await brick.client?.uploadFile(f.name, f.bytes);
+                  })().catch((e: unknown) => window.alert(String(e)))
+                }
+              >
+                <img src={iconUrl('page_white_put')} alt="" /> Upload them to the brick
+              </button>
+            )}
+          </>
+        )}
         {result.warnings.length > 0 && (
           <>
             <p>Some parts could not be carried over exactly:</p>

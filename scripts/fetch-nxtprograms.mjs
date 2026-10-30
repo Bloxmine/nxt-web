@@ -107,3 +107,18 @@ for (const url of programs.keys()) {
   }
 }
 console.log(`${programs.size} programs found, ${fetched} downloaded to ${OUT}`);
+
+// Pack and Go (.rbtx) samples from SuGO (sugobot.com), for the .rbtx importer tests.
+const RBTX = join(dirname(fileURLToPath(import.meta.url)), '../fixtures/external/rbtx');
+mkdirSync(RBTX, { recursive: true });
+for (const name of ['SuGO_PV1', 'Mechanic_PV1', 'SuGO_C2', 'Mechanic_C2']) {
+  const file = join(RBTX, `${name}.rbtx`);
+  if (existsSync(file)) continue;
+  try {
+    const res = await get(`http://www.sugobot.com/downloads/NXT-G/${name}.rbtx`);
+    writeFileSync(file, new Uint8Array(await res.arrayBuffer()));
+    console.log(`  ${name}.rbtx`);
+  } catch (error) {
+    console.warn(`  skipped ${name}.rbtx: ${error.message}`);
+  }
+}

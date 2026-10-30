@@ -19,3 +19,5 @@ import { decodeRbt } from './decode.js';
 export function importRbt(bytes: Uint8Array, fileName = 'Program.rbt'): ImportResult {
   return convertRbt(decodeRbt(bytes, fileName));
 }
+export { importRbtx, unzip, type PackedFile, type RbtxResult } from './rbtx.js';
+export { myBlockId } from './convert.js';

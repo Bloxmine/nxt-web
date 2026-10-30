@@ -165,6 +165,39 @@ is why some fields are found by anchors rather than fixed offsets.
 - **Timer blocks:** the trigger value is not yet decoded; it only matters when the timer's
   yes/no output is used.
 
+## Pack and Go (.rbtx)
+
+An `.rbtx` is a plain zip (deflate). It holds the program's `.rbt`, one `.rbt` per My
+Block, the `.rso`/`.ric` files it uses, and `rbtDistro.ini`, which lists every file with
+its destination: `<PROFILE DIR>` for the program, `<PROFILE DIR>:::Blocks:::My Blocks` for
+My Blocks and `<MINDSTORMS DIR>:::Sounds` for sounds. Checked against four SuGO programs
+from sugobot.com (`pnpm fetch:nxtprograms` downloads them into the git-ignored
+`fixtures/external/rbtx/`).
+
+A My Block call is a block node whose template is the My Block's own file
+(`Drive Timed.rbt`). The importer turns it into a My Block call; `importRbtx` loads the My
+Block files (and My Blocks inside them). A plain `.rbt` keeps empty My Blocks and says so.
+
+Not carried over yet: **My Block parameters** (data plugs on a My Block). Wires into them
+are dropped with a note, and a logic/value Switch inside a My Block that read a parameter
+gets a Constant instead (its default case).
+
+## Export to .rbt: not done, and why
+
+Writing `.rbt` files back is harder than reading them: block settings are stored **twice**,
+in the `…BlockConfig` VI tag and again in the instance's front-panel data (`DFDS`). For a
+Move block the power appears as 75 in the tag and as `0000004b` (−75 as `ffffffb5` when
+backwards) in `DFDS`. `DFDS` is sparse: values equal to the default are left out, so the
+same block type is 1,424–1,429 bytes depending on its settings. Changing a setting
+can therefore change the size of `DFDS`, which means rebuilding the embedded VI and the
+outer resource file, and knowing the full front-panel layout of every block type.
+
+Without the NXT-G software to check the result against, an exporter could write files
+that look right to our importer but that NXT-G reads differently (or rejects). It needs:
+
+1. the NXT-G 2.x software (or a volunteer with it) to round-trip test files, and
+2. a full decode of `DFDS` per block type (today only the fields in the table above).
+
 ## Next steps
 
 1. Decode the remaining `DFDS` fields (Display X/Y, Range inside/outside, Timer trigger,

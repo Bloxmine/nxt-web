@@ -2,7 +2,10 @@ import {
   createBlock,
   defaultCondition,
   emptyProgram,
+  findBlock,
+  insertBlock,
   newId,
+  walkProgram,
   type Block,
   type Condition,
   type Duration,
@@ -16,10 +19,22 @@ import type { RbtDiagram, RbtInstance, RbtNode, RbtProgram, RbtTerminal } from '
 import type { LvValue } from './lvtype.js';
 
 /** Result of converting an .rbt program. */
+/** Id of the My Block definition imported from `<name>.rbt`. */
+export function myBlockId(name: string): string {
+  return `mb_${name.replace(/[^A-Za-z0-9]/g, '_')}`;
+}
+
+/** Warning for a My Block whose own .rbt file was not loaded. */
+export function myBlockMissing(name: string): string {
+  return `My Block "${name}" is saved in its own file (${name}.rbt), so it is empty here. Open the Pack and Go (.rbtx) file to bring it along.`;
+}
+
 export interface ImportResult {
   program: Program;
   /** Things that could not be carried over exactly. */
   warnings: string[];
+  /** Names of the My Blocks the program calls (each is its own `<name>.rbt`). */
+  myBlocks: string[];
 }
 
 type Cfg = { [field: string]: LvValue };
@@ -167,6 +182,7 @@ export function convertRbt(rbt: RbtProgram): ImportResult {
     variables: [],
   };
   const variables = new Map<string, 'number' | 'logic' | 'text'>();
+  const myBlockNames = new Set<string>();
 
   // ---------- terminals and wiring ----------
   const termsByOwner = new Map<number, RbtTerminal[]>();
@@ -716,6 +732,12 @@ export function convertRbt(rbt: RbtProgram): ImportResult {
         if (/^Random/i.test(t)) return { ...createBlock('random'), hub: true } as Block;
         if (/Reset/i.test(t) && /Rotation/i.test(t)) return createBlock('resetRotation');
         if (/^Stop/i.test(t)) return createBlock('stop');
+        // A My Block: its template is the My Block's own .rbt file.
+        if (/\.rbt$/i.test(t)) {
+          const name = t.replace(/\.rbt$/i, '');
+          myBlockNames.add(name);
+          return { ...createBlock('myBlock'), ref: myBlockId(name) } as Block;
+        }
         warn(`Block "${t || inst.title || 'unknown'}" is not supported yet and was left out.`);
         return null;
       }
@@ -932,7 +954,52 @@ export function convertRbt(rbt: RbtProgram): ImportResult {
   program.wires = wires;
   program.variables = [...variables].map(([name, type]) => ({ name, type }));
   if (program.variables.length === 0) program.variables = [{ name: 'Number 1', type: 'number' }];
-  return { program, warnings };
+  // A logic or value Switch whose selector came from outside this diagram (a My Block's
+  // input parameter, which the editor does not have yet) gets a Constant instead, so it
+  // runs its default case.
+  const unwired: Block[] = [];
+  walkProgram(program, (b) => {
+    if (
+      b.kind === 'switch' &&
+      (b.condition.source === 'logic' || b.condition.source === 'value') &&
+      !program.wires.some((w) => w.to.block === b.id && w.to.plug === 'condition')
+    ) {
+      unwired.push(b);
+    }
+  });
+  for (const sw of unwired) {
+    if (sw.kind !== 'switch') continue;
+    const found = findBlock(program, sw.id);
+    if (!found) continue;
+    const valueType =
+      sw.condition.source === 'logic'
+        ? 'logic'
+        : sw.condition.source === 'value' && sw.condition.valueType === 'text'
+          ? 'text'
+          : 'number';
+    const first = sw.cases?.[sw.defaultCase ?? 0]?.value;
+    const constant = {
+      ...createBlock('constant'),
+      valueType,
+      number: typeof first === 'number' ? first : 0,
+      text: typeof first === 'string' ? first : '',
+    } as Block;
+    Object.assign(program, insertBlock(program, found.ref, found.index, constant));
+    program.wires.push({
+      id: newId('w'),
+      from: { block: constant.id, plug: 'value' },
+      to: { block: sw.id, plug: 'condition' },
+    });
+    warn(
+      'A Switch got its value from a My Block input, which is not supported yet; it now uses a Constant (its default case).',
+    );
+  }
+
+  // My Blocks live in their own .rbt files; until those are loaded (importRbtx), keep
+  // an empty definition so the call sites survive.
+  program.myBlocks = [...myBlockNames].map((name) => ({ id: myBlockId(name), name, body: [] }));
+  for (const name of myBlockNames) warn(myBlockMissing(name));
+  return { program, warnings, myBlocks: [...myBlockNames] };
 }
 
 function startsWith(d: Defaults, offset: number, pattern: number[]): boolean {

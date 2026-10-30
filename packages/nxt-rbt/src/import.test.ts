@@ -239,3 +239,76 @@ function walk(blocks: Block[], fn: (b: Block) => void): void {
     }
   }
 }
+
+describe('Pack and Go (.rbtx)', async () => {
+  const { deflateRawSync } = await import('node:zlib');
+  const { importRbtx, unzip } = await import('./index.js');
+
+  /** A minimal zip with deflated entries, like the NXT software writes. */
+  function zip(entries: [string, Uint8Array][]): Uint8Array {
+    const parts: number[] = [];
+    const central: number[] = [];
+    const u16 = (a: number[], n: number) => a.push(n & 255, (n >> 8) & 255);
+    const u32 = (a: number[], n: number) =>
+      a.push(n & 255, (n >> 8) & 255, (n >> 16) & 255, (n >>> 24) & 255);
+    for (const [name, data] of entries) {
+      const packed = deflateRawSync(data);
+      const offset = parts.length;
+      u32(parts, 0x04034b50);
+      [20, 0, 8, 0, 0].forEach((n) => u16(parts, n));
+      u32(parts, 0);
+      u32(parts, packed.length);
+      u32(parts, data.length);
+      u16(parts, name.length);
+      u16(parts, 0);
+      parts.push(...Buffer.from(name, 'latin1'), ...packed);
+      u32(central, 0x02014b50);
+      [20, 20, 0, 8, 0, 0].forEach((n) => u16(central, n));
+      u32(central, 0);
+      u32(central, packed.length);
+      u32(central, data.length);
+      [name.length, 0, 0, 0, 0].forEach((n) => u16(central, n));
+      u32(central, 0);
+      u32(central, offset);
+      central.push(...Buffer.from(name, 'latin1'));
+    }
+    const end: number[] = [];
+    u32(end, 0x06054b50);
+    [0, 0, entries.length, entries.length].forEach((n) => u16(end, n));
+    u32(end, central.length);
+    u32(end, parts.length);
+    u16(end, 0);
+    return Uint8Array.from([...parts, ...central, ...end]);
+  }
+
+  it('unzips deflated entries', async () => {
+    const text = new TextEncoder().encode('hello hello hello hello');
+    const files = await unzip(
+      zip([
+        ['a.txt', text],
+        ['dir/b.rso', Uint8Array.of(1, 0, 0, 0)],
+      ]),
+    );
+    expect(files.map((f) => f.name)).toEqual(['a.txt', 'b.rso']);
+    expect(new TextDecoder().decode(files[0]!.bytes)).toBe('hello hello hello hello');
+  });
+
+  const rbtxDir = join(import.meta.dirname, '../../../fixtures/external/rbtx');
+  const packs = existsSync(rbtxDir) ? readdirSync(rbtxDir).filter((f) => f.endsWith('.rbtx')) : [];
+  it.skipIf(packs.length === 0).each(packs)(
+    '%s: program, My Blocks and sounds (local only)',
+    async (name) => {
+      const result = await importRbtx(new Uint8Array(readFileSync(join(rbtxDir, name))));
+      expect(result.warnings.filter((w) => /not in the Pack and Go/.test(w))).toEqual([]);
+      expect(result.program.myBlocks.length).toBeGreaterThan(2);
+      for (const m of result.program.myBlocks) expect(m.body.length).toBeGreaterThan(0);
+      expect(result.files.some((f) => f.name.endsWith('.rso'))).toBe(true);
+      expect(
+        validateProgram(result.program)
+          .filter((i) => i.severity === 'error')
+          .map((i) => i.message),
+      ).toEqual([]);
+      expect(() => lowerProgram(result.program)).not.toThrow();
+    },
+  );
+});

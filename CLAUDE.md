@@ -48,9 +48,9 @@ code layout and dependency rules in [docs/architecture.md](docs/architecture.md)
 - [x] Phase 0: Scaffolding (waiting on: manual browser check)
 - [ ] Phase 1: NXT protocol over WebUSB — code done; waiting on docs/hardware-tests.md Phase 1
 - [ ] Phase 2: Classic editor and block set — done except workspace search; Blockly mode later
-- [x] .rbt import — all 36 corpus programs import; remaining unknown fields in docs/rbt-compat.md
+- [x] .rbt import — all 36 corpus programs import; .rbtx (Pack and Go) with My Blocks; export not done (docs/rbt-compat.md)
 - [x] Simulator (mats, screen, buttons, sound) and step debugging — done
 - [ ] Phase 3: Compiler to .rxe bytecode — code done (golden + VM tests); waiting on docs/hardware-tests.md Phase 3
 - [ ] Phase 4: Upload, run, and live monitoring
-- [ ] Phase 5: File manager, firmware tools, and Bluetooth
+- [ ] Phase 5: File manager, firmware tools, and Bluetooth — file manager, data logging, calibration, remote, health check done; waiting on docs/hardware-tests.md
 - [ ] Phase 6: Polish, offline, and release — offline PWA done

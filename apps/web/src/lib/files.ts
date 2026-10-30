@@ -1,5 +1,5 @@
 import { PROJECT_EXTENSION, parseProject, serializeProject, type Program } from '@nxt/blocks';
-import { importRbt } from '@nxt/rbt';
+import { importRbt, importRbtx, type PackedFile } from '@nxt/rbt';
 
 // File System Access API types are not in the DOM lib yet.
 interface FileHandle {
@@ -20,10 +20,10 @@ const saveTypes = [
 ];
 const openTypes = [
   {
-    description: 'NXT programs (.nxtproj.json, .rbt)',
+    description: 'NXT programs (.nxtproj.json, .rbt, .rbtx)',
     accept: {
       'application/json': [PROJECT_EXTENSION, '.json'],
-      'application/octet-stream': ['.rbt'],
+      'application/octet-stream': ['.rbt', '.rbtx'],
     },
   },
 ];
@@ -37,8 +37,10 @@ export interface OpenedProgram {
   handle: SavedFile;
   /** Notes about things that could not be carried over (imported .rbt files). */
   warnings: string[];
-  /** True when the file was an original NXT-G program (.rbt). */
+  /** True when the file was an original NXT-G program (.rbt or .rbtx). */
   imported: boolean;
+  /** Sounds and pictures that came in a Pack and Go (.rbtx) file. */
+  files?: PackedFile[];
 }
 
 function isAbort(error: unknown): boolean {
@@ -47,6 +49,10 @@ function isAbort(error: unknown): boolean {
 
 /** Reads a project (.nxtproj.json) or an original NXT-G program (.rbt). */
 export async function readProgramFile(file: File): Promise<Omit<OpenedProgram, 'handle'>> {
+  if (/\.rbtx$/i.test(file.name)) {
+    const { program, warnings, files } = await importRbtx(new Uint8Array(await file.arrayBuffer()));
+    return { program, warnings, imported: true, files };
+  }
   if (/\.rbt$/i.test(file.name)) {
     const { program, warnings } = importRbt(new Uint8Array(await file.arrayBuffer()), file.name);
     return { program, warnings, imported: true };
@@ -72,7 +78,7 @@ export async function openProjectFile(): Promise<OpenedProgram | null> {
   const file = await new Promise<File | null>((resolve) => {
     const input = document.createElement('input');
     input.type = 'file';
-    input.accept = `${PROJECT_EXTENSION},.json,.rbt`;
+    input.accept = `${PROJECT_EXTENSION},.json,.rbt,.rbtx`;
     input.onchange = () => resolve(input.files?.[0] ?? null);
     input.click();
   });
