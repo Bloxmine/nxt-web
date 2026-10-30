@@ -39,12 +39,21 @@ export interface ViewOptions {
   classicWires: boolean;
   /** Show the Work Map overview. */
   workMap: boolean;
+  /** Colour theme; "system" follows the operating system. */
+  theme: 'system' | 'light' | 'dark';
+  /** Editor: the classic beam, or modern Blockly blocks. */
+  editor: 'classic' | 'modern';
 }
 
 const VIEW_KEY = 'nxt-web-studio:view';
 
 function loadView(): ViewOptions {
-  const fallback = { classicWires: false, workMap: false };
+  const fallback: ViewOptions = {
+    classicWires: false,
+    workMap: false,
+    theme: 'system',
+    editor: 'classic',
+  };
   try {
     const saved = JSON.parse(
       globalThis.localStorage?.getItem(VIEW_KEY) ?? 'null',

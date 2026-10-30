@@ -24,6 +24,10 @@ import {
 } from 'react';
 import { BrickProvider, useBrick } from './brick/BrickContext';
 import { AboutDialog, MessageDialog } from './components/AboutDialog';
+import { Gallery } from './components/Gallery';
+import { ModernCanvas } from './modern/ModernCanvas';
+import { TutorialPanel, TutorialPicker } from './tutorials/TutorialPanel';
+import type { Tutorial } from './tutorials/content';
 import { Canvas } from './components/Canvas';
 import { ConfigPanel } from './components/ConfigPanel';
 import { Controller } from './components/Controller';
@@ -74,18 +78,10 @@ function saveBytes(fileName: string, bytes: Uint8Array): void {
   setTimeout(() => URL.revokeObjectURL(url), 1000);
 }
 
-/** The simulator mat each example is meant for. */
-const EXAMPLE_MATS: Record<string, string> = {
-  square: 'square',
-  avoid: 'walls',
-  line: 'oval',
-  bumper: 'walls',
-  distance: 'walls',
-  parallel: 'square',
-};
-
 type Modal =
   | 'nxt'
+  | 'gallery'
+  | 'tutorials'
   | { nxt: NxtTab }
   | 'datalog'
   | 'calibrate'
@@ -129,6 +125,7 @@ function Studio() {
   // Simulator controls, filled in by <SimulatorHooks> inside the provider.
   const simActions = useRef<SimulatorControls | null>(null);
   const [initialMat, setInitialMat] = useState('empty');
+  const [tutorial, setTutorial] = useState<{ tutorial: Tutorial; step: number } | null>(null);
   // Polite announcements for screen readers (selection, clipboard).
   const [announcement, setAnnouncement] = useState('');
   const cmds = editCommands(state, dispatch, setAnnouncement);
@@ -150,7 +147,7 @@ function Studio() {
     void loadValue<unknown>(AUTOSAVE_KEY).then((saved) => {
       if (example) {
         dispatch({ type: 'load', program: example.create() });
-        setInitialMat(EXAMPLE_MATS[example.key] ?? 'empty');
+        setInitialMat(example.mat ?? 'empty');
       } else if (isProgram(saved)) dispatch({ type: 'load', program: normalizeProgram(saved) });
       setReady(true);
     });
@@ -161,6 +158,18 @@ function Studio() {
     const id = setTimeout(() => void saveValue(AUTOSAVE_KEY, state.program), 400);
     return () => clearTimeout(id);
   }, [state.program, ready]);
+
+  // Colour theme: View → Theme, "system" follows the operating system.
+  useEffect(() => {
+    const media = window.matchMedia('(prefers-color-scheme: dark)');
+    const apply = () => {
+      const dark = state.view.theme === 'dark' || (state.view.theme === 'system' && media.matches);
+      document.documentElement.dataset['theme'] = dark ? 'dark' : 'light';
+    };
+    apply();
+    media.addEventListener('change', apply);
+    return () => media.removeEventListener('change', apply);
+  }, [state.view.theme]);
 
   // Keep a copy in the browser every five minutes while there are changes.
   const programRef = useRef(state.program);
@@ -291,15 +300,17 @@ function Studio() {
         message('Could not save', 'exclamation', e instanceof Error ? e.message : String(e));
       }
     },
-    loadExample: (key: string) => {
+    loadExample: (key: string, simulate = false) => {
       const example = EXAMPLES.find((e) => e.key === key);
       if (!example || !confirmDiscard()) return;
       void saveVersion(state.program, 'Before opening an example');
       fileHandle.current = null;
       rbtOrigin.current = null;
       dispatch({ type: 'load', program: example.create() });
-      const mat = EXAMPLE_MATS[key];
-      if (mat) simActions.current?.setScenario(mat);
+      if (example.mat) simActions.current?.setScenario(example.mat);
+      setModal(null);
+      // Run it once the new program has rendered (the simulator builds from the program).
+      if (simulate) setTimeout(() => actionsRef.current.simulate(), 50);
     },
     renameProgram: () => {
       const name = window.prompt('Program name:', state.program.name);
@@ -633,8 +644,9 @@ function Studio() {
           onClick: actions.saveBackToNxtg,
         },
         { separator: true },
+        { label: 'Example gallery…', icon: 'star', onClick: () => setModal('gallery') },
         { section: 'Examples' },
-        ...EXAMPLES.map((ex) => ({
+        ...EXAMPLES.slice(0, 6).map((ex) => ({
           label: ex.name,
           icon: 'brick',
           onClick: () => actions.loadExample(ex.key),
@@ -743,10 +755,32 @@ function Studio() {
             dispatch({ type: 'view', view: { classicWires: !state.view.classicWires } }),
         },
         {
+          label: 'Modern blocks (Blockly)',
+          icon: state.view.editor === 'modern' ? 'tick' : 'bricks',
+          onClick: () =>
+            dispatch({
+              type: 'view',
+              view: { editor: state.view.editor === 'modern' ? 'classic' : 'modern' },
+            }),
+        },
+        {
           label: 'Work Map',
           icon: state.view.workMap ? 'tick' : 'map',
           onClick: () => dispatch({ type: 'view', view: { workMap: !state.view.workMap } }),
         },
+        { separator: true },
+        { section: 'Theme' },
+        ...(
+          [
+            ['system', 'Same as the system'],
+            ['light', 'Light'],
+            ['dark', 'Dark'],
+          ] as const
+        ).map(([theme, label]) => ({
+          label,
+          icon: state.view.theme === theme ? 'tick' : 'color_wheel',
+          onClick: () => dispatch({ type: 'view', view: { theme } }),
+        })),
         { separator: true },
         {
           label: 'Program outline (text)…',
@@ -842,10 +876,25 @@ function Studio() {
     {
       label: 'Help',
       items: [
+        { label: 'Tutorials…', icon: 'help', onClick: () => setModal('tutorials') },
+        { label: 'Example gallery…', icon: 'star', onClick: () => setModal('gallery') },
+        { separator: true },
         { label: 'About NXT Web Studio', icon: 'information', onClick: () => setModal('about') },
       ],
     },
   ];
+
+  const controller = (
+    <Controller
+      connected={connected}
+      onNxtWindow={() => setModal('nxt')}
+      onSimulate={actions.simulate}
+      onDownload={() => actions.download(false)}
+      onRun={() => actions.download(true)}
+      onStop={actions.stop}
+      onConnect={() => (connected ? setModal('nxt') : void brick.connectUsb())}
+    />
+  );
 
   const nxtTab = modal !== null && typeof modal === 'object' && 'nxt' in modal ? modal.nxt : null;
 
@@ -969,22 +1018,13 @@ function Studio() {
           />
           <SupportBanner support={support} />
           <div className="workspace">
-            <Palette />
+            {state.view.editor === 'classic' && <Palette />}
             <div className="editor-column">
-              <Canvas
-                onRenameProgram={actions.renameProgram}
-                overlay={
-                  <Controller
-                    connected={connected}
-                    onNxtWindow={() => setModal('nxt')}
-                    onSimulate={actions.simulate}
-                    onDownload={() => actions.download(false)}
-                    onRun={() => actions.download(true)}
-                    onStop={actions.stop}
-                    onConnect={() => (connected ? setModal('nxt') : void brick.connectUsb())}
-                  />
-                }
-              />
+              {state.view.editor === 'modern' ? (
+                <ModernCanvas overlay={controller} />
+              ) : (
+                <Canvas onRenameProgram={actions.renameProgram} overlay={controller} />
+              )}
               <div className="bottom-area">
                 <ConfigPanel onEditVariables={() => setModal('variables')} />
                 <HelpPanel />
@@ -1022,6 +1062,29 @@ function Studio() {
           </MessageDialog>
         )}
         {modal === 'datalog' && <DataLogDialog onClose={() => setModal(null)} />}
+        {modal === 'tutorials' && (
+          <TutorialPicker
+            onStart={(t, step) => {
+              setTutorial({ tutorial: t, step });
+              setModal(null);
+            }}
+            onClose={() => setModal(null)}
+          />
+        )}
+        {tutorial && (
+          <TutorialPanel
+            key={tutorial.tutorial.key}
+            tutorial={tutorial.tutorial}
+            initialStep={tutorial.step}
+            onClose={() => setTutorial(null)}
+          />
+        )}
+        {modal === 'gallery' && (
+          <Gallery
+            onOpen={(e, simulate) => actions.loadExample(e.key, simulate)}
+            onClose={() => setModal(null)}
+          />
+        )}
         {modal === 'calibrate' && <CalibrateDialog onClose={() => setModal(null)} />}
         {modal !== null && typeof modal === 'object' && 'title' in modal && (
           <MessageDialog title={modal.title} icon={modal.icon} onClose={() => setModal(null)}>

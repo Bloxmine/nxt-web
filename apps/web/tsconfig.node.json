@@ -4,5 +4,5 @@
     "types": ["node"],
     "allowImportingTsExtensions": true
   },
-  "include": ["vite.config.ts", "build"]
+  "include": ["vite.config.ts", "build", "src/**/*.node.test.ts"]
 }

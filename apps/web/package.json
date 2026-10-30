@@ -20,6 +20,7 @@
     "@nxt/rbt": "workspace:*",
     "@nxt/sim": "workspace:*",
     "@nxt/transport": "workspace:*",
+    "blockly": "13.4.0",
     "react": "^19.3.1",
     "react-dom": "^19.3.1"
   },
