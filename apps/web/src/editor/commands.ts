@@ -66,6 +66,10 @@ export function editCommands(
 
   return {
     copy,
+    /** Inserts a saved group of blocks (snippet) after the selection. */
+    insertClip: (clip: Clip) => paste(clip),
+    /** The selection as a clip, or null when nothing is selected. */
+    selectionClip: (): Clip | null => (ids.length ? copyBlocks(state.program, ids) : null),
     cut: () => {
       if (!copy()) return;
       dispatch({ type: 'edit', update: (p) => removeBlocks(p, ids), select: null });

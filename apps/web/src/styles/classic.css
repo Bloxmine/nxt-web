@@ -2803,3 +2803,56 @@ p.gallery-meta {
 .canvas-frame.modern .controller {
   z-index: 70;
 }
+
+.gallery-strip.mini {
+  padding: 1px 2px;
+}
+
+.gallery-strip.mini img {
+  width: 12px;
+  height: 12px;
+}
+
+.pick-list kbd {
+  font: 10px var(--font-ui);
+  color: var(--text-muted);
+}
+
+.robot-field {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin: 4px 0;
+}
+
+/* ---------- Touch ---------- */
+
+.touch-ghost {
+  position: fixed;
+  top: 0;
+  left: 0;
+  z-index: 200;
+  opacity: 0.8;
+  pointer-events: none;
+}
+
+@media (pointer: coarse) {
+  .socket {
+    min-width: 18px;
+    min-height: 18px;
+  }
+
+  .tool-btn,
+  .ctl-btn {
+    min-width: 34px;
+    min-height: 34px;
+  }
+
+  .menu-list button {
+    min-height: 32px;
+  }
+
+  .palette-btn {
+    touch-action: none;
+  }
+}

@@ -6,6 +6,7 @@ import {
   lowerProgram,
   newId,
   normalizeProgram,
+  PALETTE,
   disconnect,
   tabOf,
   updateSequence,
@@ -25,6 +26,11 @@ import {
 import { BrickProvider, useBrick } from './brick/BrickContext';
 import { AboutDialog, MessageDialog } from './components/AboutDialog';
 import { Gallery } from './components/Gallery';
+import { CalculatorDialog, CheckerDialog, CommandPalette, type Command } from './tools/EditorTools';
+import { LibraryDialog, SnippetsDialog } from './tools/LibraryDialogs';
+import { RobotSetupDialog } from './tools/RobotSetupDialog';
+import { newLibraryId, saveSnippet, saveToLibrary, type LibraryEntry } from './lib/library';
+import { TUTORIALS } from './tutorials/content';
 import { ModernCanvas } from './modern/ModernCanvas';
 import { TutorialPanel, TutorialPicker } from './tutorials/TutorialPanel';
 import type { Tutorial } from './tutorials/content';
@@ -47,6 +53,7 @@ import { HistoryDialog, InsertDialog, SearchDialog, WireDialog } from './compone
 import { saveVersion } from './lib/versions';
 import { EditorContext, useIssues } from './editor/EditorContext';
 import { describeBlock, describeProgram, editCommands } from './editor/commands';
+import { installTouchSupport } from './editor/touch';
 import { editorReducer, initialState, selectedIds } from './editor/store';
 import { checkBrowserSupport } from './lib/browserSupport';
 import { openProjectFile, readProgramFile, saveProjectFile, type SavedFile } from './lib/files';
@@ -57,6 +64,7 @@ import { SimulatorWindow } from './sim/SimulatorWindow';
 
 const support = checkBrowserSupport(navigator);
 const AUTOSAVE_KEY = 'autosave';
+const AUTOSAVE_ID_KEY = 'autosave-library-id';
 /** Brick file name for a program: 15.3 characters, letters, digits, spaces, - and _. */
 function rxeFileName(name: string): string {
   const base =
@@ -81,6 +89,12 @@ function saveBytes(fileName: string, bytes: Uint8Array): void {
 type Modal =
   | 'nxt'
   | 'gallery'
+  | 'palette'
+  | 'checker'
+  | 'calculator'
+  | 'robot'
+  | 'library'
+  | 'snippets'
   | 'tutorials'
   | { nxt: NxtTab }
   | 'datalog'
@@ -122,6 +136,8 @@ function Studio() {
   const fileHandle = useRef<SavedFile>(null);
   // The original NXT-G file, when the program was opened from one (for Save back).
   const rbtOrigin = useRef<RbtOrigin | null>(null);
+  // Library entry the current program is saved under (File → Library).
+  const libraryId = useRef(newLibraryId());
   // Simulator controls, filled in by <SimulatorHooks> inside the provider.
   const simActions = useRef<SimulatorControls | null>(null);
   const [initialMat, setInitialMat] = useState('empty');
@@ -144,6 +160,9 @@ function Studio() {
     // ?example=<key> opens an example directly (handy for links and docs).
     const exampleKey = new URLSearchParams(window.location.search).get('example');
     const example = EXAMPLES.find((e) => e.key === exampleKey);
+    void loadValue<string>(AUTOSAVE_ID_KEY).then((id) => {
+      if (id && !example) libraryId.current = id;
+    });
     void loadValue<unknown>(AUTOSAVE_KEY).then((saved) => {
       if (example) {
         dispatch({ type: 'load', program: example.create() });
@@ -155,9 +174,17 @@ function Studio() {
 
   useEffect(() => {
     if (!ready) return;
-    const id = setTimeout(() => void saveValue(AUTOSAVE_KEY, state.program), 400);
+    const id = setTimeout(() => {
+      void saveValue(AUTOSAVE_KEY, state.program);
+      void saveValue(AUTOSAVE_ID_KEY, libraryId.current);
+      // Programs you have changed are kept in the library (File → Library).
+      if (state.dirty) void saveToLibrary(libraryId.current, state.program);
+    }, 400);
     return () => clearTimeout(id);
-  }, [state.program, ready]);
+  }, [state.program, state.dirty, ready]);
+
+  // Drag blocks and draw wires with a finger (editor/touch.ts).
+  useEffect(() => installTouchSupport(), []);
 
   // Colour theme: View → Theme, "system" follows the operating system.
   useEffect(() => {
@@ -203,6 +230,7 @@ function Studio() {
   }) => {
     dispatch({ type: 'load', program: result.program });
     rbtOrigin.current = result.origin ?? null;
+    libraryId.current = newLibraryId();
     if (!result.imported) return;
     message(
       'Program imported',
@@ -266,6 +294,7 @@ function Studio() {
       if (!confirmDiscard()) return;
       fileHandle.current = null;
       rbtOrigin.current = null;
+      libraryId.current = newLibraryId();
       dispatch({ type: 'load', program: emptyProgram() });
     },
     open: async () => {
@@ -306,6 +335,7 @@ function Studio() {
       void saveVersion(state.program, 'Before opening an example');
       fileHandle.current = null;
       rbtOrigin.current = null;
+      libraryId.current = newLibraryId();
       dispatch({ type: 'load', program: example.create() });
       if (example.mat) simActions.current?.setScenario(example.mat);
       setModal(null);
@@ -457,6 +487,24 @@ function Studio() {
       });
     },
     stop: () => void brick.stopEverything(),
+    openFromLibrary: (entry: LibraryEntry) => {
+      if (entry.id !== libraryId.current && !confirmDiscard()) return;
+      void saveVersion(state.program, 'Before opening another program');
+      fileHandle.current = null;
+      rbtOrigin.current = null;
+      libraryId.current = entry.id;
+      dispatch({ type: 'load', program: normalizeProgram(entry.program) });
+      setModal(null);
+    },
+    saveSnippet: () => {
+      const clip = cmds.selectionClip();
+      if (!clip) {
+        message('Save as snippet', 'information', 'Select the blocks you want to keep first.');
+        return;
+      }
+      const name = window.prompt('Name for the snippet:', 'My snippet')?.trim();
+      if (name) void saveSnippet(name, clip).then(() => setAnnouncement(`Saved snippet ${name}`));
+    },
     saveBackToNxtg: () => {
       const origin = rbtOrigin.current;
       if (!origin) {
@@ -548,6 +596,12 @@ function Studio() {
     } else if (e.key === 'Delete' || e.key === 'Backspace') {
       e.preventDefault();
       a.deleteSelected();
+    } else if (
+      mod &&
+      (e.key.toLowerCase() === 'k' || (e.shiftKey && e.key.toLowerCase() === 'p'))
+    ) {
+      e.preventDefault();
+      setModal('palette');
     } else if (mod && e.key.toLowerCase() === 'f') {
       e.preventDefault();
       setModal('search');
@@ -644,6 +698,7 @@ function Studio() {
           onClick: actions.saveBackToNxtg,
         },
         { separator: true },
+        { label: 'Program library…', icon: 'folder', onClick: () => setModal('library') },
         { label: 'Example gallery…', icon: 'star', onClick: () => setModal('gallery') },
         { section: 'Examples' },
         ...EXAMPLES.slice(0, 6).map((ex) => ({
@@ -797,6 +852,13 @@ function Studio() {
         { label: 'Remote control…', icon: 'joystick', onClick: () => setModal({ nxt: 'remote' }) },
         { label: 'Health check…', icon: 'heart', onClick: () => setModal({ nxt: 'health' }) },
         { label: 'Data logging…', icon: 'chart_line', onClick: () => setModal('datalog') },
+        { label: 'Check program…', icon: 'tick', onClick: () => setModal('checker') },
+        {
+          label: 'Distance and turn calculator…',
+          icon: 'calculator',
+          onClick: () => setModal('calculator'),
+        },
+        { label: 'Robot setup…', icon: 'wrench', onClick: () => setModal('robot') },
         {
           label: 'Calibrate sensor…',
           icon: 'color_adjustment',
@@ -882,6 +944,43 @@ function Studio() {
         { label: 'About NXT Web Studio', icon: 'information', onClick: () => setModal('about') },
       ],
     },
+  ];
+
+  // Every menu item, block, example and tutorial for the command palette.
+  const commands: Command[] = [
+    ...menus.flatMap((m) =>
+      m.items.flatMap((item) =>
+        'label' in item && !item.disabled
+          ? [
+              {
+                label: item.label.replace(/…$/, ''),
+                section: m.label,
+                ...(item.icon ? { icon: item.icon } : {}),
+                ...(item.shortcut ? { shortcut: item.shortcut } : {}),
+                run: item.onClick,
+              },
+            ]
+          : [],
+      ),
+    ),
+    ...Object.values(PALETTE).map((p) => ({
+      label: `Insert ${p.label}`,
+      section: 'Blocks',
+      icon: p.icon,
+      run: () => cmds.insert(p.create()),
+    })),
+    ...EXAMPLES.map((e) => ({
+      label: `Open example: ${e.name}`,
+      section: 'Examples',
+      icon: 'star',
+      run: () => actions.loadExample(e.key),
+    })),
+    ...TUTORIALS.map((t) => ({
+      label: `Tutorial: ${t.title}`,
+      section: 'Tutorials',
+      icon: 'help',
+      run: () => setTutorial({ tutorial: t, step: 0 }),
+    })),
   ];
 
   const controller = (
@@ -1078,6 +1177,24 @@ function Studio() {
             initialStep={tutorial.step}
             onClose={() => setTutorial(null)}
           />
+        )}
+        {modal === 'palette' && (
+          <CommandPalette commands={commands} onClose={() => setModal(null)} />
+        )}
+        {modal === 'checker' && <CheckerDialog onClose={() => setModal(null)} />}
+        {modal === 'calculator' && (
+          <CalculatorDialog onClose={() => setModal(null)} onRobotSetup={() => setModal('robot')} />
+        )}
+        {modal === 'library' && (
+          <LibraryDialog
+            currentId={libraryId.current}
+            onOpen={actions.openFromLibrary}
+            onClose={() => setModal(null)}
+          />
+        )}
+        {modal === 'robot' && <RobotSetupDialog onClose={() => setModal(null)} />}
+        {modal === 'snippets' && (
+          <SnippetsDialog onInsert={cmds.insertClip} onClose={() => setModal(null)} />
         )}
         {modal === 'gallery' && (
           <Gallery

@@ -308,3 +308,22 @@ describe('My Block parameters', async () => {
     expect(sub).toContain('__p_m1_Y');
   });
 });
+
+describe('program checker', async () => {
+  const { checkProgram, createBlock, emptyProgram, EXAMPLES } = await import('./index.js');
+  it('finds motors left running and text that does not fit', () => {
+    const p = {
+      ...emptyProgram(),
+      body: [
+        { ...createBlock('display'), text: 'A very long message here', x: 10 } as Block,
+        { ...createBlock('move'), duration: { unit: 'unlimited' } } as Block,
+      ],
+    };
+    const tips = checkProgram(p).map((t) => t.message);
+    expect(tips.some((t) => t.includes('does not fit'))).toBe(true);
+    expect(tips.some((t) => t.includes('ends right after'))).toBe(true);
+  });
+  it('has nothing to say about the examples', () => {
+    for (const e of EXAMPLES) expect(checkProgram(e.create()), e.key).toEqual([]);
+  });
+});

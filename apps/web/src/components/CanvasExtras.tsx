@@ -102,7 +102,8 @@ export function useMarquee(content: RefObject<HTMLDivElement | null>, zoom: numb
   const [box, setBox] = useState<Marquee | null>(null);
 
   const onPointerDown = (e: React.PointerEvent) => {
-    if (e.button !== 0) return;
+    // Box selection is for mice; on touch screens a drag scrolls the canvas.
+    if (e.button !== 0 || e.pointerType === 'touch') return;
     const target = e.target as HTMLElement;
     if (
       target.closest(
