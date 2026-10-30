@@ -152,6 +152,8 @@ export function createBlock(kind: BlockKind): Block {
       return { id, kind, name: 'Number 1', action: 'set', value: 0 };
     case 'myBlock':
       return { id, kind, ref: '' };
+    case 'myBlockParam':
+      return { id, kind, hub: true, name: 'Input 1', valueType: 'number', direction: 'in' };
     case 'sensor':
       return { id, kind, hub: true, condition: { source: 'touch', port: 1, action: 'pressed' } };
     case 'math':
@@ -486,6 +488,14 @@ export const PALETTE: Record<string, PaletteEntry> = Object.fromEntries(
       () => createBlock('constant'),
     ),
     entry(
+      'my-block-param',
+      'My Block parameter',
+      'custom',
+      'door_in',
+      'Inside a My Block: a value it takes in (or hands back). Each parameter becomes a plug on the My Block.',
+      () => createBlock('myBlockParam'),
+    ),
+    entry(
       'send-message',
       'Send Message',
       'advanced',
@@ -571,7 +581,16 @@ export const COMPLETE_PALETTE: {
     category: 'data',
     label: 'Data',
     icon: 'database',
-    entries: ['logic', 'math', 'compare', 'range', 'random', 'variable', 'constant'],
+    entries: [
+      'logic',
+      'math',
+      'compare',
+      'range',
+      'random',
+      'variable',
+      'constant',
+      'my-block-param',
+    ],
   },
   {
     category: 'advanced',
@@ -610,6 +629,7 @@ export function categoryOf(block: Block): Category {
     case 'constant':
       return 'data';
     case 'myBlock':
+    case 'myBlockParam':
       return 'custom';
     default:
       return 'flow';
@@ -647,6 +667,8 @@ export function iconOf(block: Block): string {
       return 'tag_red';
     case 'myBlock':
       return 'bricks';
+    case 'myBlockParam':
+      return block.direction === 'in' ? 'door_in' : 'door_out';
     case 'sensor':
       return CONDITION_ICONS[block.condition.source];
     case 'math':
@@ -702,6 +724,8 @@ export function labelOf(block: Block): string {
       return 'Receive Message';
     case 'myBlock':
       return 'My Block';
+    case 'myBlockParam':
+      return block.direction === 'in' ? `Input ${block.name}` : `Output ${block.name}`;
     case 'sensor':
       return SENSOR_LABELS[block.condition.source];
     case 'numberToText':

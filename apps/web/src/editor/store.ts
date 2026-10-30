@@ -1,4 +1,11 @@
-import { describeChange, EXAMPLES, emptyProgram, labelOf, type Program } from '@nxt/blocks';
+import {
+  describeChange,
+  EXAMPLES,
+  emptyProgram,
+  labelOf,
+  syncMyBlockParams,
+  type Program,
+} from '@nxt/blocks';
 
 /** Editor state: the program, history for undo/redo, selection and open tabs. */
 export interface EditorState {
@@ -117,7 +124,8 @@ function withProgram(state: EditorState, program: Program): EditorState {
 export function editorReducer(state: EditorState, action: EditorAction): EditorState {
   switch (action.type) {
     case 'edit': {
-      const program = action.update(state.program);
+      // My Block calls follow their parameter blocks (plugs appear and disappear).
+      const program = syncMyBlockParams(action.update(state.program));
       if (program === state.program) return state;
       const now = Date.now();
       const merge =

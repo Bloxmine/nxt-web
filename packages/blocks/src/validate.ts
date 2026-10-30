@@ -211,6 +211,25 @@ export function validateProgram(program: Program): Issue[] {
         if (!def) add(block.id, 'This My Block no longer exists.');
         break;
       }
+      case 'myBlockParam': {
+        const def = program.myBlocks.find((m) => {
+          let inside = false;
+          walk(m.body, (b) => {
+            if (b.id === block.id) inside = true;
+          });
+          return inside;
+        });
+        if (!def) add(block.id, 'Parameter blocks belong inside a My Block.');
+        else {
+          let same = 0;
+          walk(def.body, (b) => {
+            if (b.kind === 'myBlockParam' && b.name === block.name) same++;
+          });
+          if (same > 1)
+            add(block.id, `Two parameters of this My Block are called "${block.name}".`);
+        }
+        break;
+      }
       default:
         break;
     }

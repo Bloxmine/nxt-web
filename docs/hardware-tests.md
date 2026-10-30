@@ -104,3 +104,19 @@ Real replies make the best protocol tests. Connect over USB, then **Tools → Re
 traffic**, do something (open the NXT window, play a tone, upload a program), and choose
 **Tools → Stop recording and save…**. Describe what you did when asked, and add the saved
 `capture-….json` to `fixtures/captures/`: `pnpm test` replays it through the client.
+
+## Save back to NXT-G (.rbt)
+
+Needs the NXT-G 2.x software.
+
+1. Open `BumperCar.rbt` (or any of your programs) in NXT Web Studio. Change the first
+   Move block's power to 50 and its duration to 2 seconds, and the Wait's sensor to
+   "released". File → Save back to NXT-G.
+2. Open the saved file in NXT-G: it opens without errors, the Move block's panel shows
+   power 50 and 2 seconds, the Wait shows "Released".
+3. Download it from NXT-G to the brick and run it: the robot drives with the new settings.
+4. Open a Pack and Go file (e.g. SuGO from sugobot.com): My Blocks show their parameters
+   as plugs on the call and as parameter blocks inside.
+
+Tell us about any difference; it means one of the two copies of a setting
+(docs/rbt-compat.md, "Settings tag versus defaults") is wrong.

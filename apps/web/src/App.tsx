@@ -33,7 +33,7 @@ import { NxtWindow, type NxtTab } from './components/NxtWindow';
 import { CalibrateDialog } from './tools/CalibrateDialog';
 import { DataLogDialog } from './tools/DataLogDialog';
 import { saveFile } from './tools/convert';
-import type { PackedFile } from '@nxt/rbt';
+import { exportNotes, exportRbt, RbtExportError, type PackedFile, type RbtOrigin } from '@nxt/rbt';
 import { Palette } from './components/Palette';
 import { SupportBanner } from './components/SupportBanner';
 import { Toolbar } from './components/Toolbar';
@@ -124,6 +124,8 @@ function Studio() {
   const [modal, setModal] = useState<Modal>(null);
   const [ready, setReady] = useState(false);
   const fileHandle = useRef<SavedFile>(null);
+  // The original NXT-G file, when the program was opened from one (for Save back).
+  const rbtOrigin = useRef<RbtOrigin | null>(null);
   // Simulator controls, filled in by <SimulatorHooks> inside the provider.
   const simActions = useRef<SimulatorControls | null>(null);
   const [initialMat, setInitialMat] = useState('empty');
@@ -188,8 +190,10 @@ function Studio() {
     warnings: string[];
     imported: boolean;
     files?: PackedFile[];
+    origin?: RbtOrigin;
   }) => {
     dispatch({ type: 'load', program: result.program });
+    rbtOrigin.current = result.origin ?? null;
     if (!result.imported) return;
     message(
       'Program imported',
@@ -252,6 +256,7 @@ function Studio() {
     newProgram: () => {
       if (!confirmDiscard()) return;
       fileHandle.current = null;
+      rbtOrigin.current = null;
       dispatch({ type: 'load', program: emptyProgram() });
     },
     open: async () => {
@@ -291,6 +296,7 @@ function Studio() {
       if (!example || !confirmDiscard()) return;
       void saveVersion(state.program, 'Before opening an example');
       fileHandle.current = null;
+      rbtOrigin.current = null;
       dispatch({ type: 'load', program: example.create() });
       const mat = EXAMPLE_MATS[key];
       if (mat) simActions.current?.setScenario(mat);
@@ -440,6 +446,58 @@ function Studio() {
       });
     },
     stop: () => void brick.stopEverything(),
+    saveBackToNxtg: () => {
+      const origin = rbtOrigin.current;
+      if (!origin) {
+        message(
+          'Save back to NXT-G',
+          'information',
+          <p style={{ marginTop: 0 }}>
+            This only works for programs opened from an NXT-G file (.rbt): it writes your changed
+            settings back into that file.
+          </p>,
+        );
+        return;
+      }
+      try {
+        const bytes = exportRbt(state.program, origin);
+        const notes = exportNotes(state.program, origin);
+        saveFile(origin.fileName, bytes);
+        message(
+          'Saved for NXT-G',
+          'tick',
+          <>
+            <p style={{ marginTop: 0 }}>
+              <strong>{origin.fileName}</strong> was written with your changed settings. Open it in
+              NXT-G 2.x to check it.
+            </p>
+            {notes.length > 0 && (
+              <ul style={{ paddingLeft: 18 }}>
+                {notes.map((n, i) => (
+                  <li key={i}>{n}</li>
+                ))}
+              </ul>
+            )}
+          </>,
+        );
+      } catch (error) {
+        message(
+          'Cannot save back to NXT-G',
+          'exclamation',
+          <>
+            <p style={{ marginTop: 0 }}>
+              Only settings of the blocks you imported can be written back for now. These changes
+              cannot:
+            </p>
+            <ul style={{ paddingLeft: 18 }}>
+              {(error instanceof RbtExportError ? error.problems : [String(error)]).map((p, i) => (
+                <li key={i}>{p}</li>
+              ))}
+            </ul>
+          </>,
+        );
+      }
+    },
     simulate: () => {
       const sim = simActions.current;
       if (!sim) return;
@@ -569,6 +627,11 @@ function Studio() {
         { label: 'Save', icon: 'diskette', shortcut: 'Ctrl+S', onClick: () => void actions.save() },
         { label: 'Save As…', shortcut: 'Ctrl+Shift+S', onClick: () => void actions.save(true) },
         { label: 'Rename program…', onClick: actions.renameProgram },
+        {
+          label: 'Save back to NXT-G (.rbt)…',
+          icon: 'brick',
+          onClick: actions.saveBackToNxtg,
+        },
         { separator: true },
         { section: 'Examples' },
         ...EXAMPLES.map((ex) => ({

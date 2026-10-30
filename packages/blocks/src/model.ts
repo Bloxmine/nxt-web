@@ -297,10 +297,33 @@ export interface TextBlock extends Base {
   c: string;
 }
 
+/** A data plug of a My Block: an input it takes or an output it gives. */
+export interface MyBlockParamDef {
+  name: string;
+  type: DataType;
+  direction: 'in' | 'out';
+}
+
 export interface MyBlockCall extends Base {
   kind: 'myBlock';
   /** Id of a {@link MyBlockDefinition}. */
   ref: string;
+  /**
+   * The My Block's parameters, copied from its parameter blocks so the call's plugs
+   * are known without the definition (kept in step by `syncMyBlockParams`).
+   */
+  params?: MyBlockParamDef[];
+}
+
+/**
+ * Inside a My Block: one of its parameters. An input parameter gives the value the
+ * caller wired in; an output parameter takes the value to hand back.
+ */
+export interface MyBlockParamBlock extends Base {
+  kind: 'myBlockParam';
+  name: string;
+  valueType: DataType;
+  direction: 'in' | 'out';
 }
 
 export type Block =
@@ -321,6 +344,7 @@ export type Block =
   | ReceiveMessageBlock
   | VariableBlock
   | MyBlockCall
+  | MyBlockParamBlock
   | SensorBlock
   | MathBlock
   | CompareBlock

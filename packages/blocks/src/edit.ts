@@ -1,5 +1,5 @@
 import { newId } from './ids.js';
-import type { Block, Program, Wire } from './model.js';
+import type { Block, MyBlockParamDef, Program, Wire } from './model.js';
 
 const clone = <T>(value: T): T => JSON.parse(JSON.stringify(value)) as T;
 import {
@@ -157,4 +157,52 @@ export function describeChange(
   }
   if (after.myBlocks.length !== before.myBlocks.length) return 'Changed My Blocks';
   return 'Moved blocks';
+}
+
+/**
+ * Copies each My Block's parameters (its parameter blocks, in order) onto every call
+ * of it, and drops wires to plugs that no longer exist. Returns the same program
+ * object when nothing changed.
+ */
+export function syncMyBlockParams(program: Program): Program {
+  const params = new Map<string, MyBlockParamDef[]>();
+  for (const def of program.myBlocks) {
+    const list: MyBlockParamDef[] = [];
+    walk(def.body, (b) => {
+      if (b.kind === 'myBlockParam')
+        list.push({ name: b.name, type: b.valueType, direction: b.direction });
+    });
+    params.set(def.id, list);
+  }
+  let changed = false;
+  const fix = (blocks: Block[]): Block[] =>
+    blocks.map((b) => {
+      let next = b;
+      if (b.kind === 'myBlock') {
+        const want = params.get(b.ref) ?? [];
+        if (JSON.stringify(want) !== JSON.stringify(b.params ?? [])) {
+          changed = true;
+          next = { ...b, params: want };
+        }
+      }
+      if (next.kind === 'loop') return { ...next, body: fix(next.body) };
+      if (next.kind === 'switch') {
+        return {
+          ...next,
+          whenTrue: fix(next.whenTrue),
+          whenFalse: fix(next.whenFalse),
+          ...(next.cases
+            ? { cases: next.cases.map((c) => ({ ...c, blocks: fix(c.blocks) })) }
+            : {}),
+        };
+      }
+      return next;
+    });
+  const next: Program = {
+    ...program,
+    body: fix(program.body),
+    parallel: program.parallel.map(fix),
+    myBlocks: program.myBlocks.map((m) => ({ ...m, body: fix(m.body) })),
+  };
+  return changed ? pruneWires(next) : program;
 }

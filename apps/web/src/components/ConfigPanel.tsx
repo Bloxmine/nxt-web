@@ -695,6 +695,43 @@ function BlockFields({ block, update, program, onEditVariables }: FieldsProps) {
       );
     case 'myBlock':
       return <p>Double-click the block to open and edit it.</p>;
+    case 'myBlockParam':
+      return (
+        <>
+          <Field label="Name" icon="tag_red">
+            <input
+              className="text-input"
+              aria-label="Parameter name"
+              value={block.name}
+              maxLength={24}
+              onChange={(e) => update({ name: e.target.value })}
+            />
+          </Field>
+          <Field label="Direction">
+            <Radios
+              name={`param-${block.id}`}
+              value={block.direction}
+              options={[
+                ['in', 'Input (the caller wires a value in)'],
+                ['out', 'Output (hands a value back)'],
+              ]}
+              onChange={(direction) => update({ direction })}
+            />
+          </Field>
+          <Field label="Type">
+            <Select
+              label="Parameter type"
+              value={block.valueType}
+              options={[
+                ['number', 'Number'],
+                ['logic', 'Logic'],
+                ['text', 'Text'],
+              ]}
+              onChange={(valueType) => update({ valueType })}
+            />
+          </Field>
+        </>
+      );
     case 'stop':
       return <p>Ends the program when reached.</p>;
     case 'resetTimer':

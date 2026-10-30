@@ -25,6 +25,11 @@ const plug = (
   output,
 });
 
+/** Plug name of a My Block call for parameter `name`. */
+export function myBlockPlug(name: string): string {
+  return `p:${name}`;
+}
+
 /** The data plugs a block offers, in hub order. */
 export function plugsOf(block: Block): Plug[] {
   switch (block.kind) {
@@ -92,6 +97,16 @@ export function plugsOf(block: Block): Plug[] {
       return [];
     case 'variable':
       return [plug('value', 'Value', block.valueType ?? 'number', block.action !== 'read')];
+    case 'myBlock':
+      return (block.params ?? []).map((p) =>
+        p.direction === 'in'
+          ? plug(myBlockPlug(p.name), p.name, p.type, true, false)
+          : plug(myBlockPlug(p.name), p.name, p.type, false),
+      );
+    case 'myBlockParam':
+      return block.direction === 'in'
+        ? [plug('value', block.name, block.valueType, false)]
+        : [plug('value', block.name, block.valueType, true, false)];
     case 'sensor': {
       const c = block.condition;
       if (c.source === 'touch' || c.source === 'button')

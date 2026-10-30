@@ -1,4 +1,4 @@
-import { emptyProgram, type Program } from '@nxt/blocks';
+import { emptyProgram, syncMyBlockParams, type Program } from '@nxt/blocks';
 import { myBlockId, myBlockMissing, type ImportResult } from './convert.js';
 import { importRbt } from './index.js';
 
@@ -125,8 +125,11 @@ export async function importRbtx(bytes: Uint8Array): Promise<RbtxResult> {
       wires: [...program.wires, ...sub.program.wires],
     };
   }
+  // Calls now know their My Block's parameter blocks; keep the two in step.
+  program = syncMyBlockParams(program);
   const missing = new Set([...loaded].filter((n) => !byName.has(n.toLowerCase())));
   return {
+    origins: result.origins,
     program: { ...emptyProgram(program.name), ...program },
     warnings: warnings.filter(
       (w) => ![...loaded].some((n) => !missing.has(n) && w === myBlockMissing(n)),

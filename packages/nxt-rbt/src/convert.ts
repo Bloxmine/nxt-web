@@ -4,6 +4,7 @@ import {
   emptyProgram,
   findBlock,
   insertBlock,
+  myBlockPlug,
   newId,
   walkProgram,
   type Block,
@@ -17,8 +18,14 @@ import {
 import { ByteReader } from './bytes.js';
 import type { RbtDiagram, RbtInstance, RbtNode, RbtProgram, RbtTerminal } from './decode.js';
 import type { LvValue } from './lvtype.js';
+import { steeringRatio, type BlockOrigin } from './export.js';
 
 /** Result of converting an .rbt program. */
+/** Editor data type for a LabVIEW type code (logic, text, otherwise number). */
+function dataTypeOf(type: number | undefined): 'number' | 'logic' | 'text' {
+  return type === 0x21 ? 'logic' : type === 0x30 ? 'text' : 'number';
+}
+
 /** Id of the My Block definition imported from `<name>.rbt`. */
 export function myBlockId(name: string): string {
   return `mb_${name.replace(/[^A-Za-z0-9]/g, '_')}`;
@@ -35,6 +42,8 @@ export interface ImportResult {
   warnings: string[];
   /** Names of the My Blocks the program calls (each is its own `<name>.rbt`). */
   myBlocks: string[];
+  /** Which instances in the file each block's settings come from (for export). */
+  origins: Record<string, BlockOrigin>;
 }
 
 type Cfg = { [field: string]: LvValue };
@@ -183,6 +192,7 @@ export function convertRbt(rbt: RbtProgram): ImportResult {
   };
   const variables = new Map<string, 'number' | 'logic' | 'text'>();
   const myBlockNames = new Set<string>();
+  const origins: Record<string, BlockOrigin> = {};
 
   // ---------- terminals and wiring ----------
   const termsByOwner = new Map<number, RbtTerminal[]>();
@@ -223,7 +233,12 @@ export function convertRbt(rbt: RbtProgram): ImportResult {
         seen.add(n);
         const t = rbt.terminals.get(Number(n.split(':')[0]));
         if (!t) continue;
-        if (t.ownerKind === 'block' || t.role === 'selector' || t.role === 'condition')
+        if (
+          t.ownerKind === 'block' ||
+          t.ownerKind === 'param' ||
+          t.role === 'selector' ||
+          t.role === 'condition'
+        )
           found.push(t);
         if (t.role === 'tunnel' || t.ownerKind !== 'block') queue.push(n);
       }
@@ -416,7 +431,7 @@ export function convertRbt(rbt: RbtProgram): ImportResult {
           ...createBlock('move'),
           ports: [...new Set(ports)].sort(),
           direction: dir === 'Backward' ? 'backward' : dir === 'Stop' ? 'stop' : 'forward',
-          steering: num(c?.['Steering']),
+          steering: steeringRatio(num(c?.['Steering'])),
           power: num(c?.['Power'], 75),
           duration: duration(num(c?.['Goal Type']), num(c?.['Goal'], 1)),
           nextAction: num(c?.['Next']) === 1 ? 'coast' : 'brake',
@@ -736,7 +751,20 @@ export function convertRbt(rbt: RbtProgram): ImportResult {
         if (/\.rbt$/i.test(t)) {
           const name = t.replace(/\.rbt$/i, '');
           myBlockNames.add(name);
-          return { ...createBlock('myBlock'), ref: myBlockId(name) } as Block;
+          // Its data plugs (the My Block's parameters) come from the connector pane.
+          const params = (termsByOwner.get(n.ptr) ?? [])
+            .filter((x) => x.name && !x.name.startsWith('Sequence'))
+            .sort((a, b) => (a.slot ?? 0) - (b.slot ?? 0))
+            .map((x) => ({
+              name: x.name!,
+              type: dataTypeOf(x.slot === undefined ? undefined : inst.plugs[x.slot]?.type),
+              direction: x.output ? ('out' as const) : ('in' as const),
+            }));
+          return {
+            ...createBlock('myBlock'),
+            ref: myBlockId(name),
+            ...(params.length ? { params } : {}),
+          } as Block;
         }
         warn(`Block "${t || inst.title || 'unknown'}" is not supported yet and was left out.`);
         return null;
@@ -813,7 +841,19 @@ export function convertRbt(rbt: RbtProgram): ImportResult {
     if (n.kind === 'block') block = makeBlock(n);
     else if (n.kind === 'loop') block = convertLoop(n);
     else block = convertSwitch(n);
-    if (block) blockFor.set(n.ptr, block);
+    if (block) {
+      blockFor.set(n.ptr, block);
+      // Where its settings live in the file, for writing them back (export.ts).
+      const sensor = conditionSource.get(n.ptr)?.instance?.number;
+      const term = (n.diagrams[0]?.nodes ?? []).find(
+        (c) => c.instance && /^LoopTerm/.test(c.instance.template),
+      )?.instance?.number;
+      origins[block.id] = {
+        ...(n.instance ? { instance: n.instance.number } : {}),
+        ...(sensor !== undefined ? { sensor } : {}),
+        ...(n.kind === 'loop' && term !== undefined ? { term } : {}),
+      };
+    }
     return block;
   };
 
@@ -908,16 +948,43 @@ export function convertRbt(rbt: RbtProgram): ImportResult {
   program.body = topLanes[0] ? convertLane(topLanes[0]) : [];
   program.parallel = topLanes.slice(1).map(convertLane);
 
+  // ---------- My Block parameters ----------
+  // In a My Block's own file, each parameter becomes a parameter block: inputs at the
+  // start of the beam, outputs at the end.
+  const paramBlocks = new Map<number, Block>();
+  for (const t of rbt.terminals.values()) {
+    if (t.ownerKind !== 'param' || !t.name) continue;
+    const wire = rbt.wires.find((w) => w.ends.some((e) => e.terminal === t.ptr));
+    paramBlocks.set(t.ptr, {
+      ...createBlock('myBlockParam'),
+      name: t.name,
+      valueType: dataTypeOf(wire?.dataType),
+      direction: t.output ? 'in' : 'out',
+    } as Block);
+  }
+  const params = [...paramBlocks.values()] as Extract<Block, { kind: 'myBlockParam' }>[];
+  program.body = [
+    ...params.filter((b) => b.direction === 'in'),
+    ...program.body,
+    ...params.filter((b) => b.direction === 'out'),
+  ];
+
   // ---------- data wires ----------
   const kindOf = (b: Block) => b.kind;
+  const plugName = (b: Block, name: string) =>
+    b.kind === 'myBlock' ? myBlockPlug(name) : PLUG_NAMES[kindOf(b)]?.[name];
   const wires: Wire[] = [];
   for (const t of rbt.terminals.values()) {
-    if (t.ownerKind !== 'block' || !t.output || !t.name || t.name.startsWith('Sequence')) continue;
+    if (!t.output || !t.name || t.name.startsWith('Sequence')) continue;
+    if (t.ownerKind !== 'block' && t.ownerKind !== 'param') continue;
     const fromNode = rbt.nodes.get(t.owner);
-    if (!fromNode || hidden.has(fromNode.ptr)) continue;
-    let fromBlock: Block | undefined = blockFor.get(fromNode.ptr);
+    if (t.ownerKind === 'block' && (!fromNode || hidden.has(fromNode.ptr))) continue;
+    let fromBlock: Block | undefined =
+      t.ownerKind === 'param' ? paramBlocks.get(t.ptr) : blockFor.get(fromNode!.ptr);
     let fromPlug: string | undefined = fromBlock
-      ? PLUG_NAMES[kindOf(fromBlock)]?.[t.name]
+      ? t.ownerKind === 'param'
+        ? 'value'
+        : plugName(fromBlock, t.name)
       : undefined;
     const counterLoop = loopCounters.get(t.ptr);
     if (counterLoop) {
@@ -930,7 +997,10 @@ export function convertRbt(rbt: RbtProgram): ImportResult {
       let toPlug: string | undefined;
       if (target.ownerKind === 'block') {
         toBlock = blockFor.get(target.owner);
-        toPlug = toBlock && target.name ? PLUG_NAMES[kindOf(toBlock)]?.[target.name] : undefined;
+        toPlug = toBlock && target.name ? plugName(toBlock, target.name) : undefined;
+      } else if (target.ownerKind === 'param') {
+        toBlock = paramBlocks.get(target.ptr);
+        toPlug = 'value';
       } else if (target.role === 'selector' || target.role === 'condition') {
         toBlock = blockFor.get(target.owner);
         toPlug = 'condition';
@@ -999,7 +1069,7 @@ export function convertRbt(rbt: RbtProgram): ImportResult {
   // an empty definition so the call sites survive.
   program.myBlocks = [...myBlockNames].map((name) => ({ id: myBlockId(name), name, body: [] }));
   for (const name of myBlockNames) warn(myBlockMissing(name));
-  return { program, warnings, myBlocks: [...myBlockNames] };
+  return { program, warnings, myBlocks: [...myBlockNames], origins };
 }
 
 function startsWith(d: Defaults, offset: number, pattern: number[]): boolean {

@@ -21,6 +21,7 @@ export interface HeapObject {
 export const HeapClass = {
   Label: 7,
   Connection: 21,
+  FrontPanelTerminal: 22,
   Wire: 23,
   WireGeometry: 24,
   Diagram: 27,

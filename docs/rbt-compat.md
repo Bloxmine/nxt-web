@@ -178,25 +178,82 @@ A My Block call is a block node whose template is the My Block's own file
 (`Drive Timed.rbt`). The importer turns it into a My Block call; `importRbtx` loads the My
 Block files (and My Blocks inside them). A plain `.rbt` keeps empty My Blocks and says so.
 
-Not carried over yet: **My Block parameters** (data plugs on a My Block). Wires into them
-are dropped with a note, and a logic/value Switch inside a My Block that read a parameter
-gets a Constant instead (its default case).
+My Block parameters come along (see "My Block parameters" below). A parameter wired to a
+plug the editor does not have (for example a sensor's port) is noted.
 
-## Export to .rbt: not done, and why
+## Front-panel default data (DFDS)
 
-Writing `.rbt` files back is harder than reading them: block settings are stored **twice**,
-in the `…BlockConfig` VI tag and again in the instance's front-panel data (`DFDS`). For a
-Move block the power appears as 75 in the tag and as `0000004b` (−75 as `ffffffb5` when
-backwards) in `DFDS`. `DFDS` is sparse: values equal to the default are left out, so the
-same block type is 1,424–1,429 bytes depending on its settings. Changing a setting
-can therefore change the size of `DFDS`, which means rebuilding the embedded VI and the
-outer resource file, and knowing the full front-panel layout of every block type.
+Every block instance is a complete LabVIEW 7.1 VI. Its settings are the defaults of its
+front-panel controls, stored in two resources:
 
-Without the NXT-G software to check the result against, an exporter could write files
-that look right to our importer but that NXT-G reads differently (or rejects). It needs:
+- `DSTM` (type map): one cluster of type descriptors (`u16 size, u8 flags, u8 type`, then
+  type-specific data). Besides the usual types it uses `0x60` Block (u32 byte size),
+  `0x63` AlignedBlock (u32 byte size) and `0x64` RepeatedBlock (u16 count + element type).
+- `DFDS` (default data): the flattened default of every descriptor flagged `0x20`, in
+  type-map order (a flagged descriptor's children are not visited). With `0x08` as well,
+  the default is zero and is **left out** of DFDS. Strings are `u32 length + bytes`,
+  numbers big-endian, booleans one byte; blocks are raw bytes of their declared size.
+- A front-panel control is a cluster `[udf, value, dfd, txd, old, ext]`; `dfd` is its
+  default, i.e. the block's setting, found by the value's label ("Power", "Steering", …).
+  Loop terminators keep their setting in a labelled top-level value (`MilliSeconds`,
+  `Count`).
 
-1. the NXT-G 2.x software (or a volunteer with it) to round-trip test files, and
-2. a full decode of `DFDS` per block type (today only the fields in the table above).
+These rules decode all 1,326 block instances in the corpus to exactly their DFDS length,
+and no stored default is ever all zero bytes. `packages/nxt-rbt/src/dataspace.ts`
+implements them; writing a setting sets or clears the `0x08` flag and re-flattens.
+
+## Settings tag versus defaults
+
+Blocks with a configuration panel also keep a settings tag (`…BlockConfig` in `VITS`); it
+is what the panel shows. The defaults are what the block runs with. They are related by
+conversions, worked out from every block in the corpus:
+
+| Block      | Tag                                                            | Defaults                                                                                                  |
+| ---------- | -------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------- |
+| Move       | Power, Direction (Forward/Backward/Stop)                       | Power signed (backward negative, 0 for Stop), Direction boolean                                           |
+| Move       | Steering −10…10 (slider position)                              | Steering = sign × [0, 2, 3, 5, 6, 7, 9, 12, 17, 33, 100][\|s\|] (table found in NXT-G's SetMoveConfig.vi) |
+| Move/Motor | Goal Type 0 unlimited, 1 degrees, 2 rotations, 3 seconds; Goal | Goal Type 0 / 1 / 1 / 2 (Stop: 3); Goal 0 / degrees / rotations × 360 / ms                                |
+| Move/Motor | Next 0 brake / 1 coast                                         | Stop After (brake)                                                                                        |
+| Motor      | Direction, Wait                                                | Direction boolean (power stays positive); Wait and Stop After only with a goal                            |
+| Sound      | Action, mode (Tone/Sound)                                      | Sound Mode 0 play / 1 stop, Type 1 tone / 0 file                                                          |
+| Distance   | Polarity 1, Units 1                                            | Polarity true, Inches (F) true                                                                            |
+
+Blocks without a tag (Display, Math, Compare, Range, Random, Text, Timer, Buttons, Touch,
+File, Messages, loops and waits) only have defaults.
+
+## Writing back to .rbt (File → Save back to NXT-G)
+
+For a program opened from an `.rbt`, changed settings are written back into that file:
+both the settings tag and the defaults of each changed block are rewritten, the embedded
+VI and the outer resource file are rebuilt (`rsrcWrite.ts`; rebuilding any corpus file
+without changes gives the identical bytes). Supported: Move, Motor, Sound (not the file
+name), Display, wait and loop time and count, Math, Compare, Range (not inside/outside),
+Random, Logic, Text, number Constant, Color Lamp, and the touch, ultrasonic, timer,
+rotation and button settings of waits, loops, switches and sensor blocks.
+
+Tested on the corpus: an unchanged program exports byte for byte; every supported setting
+of every block, changed, exports and imports back with the new value while all other
+blocks stay the same.
+
+Not supported yet, and refused with a clear message: adding, deleting or moving blocks,
+changing wires, beams, variables or My Blocks (that needs rewriting the block-diagram
+heap and creating block VIs from NXT-G's own templates), and settings not listed above.
+**Not yet checked in NXT-G itself** (see docs/hardware-tests.md).
+
+## My Block parameters
+
+A My Block's inputs and outputs are front-panel terminals on its diagram (heap class 22).
+Each points at its wire (+8) and holds an index (+40); sorted by that index they follow
+the VI's front-panel controls in type-map order, which gives their names and types. A
+parameter is an output when its wire starts at a block output. Calls get one plug per
+parameter (from their connector pane). The editor shows parameters as parameter blocks
+inside the My Block (inputs first, outputs last).
+
+## Analysis sources
+
+The formats above were worked out from the corpus and from LEGO's own sample programs and
+block VIs in the NXT 2.0 software installer (examined locally; none of its files are in
+this repository).
 
 ## Next steps
 

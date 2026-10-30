@@ -249,3 +249,62 @@ describe('copy, paste and history labels', async () => {
     );
   });
 });
+
+describe('My Block parameters', async () => {
+  const { createBlock, lowerProgram, syncMyBlockParams, validateProgram, emptyProgram } =
+    await import('./index.js');
+  it('pass values in and out of a My Block', () => {
+    const pin = {
+      ...createBlock('myBlockParam'),
+      name: 'X',
+      direction: 'in',
+      valueType: 'number',
+    } as Block;
+    const math = { ...createBlock('math'), op: '*', b: 2 } as Block;
+    const pout = {
+      ...createBlock('myBlockParam'),
+      name: 'Y',
+      direction: 'out',
+      valueType: 'number',
+    } as Block;
+    const constant = { ...createBlock('constant'), number: 21 } as Block;
+    const call = { ...createBlock('myBlock'), ref: 'm1' } as Block;
+    const show = { ...createBlock('numberToText') } as Block;
+    let program = {
+      ...emptyProgram('P'),
+      myBlocks: [{ id: 'm1', name: 'Double', body: [pin, math, pout] }],
+      body: [constant, call, show],
+      wires: [
+        { id: 'w1', from: { block: pin.id, plug: 'value' }, to: { block: math.id, plug: 'a' } },
+        {
+          id: 'w2',
+          from: { block: math.id, plug: 'result' },
+          to: { block: pout.id, plug: 'value' },
+        },
+        {
+          id: 'w3',
+          from: { block: constant.id, plug: 'value' },
+          to: { block: call.id, plug: 'p:X' },
+        },
+        { id: 'w4', from: { block: call.id, plug: 'p:Y' }, to: { block: show.id, plug: 'number' } },
+      ],
+    };
+    program = syncMyBlockParams(program);
+    expect((program.body[1] as Extract<Block, { kind: 'myBlock' }>).params).toEqual([
+      { name: 'X', type: 'number', direction: 'in' },
+      { name: 'Y', type: 'number', direction: 'out' },
+    ]);
+    expect(program.wires).toHaveLength(4);
+    expect(validateProgram(program).filter((i) => i.severity === 'error')).toEqual([]);
+    const ir = lowerProgram(program);
+    const kinds = ir.main.map((s) => (s.kind === 'set' ? `set ${s.name}` : s.kind));
+    expect(kinds).toEqual([
+      expect.stringMatching(/^set __w_/),
+      'set __p_m1_X',
+      'call',
+      expect.stringMatching(/^set __w_/),
+    ]);
+    const sub = ir.subroutines[0]!.body.map((s) => (s.kind === 'set' ? s.name : s.kind));
+    expect(sub).toContain('__p_m1_Y');
+  });
+});

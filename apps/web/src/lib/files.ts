@@ -1,5 +1,5 @@
 import { PROJECT_EXTENSION, parseProject, serializeProject, type Program } from '@nxt/blocks';
-import { importRbt, importRbtx, type PackedFile } from '@nxt/rbt';
+import { importRbt, importRbtx, originOf, type PackedFile, type RbtOrigin } from '@nxt/rbt';
 
 // File System Access API types are not in the DOM lib yet.
 interface FileHandle {
@@ -41,6 +41,8 @@ export interface OpenedProgram {
   imported: boolean;
   /** Sounds and pictures that came in a Pack and Go (.rbtx) file. */
   files?: PackedFile[];
+  /** For writing settings back into the original NXT-G file (File → Save back to NXT-G). */
+  origin?: RbtOrigin;
 }
 
 function isAbort(error: unknown): boolean {
@@ -54,8 +56,14 @@ export async function readProgramFile(file: File): Promise<Omit<OpenedProgram, '
     return { program, warnings, imported: true, files };
   }
   if (/\.rbt$/i.test(file.name)) {
-    const { program, warnings } = importRbt(new Uint8Array(await file.arrayBuffer()), file.name);
-    return { program, warnings, imported: true };
+    const bytes = new Uint8Array(await file.arrayBuffer());
+    const result = importRbt(bytes, file.name);
+    return {
+      program: result.program,
+      warnings: result.warnings,
+      imported: true,
+      origin: originOf(result, bytes, file.name),
+    };
   }
   return { program: parseProject(await file.text()), warnings: [], imported: false };
 }

@@ -103,6 +103,8 @@ export function blockSummary(block: Block): string {
       return block.action === 'set' ? `= ${block.value}` : `+= ${block.value}`;
     case 'myBlock':
       return '';
+    case 'myBlockParam':
+      return `${block.direction === 'in' ? 'in' : 'out'}: ${block.name}`;
     case 'file':
       return `${block.action} ${block.file}`;
     case 'sendMessage':

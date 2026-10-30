@@ -17,8 +17,8 @@ import {
   type MotorPort,
   type Program,
 } from './model.js';
-import { findPlug, plugsOf } from './plugs.js';
-import { walkProgram } from './tree.js';
+import { findPlug, myBlockPlug, plugsOf } from './plugs.js';
+import { walk, walkProgram } from './tree.js';
 import { conditionOf, sensorKindOf, validateProgram } from './validate.js';
 
 /** Thrown when a program has errors; carries every error found. */
@@ -48,6 +48,11 @@ const not = (operand: Expr): Expr => ({ kind: 'not', operand });
 /** Name of the subroutine generated for a My Block. */
 export function subroutineName(myBlockId: string): string {
   return `my_${myBlockId}`;
+}
+
+/** Name of the hidden variable that passes My Block parameter `name` in or out. */
+export function paramVariable(myBlockId: string, name: string): string {
+  return `__p_${myBlockId}_${name}`;
 }
 
 /** Name of the hidden variable that carries a block's output plug value. */
@@ -83,6 +88,18 @@ export function lowerProgram(program: Program): IrProgram {
     usedOutputs.add(`${w.from.block}:${w.from.plug}`);
     inputSource.set(`${w.to.block}:${w.to.plug}`, name);
   }
+
+  // My Block parameters: one hidden variable each, and which My Block a block is in.
+  const myBlockOf = new Map<string, string>();
+  for (const def of program.myBlocks) {
+    walk(def.body, (b) => {
+      myBlockOf.set(b.id, def.id);
+      if (b.kind === 'myBlockParam')
+        hidden.set(paramVariable(def.id, b.name), VALUE_TYPE[b.valueType]);
+    });
+  }
+  const zeroOf = (t: DataType): Expr =>
+    t === 'logic' ? bool(false) : t === 'text' ? text('') : num(0);
 
   const sensors: Partial<Record<InputPort, SensorKind>> = {};
   const timers = new Set<number>();
@@ -617,8 +634,41 @@ export function lowerProgram(program: Program): IrProgram {
               ];
         return [...write, ...outputs(block, { value: v(block.name) })];
       }
-      case 'myBlock':
-        return [{ kind: 'call', name: subroutineName(block.ref), source }];
+      case 'myBlock': {
+        const params = block.params ?? [];
+        const before: Stmt[] = params
+          .filter((p) => p.direction === 'in')
+          .map((p) => ({
+            kind: 'set',
+            name: paramVariable(block.ref, p.name),
+            value: input(block, myBlockPlug(p.name), zeroOf(p.type)),
+            source,
+          }));
+        const after = outputs(
+          block,
+          Object.fromEntries(
+            params
+              .filter((p) => p.direction === 'out')
+              .map((p) => [myBlockPlug(p.name), v(paramVariable(block.ref, p.name))]),
+          ),
+        );
+        return [...before, { kind: 'call', name: subroutineName(block.ref), source }, ...after];
+      }
+      case 'myBlockParam': {
+        const def = myBlockOf.get(block.id);
+        if (!def) return [];
+        const variable = paramVariable(def, block.name);
+        return block.direction === 'in'
+          ? outputs(block, { value: v(variable) })
+          : [
+              {
+                kind: 'set',
+                name: variable,
+                value: input(block, 'value', zeroOf(block.valueType)),
+                source,
+              },
+            ];
+      }
       case 'sensor': {
         const c = block.condition;
         const trigger = input(block, 'trigger', num(threshold(c)));

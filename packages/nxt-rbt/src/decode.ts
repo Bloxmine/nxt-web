@@ -3,6 +3,7 @@ import { parseConnectorPanes, parseInstanceNodes } from './linker.js';
 import type { LvValue, TypeDesc } from './lvtype.js';
 import { parseRsrc, resourcesOfType, type RsrcFile } from './rsrc.js';
 import { parseViTags } from './vitags.js';
+import { DataSpace } from './dataspace.js';
 
 /**
  * A decoded .rbt program as a graph, close to the original's own structure.
@@ -62,7 +63,8 @@ export interface RbtTerminal {
   ptr: number;
   /** Node or structure the terminal belongs to. */
   owner: number;
-  ownerKind: 'block' | 'loop' | 'switch';
+  /** 'param': a My Block parameter (a front-panel terminal on the diagram). */
+  ownerKind: 'block' | 'loop' | 'switch' | 'param';
   /** Block terminals: connector-pane slot and plug name. */
   slot?: number;
   name?: string;
@@ -114,6 +116,20 @@ function readInstance(number: number, bytes: Uint8Array, plugs: TypeDesc[]): Rbt
     titl && titl.length > 0 ? String.fromCharCode(...titl.subarray(1, 1 + titl[0]!)) : '';
   const dfds = resourcesOfType(vi, 'DFDS')[0]?.data ?? new Uint8Array();
   return { number, template, title, tags, dfds, plugs };
+}
+
+/** Front-panel control names of the file's own VI, in type-map order (My Block parameters). */
+function controlNames(file: RsrcFile): string[] {
+  const dstm = resourcesOfType(file, 'DSTM')[0]?.data;
+  const dfds = resourcesOfType(file, 'DFDS')[0]?.data;
+  if (!dstm || !dfds) return [];
+  try {
+    return [...new DataSpace(dstm, dfds).controls().keys()].filter(
+      (n) => !n.startsWith('Sequence Flow'),
+    );
+  } catch {
+    return [];
+  }
 }
 
 /** Decodes an .rbt file into a program graph. */
@@ -217,10 +233,27 @@ export function decodeRbt(bytes: Uint8Array, name = 'Program'): RbtProgram {
 
   // Wires: class 23 objects; their ends are connection objects pointing at them.
   const endsByWire = new Map<number, RbtWireEnd[]>();
+
+  // My Block parameters: front-panel terminals (class 22) on the diagram. Each points
+  // at its wire (+8); sorted by the index at +40 they follow the VI's front-panel
+  // controls in type-map order, which gives their names (docs/rbt-compat.md).
+  const paramNames = controlNames(file);
+  const fpTerminals = heap
+    .ofClass(HeapClass.FrontPanelTerminal)
+    .map((o) => ({ ptr: o.ptr, wire: heap.field(o.ptr, 8), order: heap.field(o.ptr, 40) }))
+    .sort((a, b) => a.order - b.order);
+  if (fpTerminals.length === paramNames.length) {
+    fpTerminals.forEach((t, i) => {
+      if (heap.cls(t.wire) !== HeapClass.Wire) return;
+      terminals.set(t.ptr, { ptr: t.ptr, owner: t.ptr, ownerKind: 'param', name: paramNames[i]! });
+      endsByWire.set(t.wire, [{ terminal: t.ptr, inside: false }]);
+    });
+  }
   for (const conn of heap.ofClass(HeapClass.Connection)) {
     const wire = heap.field(conn.ptr, 8);
     const terminal = heap.field(conn.ptr, 12);
     if (heap.cls(wire) !== HeapClass.Wire || !terminals.has(terminal)) continue;
+    if (terminals.get(terminal)?.ownerKind === 'param') continue;
     const ownerCls = heap.cls(heap.owner(conn.ptr));
     const inside = ownerCls === HeapClass.DiagramTerminals;
     const list = endsByWire.get(wire);
@@ -235,6 +268,20 @@ export function decodeRbt(bytes: Uint8Array, name = 'Program'): RbtProgram {
     const style = heap.r.u8(w.ptr + 20);
     const dataType = heap.r.u8(w.ptr + 21);
     wires.push({ ptr: w.ptr, beam: style === 0x18, dataType, diagram: heap.owner(w.ptr), ends });
+  }
+
+  // A parameter feeds the diagram (an input of the My Block) unless its wire starts at
+  // a block output, in which case it hands a value back (an output).
+  for (const w of wires) {
+    const param = w.ends
+      .map((e) => terminals.get(e.terminal))
+      .find((t) => t?.ownerKind === 'param');
+    if (!param) continue;
+    const fromBlock = w.ends.some((e) => {
+      const t = terminals.get(e.terminal);
+      return t?.ownerKind === 'block' && t.output;
+    });
+    param.output = !fromBlock;
   }
 
   return { name, top, instances, wires, nodes, terminals };
