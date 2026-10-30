@@ -58,8 +58,8 @@ export function DataLogDialog({ onClose }: { onClose(): void }) {
     const client = brick.client;
     const simulation = sim.sim;
     if (source === 'brick' && !client) return setError('Connect a brick first (NXT window).');
-    if (source === 'simulator' && !simulation)
-      return setError('Open the simulator and run a program first.');
+    if (source === 'simulator' && (!simulation || simulation.status !== 'running'))
+      return setError('The simulator is not running a program.');
     const chosen: Channel[] = [];
     const readers: (() => Promise<number>)[] = [];
     for (let p = 0; p < 4; p++) {
@@ -203,7 +203,20 @@ export function DataLogDialog({ onClose }: { onClose(): void }) {
       {error && (
         <div className="notice error" role="alert">
           <img src={iconUrl('exclamation')} alt="" />
-          <span>{error}</span>
+          <span style={{ flex: 1 }}>{error}</span>
+          {source === 'simulator' && !sim.sim?.status.startsWith('run') && (
+            <button
+              type="button"
+              className="btn"
+              onClick={() => {
+                sim.setOpen(true);
+                sim.run();
+                setError(null);
+              }}
+            >
+              <img src={iconUrl('control_play')} alt="" /> Run in simulator
+            </button>
+          )}
         </div>
       )}
       <div className="log-setup">

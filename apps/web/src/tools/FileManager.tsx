@@ -3,7 +3,7 @@ import { useBrick } from '../brick/BrickContext';
 import { friendlyError } from '../brick/errors';
 import { formatBytes } from '../lib/format';
 import { iconUrl } from '../lib/icons';
-import { audioToRso, brickFileName, imageToRic, saveFile } from './convert';
+import { audioToRso, brickFileName, imageToRic, pickFile, saveFile } from './convert';
 import { FilePreview } from './FilePreview';
 
 const ICONS: Record<string, string> = {
@@ -20,16 +20,6 @@ const iconFor = (name: string) =>
   ICONS[name.split('.').pop()?.toLowerCase() ?? ''] ?? 'page_white_text';
 
 /** Picks one local file. */
-function pickFile(accept: string): Promise<File | null> {
-  return new Promise((resolve) => {
-    const input = document.createElement('input');
-    input.type = 'file';
-    input.accept = accept;
-    input.onchange = () => resolve(input.files?.[0] ?? null);
-    input.click();
-  });
-}
-
 /**
  * Turns a local file into what the brick needs: audio becomes .rso, images become .ric,
  * brick files are kept as they are.

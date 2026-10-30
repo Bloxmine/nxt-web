@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from 'react';
 import { useBrick } from '../brick/BrickContext';
 import { friendlyError } from '../brick/errors';
 import { usePolling } from '../brick/usePolling';
+import { ConnectPrompt } from '../components/ConnectPrompt';
 import { iconUrl } from '../lib/icons';
 import { drawLcd } from '../sim/draw';
 
@@ -47,7 +48,7 @@ export function BrickScreen() {
     a.click();
   };
 
-  if (!client) return <p>Connect to a brick on the Communications tab first.</p>;
+  if (!client) return <ConnectPrompt what="see its screen here" />;
   return (
     <>
       {error && <div className="notice error">{error}</div>}

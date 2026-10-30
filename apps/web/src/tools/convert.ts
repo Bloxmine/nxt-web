@@ -74,3 +74,14 @@ export function saveFile(
   a.click();
   setTimeout(() => URL.revokeObjectURL(url), 1000);
 }
+
+/** Asks the user for one file (resolves null when they cancel). */
+export function pickFile(accept: string): Promise<File | null> {
+  return new Promise((resolve) => {
+    const input = document.createElement('input');
+    input.type = 'file';
+    input.accept = accept;
+    input.onchange = () => resolve(input.files?.[0] ?? null);
+    input.click();
+  });
+}

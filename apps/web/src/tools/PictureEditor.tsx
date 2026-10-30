@@ -3,7 +3,7 @@ import { useBrick } from '../brick/BrickContext';
 import { friendlyError } from '../brick/errors';
 import { Dialog } from '../components/Dialog';
 import { iconUrl } from '../lib/icons';
-import { brickFileName, imageToRic, saveFile } from './convert';
+import { brickFileName, imageToRic, pickFile, saveFile } from './convert';
 import * as pic from './picture';
 
 type Tool = 'pencil' | 'eraser' | 'line' | 'rect' | 'box' | 'ellipse' | 'fill' | 'text';
@@ -22,21 +22,18 @@ const TOOLS: [Tool, string, string][] = [
 /** Screen pixels per picture pixel. */
 const ZOOM = 6;
 
-function pickFile(accept: string): Promise<File | null> {
-  return new Promise((resolve) => {
-    const input = document.createElement('input');
-    input.type = 'file';
-    input.accept = accept;
-    input.onchange = () => resolve(input.files?.[0] ?? null);
-    input.click();
-  });
-}
-
 /**
  * Tools → Picture editor: draw a black-and-white picture for the brick's screen (up to
  * 100 × 64) and save it as an .ric file for the Display block.
  */
-export function PictureEditor({ onClose }: { onClose(): void }) {
+export function PictureEditor({
+  onClose,
+  initialFile,
+}: {
+  onClose(): void;
+  /** A picture or .ric file to start with (for example one dropped on the window). */
+  initialFile?: File | null;
+}) {
   const brick = useBrick();
   const [bitmap, setBitmap] = useState(() => pic.blank());
   const [history, setHistory] = useState<pic.Bitmap[]>([]);
@@ -171,7 +168,10 @@ export function PictureEditor({ onClose }: { onClose(): void }) {
 
   const open = async () => {
     const file = await pickFile('.ric,image/*');
-    if (!file) return;
+    if (file) await load(file);
+  };
+
+  async function load(file: File) {
     try {
       if (/\.ric$/i.test(file.name)) {
         change(pic.fromRic(new Uint8Array(await file.arrayBuffer())));
@@ -191,7 +191,15 @@ export function PictureEditor({ onClose }: { onClose(): void }) {
         text: e instanceof Error ? e.message : 'This file is not a picture.',
       });
     }
-  };
+  }
+
+  const startFile = useRef(initialFile);
+  useEffect(() => {
+    if (startFile.current) void load(startFile.current);
+    startFile.current = null;
+    // Only once, when the editor opens.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   const upload = async () => {
     if (!brick.client) return;
@@ -206,28 +214,37 @@ export function PictureEditor({ onClose }: { onClose(): void }) {
     }
   };
 
-  const size = (key: 'width' | 'height', max: number) => (
-    <input
-      className="num-input"
-      type="number"
-      min={1}
-      max={max}
-      value={bitmap[key]}
-      aria-label={key === 'width' ? 'Width' : 'Height'}
-      onChange={(e) => {
-        const v = e.target.valueAsNumber;
-        if (v >= 1 && v <= max) {
-          change(
-            pic.resize(
-              bitmap,
-              key === 'width' ? v : bitmap.width,
-              key === 'height' ? v : bitmap.height,
-            ),
-          );
-        }
-      }}
-    />
-  );
+  /** Width or height box: applied on Enter or when leaving it, not on every keystroke. */
+  const size = (key: 'width' | 'height', max: number) => {
+    const apply = (input: HTMLInputElement) => {
+      const v = Math.round(input.valueAsNumber);
+      if (!(v >= 1 && v <= max)) {
+        input.value = String(bitmap[key]);
+        return;
+      }
+      if (v === bitmap[key]) return;
+      change(
+        pic.resize(
+          bitmap,
+          key === 'width' ? v : bitmap.width,
+          key === 'height' ? v : bitmap.height,
+        ),
+      );
+    };
+    return (
+      <input
+        key={`${key}-${bitmap[key]}`}
+        className="num-input"
+        type="number"
+        min={1}
+        max={max}
+        defaultValue={bitmap[key]}
+        aria-label={key === 'width' ? 'Width' : 'Height'}
+        onBlur={(e) => apply(e.currentTarget)}
+        onKeyDown={(e) => e.key === 'Enter' && apply(e.currentTarget)}
+      />
+    );
+  };
 
   return (
     <Dialog

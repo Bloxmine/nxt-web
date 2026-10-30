@@ -5,6 +5,7 @@ import { friendlyError } from '../brick/errors';
 import { usePolling } from '../brick/usePolling';
 import { formatBattery, formatBytes } from '../lib/format';
 import { iconUrl } from '../lib/icons';
+import { ConnectPrompt } from './ConnectPrompt';
 import { Dialog } from './Dialog';
 import { BrickScreen } from '../tools/BrickScreen';
 import { FileManager } from '../tools/FileManager';
@@ -84,7 +85,7 @@ export function NxtWindow({
 }
 
 function NotConnected() {
-  return <p>Connect to a brick on the Communications tab first.</p>;
+  return <ConnectPrompt what="see its sensors and motors live" />;
 }
 
 function Communications() {

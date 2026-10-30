@@ -60,62 +60,64 @@ export function RobotSetupDialog({
         </>
       }
     >
-      <p style={{ marginTop: 0 }}>
-        Tell the simulator and the calculator how your robot is built, so turns and distances match
-        the real one.
-      </p>
-      <fieldset className="groupbox">
-        <legend>Wheels</legend>
-        <label className="robot-field">
-          Wheel
-          <select
-            aria-label="Wheel preset"
-            value={WHEEL_PRESETS.find(([, d]) => d === robot.wheelDiameter)?.[1] ?? ''}
-            onChange={(e) => e.target.value && set('wheelDiameter', Number(e.target.value))}
-          >
-            <option value="">Custom</option>
-            {WHEEL_PRESETS.map(([name, d]) => (
-              <option key={name} value={d}>
-                {name}
-              </option>
-            ))}
-          </select>
-        </label>
-        {num('wheelDiameter', 'Diameter', 0.1)}
-        {num('track', 'Track (between the wheels)')}
-        <label className="robot-field">
-          Left wheel motor
-          <select
-            aria-label="Left wheel motor"
-            value={robot.left}
-            onChange={(e) => set('left', e.target.value as RobotSetup['left'])}
-          >
-            {['A', 'B', 'C'].map((p) => (
-              <option key={p}>{p}</option>
-            ))}
-          </select>
-          right
-          <select
-            aria-label="Right wheel motor"
-            value={robot.right}
-            onChange={(e) => set('right', e.target.value as RobotSetup['right'])}
-          >
-            {['A', 'B', 'C'].map((p) => (
-              <option key={p}>{p}</option>
-            ))}
-          </select>
-        </label>
-      </fieldset>
-      <fieldset className="groupbox">
-        <legend>Sensors (distance in front of the wheels)</legend>
-        {num('lightOffset', 'Light or color sensor')}
-        {num('sonarOffset', 'Ultrasonic sensor')}
-        {num('bumperOffset', 'Touch sensor bumper')}
-      </fieldset>
-      <p className="sim-muted">
-        <img src={iconUrl('information')} alt="" style={{ width: 12, verticalAlign: -2 }} /> Measure
-        the track from the middle of one tyre to the middle of the other.
-      </p>
+      <div className="robot-setup">
+        <p style={{ marginTop: 0 }}>
+          Tell the simulator and the calculator how your robot is built, so turns and distances
+          match the real one.
+        </p>
+        <fieldset className="groupbox">
+          <legend>Wheels</legend>
+          <label className="robot-field">
+            Wheel
+            <select
+              aria-label="Wheel preset"
+              value={WHEEL_PRESETS.find(([, d]) => d === robot.wheelDiameter)?.[1] ?? ''}
+              onChange={(e) => e.target.value && set('wheelDiameter', Number(e.target.value))}
+            >
+              <option value="">Custom</option>
+              {WHEEL_PRESETS.map(([name, d]) => (
+                <option key={name} value={d}>
+                  {name}
+                </option>
+              ))}
+            </select>
+          </label>
+          {num('wheelDiameter', 'Diameter', 0.1)}
+          {num('track', 'Track (between the wheels)')}
+          <label className="robot-field">
+            Left wheel motor
+            <select
+              aria-label="Left wheel motor"
+              value={robot.left}
+              onChange={(e) => set('left', e.target.value as RobotSetup['left'])}
+            >
+              {['A', 'B', 'C'].map((p) => (
+                <option key={p}>{p}</option>
+              ))}
+            </select>
+            right
+            <select
+              aria-label="Right wheel motor"
+              value={robot.right}
+              onChange={(e) => set('right', e.target.value as RobotSetup['right'])}
+            >
+              {['A', 'B', 'C'].map((p) => (
+                <option key={p}>{p}</option>
+              ))}
+            </select>
+          </label>
+        </fieldset>
+        <fieldset className="groupbox">
+          <legend>Sensors (distance in front of the wheels)</legend>
+          {num('lightOffset', 'Light or color sensor')}
+          {num('sonarOffset', 'Ultrasonic sensor')}
+          {num('bumperOffset', 'Touch sensor bumper')}
+        </fieldset>
+        <p className="sim-muted">
+          <img src={iconUrl('information')} alt="" style={{ width: 12, verticalAlign: -2 }} />{' '}
+          Measure the track from the middle of one tyre to the middle of the other.
+        </p>
+      </div>
     </Dialog>
   );
 }

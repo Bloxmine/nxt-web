@@ -12,7 +12,7 @@
   --border: #4f535a;
   --border-dark: #6b7078;
   --text: #e4e6ea;
-  --text-muted: #a3a8b0;
+  --text-muted: #b4b9c1;
   --hover-border: #5b8fd6;
   --hover-top: #3c4d66;
   --hover-bottom: #2c3a50;
@@ -419,4 +419,13 @@
 }
 [data-theme='dark'] .blocklyDropDownDiv .blocklyMenuItemCheckbox {
   filter: invert(1);
+}
+
+[data-theme='dark'] .btn:disabled {
+  color: #6c7077;
+  border-color: #2a2c30;
+  box-shadow: none;
+}
+[data-theme='dark'] .picture-canvas {
+  background: linear-gradient(#3a3d42, #2b2d31);
 }

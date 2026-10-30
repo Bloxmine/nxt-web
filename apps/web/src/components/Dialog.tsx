@@ -1,4 +1,4 @@
-import { useEffect, type ReactNode } from 'react';
+import { useEffect, useRef, type ReactNode } from 'react';
 import { iconUrl } from '../lib/icons';
 
 interface Props {
@@ -12,7 +12,13 @@ interface Props {
   modeless?: boolean;
 }
 
-/** A modal window in the classic desktop style. Escape closes it. */
+const FOCUSABLE =
+  'button:not(:disabled), [href], input:not(:disabled), select:not(:disabled), textarea:not(:disabled), [tabindex]:not([tabindex="-1"])';
+
+/**
+ * A modal window in the classic desktop style. Escape closes it. Focus moves into it
+ * when it opens, Tab stays inside a modal one, and focus goes back when it closes.
+ */
 export function Dialog({
   title,
   icon = 'brick',
@@ -22,6 +28,8 @@ export function Dialog({
   footer,
   modeless,
 }: Props) {
+  const box = useRef<HTMLDivElement>(null);
+
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
       if (e.key === 'Escape') onClose();
@@ -30,12 +38,46 @@ export function Dialog({
     return () => window.removeEventListener('keydown', onKey);
   }, [onClose]);
 
+  useEffect(() => {
+    const previous = document.activeElement instanceof HTMLElement ? document.activeElement : null;
+    const el = box.current;
+    // Unless something inside already took focus (autoFocus), focus the first control
+    // in the body, or the dialog itself.
+    if (el && !el.contains(document.activeElement)) {
+      const first = el.querySelector<HTMLElement>(`.dialog-body :is(${FOCUSABLE})`);
+      (first ?? el).focus();
+    }
+    return () => {
+      if (previous?.isConnected) previous.focus();
+    };
+  }, []);
+
+  const trapTab = (e: React.KeyboardEvent) => {
+    if (modeless || e.key !== 'Tab' || !box.current) return;
+    const items = [...box.current.querySelectorAll<HTMLElement>(FOCUSABLE)].filter(
+      (x) => x.offsetParent !== null,
+    );
+    const first = items[0];
+    const last = items[items.length - 1];
+    if (!first || !last) return;
+    if (e.shiftKey && document.activeElement === first) {
+      e.preventDefault();
+      last.focus();
+    } else if (!e.shiftKey && document.activeElement === last) {
+      e.preventDefault();
+      first.focus();
+    }
+  };
+
   return (
     <div
       className={`dialog-backdrop ${modeless ? 'modeless' : ''}`}
       onMouseDown={(e) => !modeless && e.target === e.currentTarget && onClose()}
     >
       <div
+        ref={box}
+        tabIndex={-1}
+        onKeyDown={trapTab}
         className="dialog"
         role="dialog"
         aria-modal={!modeless}

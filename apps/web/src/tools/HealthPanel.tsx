@@ -4,6 +4,7 @@ import { useBrick } from '../brick/BrickContext';
 import { friendlyError } from '../brick/errors';
 import { usePolling } from '../brick/usePolling';
 import { formatBattery, formatBytes } from '../lib/format';
+import { ConnectPrompt } from '../components/ConnectPrompt';
 import { iconUrl } from '../lib/icons';
 import { LineChart, SERIES_COLORS } from './LineChart';
 
@@ -90,7 +91,7 @@ export function HealthPanel() {
     }
   };
 
-  if (!client) return <p>Connect a brick on the Communications tab first.</p>;
+  if (!client) return <ConnectPrompt what="check its motors, sensors and battery" />;
   return (
     <>
       {error && <div className="notice error">{error}</div>}

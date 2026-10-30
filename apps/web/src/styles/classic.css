@@ -1287,6 +1287,13 @@ input[type='range'] {
 .btn:disabled {
   color: #a5a39b;
   border-color: #b5b2a6;
+  box-shadow: none;
+  cursor: default;
+}
+
+.btn:disabled img {
+  filter: grayscale(1);
+  opacity: 0.45;
 }
 
 .btn.primary {
@@ -2587,8 +2594,10 @@ input[type='range'] {
 .gallery {
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+  align-content: start;
   gap: 8px;
-  max-height: 62vh;
+  /* Fixed, so the dialog doesn't jump when a level tab has fewer cards. */
+  height: 62vh;
   overflow: auto;
   padding: 8px;
   border: 1px solid #919b9c;
@@ -3148,7 +3157,7 @@ svg[display='none'] {
   height: 10px;
   border: 1px solid var(--border);
   border-radius: 2px;
-  background: #1d2a14;
+  background: var(--canvas);
   overflow: hidden;
 }
 
@@ -3272,4 +3281,94 @@ fieldset.controls.wired {
 
 .sim-toolbar .sim-field {
   margin: 0 2px;
+}
+
+/* Dialog tabs wrap instead of running off narrow screens. */
+.dialog-tabs {
+  flex-wrap: wrap;
+}
+
+.dialog-tab {
+  white-space: nowrap;
+}
+
+/* Keyboard focus is always visible. */
+.btn:focus-visible,
+.tool-btn:focus-visible,
+.dialog-tab:focus-visible,
+.dialog input:focus-visible,
+.dialog select:focus-visible,
+.dialog textarea:focus-visible,
+.sim-window input:focus-visible,
+.sim-window select:focus-visible,
+.menu-list button:focus-visible {
+  outline: 2px solid var(--selection);
+  outline-offset: 1px;
+}
+
+/* Robot setup: labels in one column, inputs lined up after them. */
+.robot-setup .robot-field {
+  display: grid;
+  grid-template-columns: 180px;
+  grid-auto-flow: column;
+  grid-auto-columns: max-content;
+  justify-content: start;
+}
+
+@media (max-width: 760px) {
+  .picture-editor .picture-canvas,
+  .mat-editor .mat-canvas {
+    flex-basis: 100%;
+    order: 2;
+  }
+  .picture-editor .mat-props,
+  .mat-editor .mat-props {
+    order: 3;
+  }
+}
+
+@media (max-width: 600px) {
+  .controller {
+    transform: scale(0.75);
+    transform-origin: bottom right;
+  }
+  .robot-setup .robot-field {
+    grid-template-columns: 130px;
+  }
+}
+
+.dialog:focus {
+  outline: none;
+}
+
+/* Shown while a file is dragged over the window. */
+.drop-hint {
+  position: fixed;
+  inset: 8px;
+  z-index: 200;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: 3px dashed var(--selection);
+  border-radius: 10px;
+  background: rgba(47, 111, 209, 0.12);
+  pointer-events: none;
+}
+
+.drop-hint span {
+  padding: 8px 14px;
+  border-radius: 6px;
+  background: var(--chrome-light);
+  color: var(--text);
+  font-weight: bold;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
+}
+
+@media (max-width: 760px) {
+  .mat-editor .mat-tools .tool-sep,
+  .picture-editor .mat-tools .tool-sep {
+    width: 1px;
+    height: 18px;
+    margin: auto 3px;
+  }
 }

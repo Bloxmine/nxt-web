@@ -16,19 +16,7 @@ import { Dialog } from '../components/Dialog';
 import { useEditor } from '../editor/EditorContext';
 import { iconUrl } from '../lib/icons';
 import { useSimulator } from '../sim/SimulatorContext';
-
-type Calibratable = Extract<Condition, { value: number }>;
-
-/** Conditions with a threshold the wizard can set. */
-function calibratable(c: Condition | null): c is Calibratable {
-  return (
-    c !== null &&
-    (c.source === 'light' ||
-      c.source === 'sound' ||
-      c.source === 'ultrasonic' ||
-      (c.source === 'color' && c.mode === 'light'))
-  );
-}
+import { calibratable } from './calibration';
 
 function withValue(block: Block, value: number): Block {
   const set = (c: Condition): Condition => ({ ...c, value }) as Condition;

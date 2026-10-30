@@ -63,6 +63,7 @@ import { CHALLENGES } from '@nxt/sim';
 import { SimulatorProvider, useSimulator, type SimulatorControls } from './sim/SimulatorContext';
 import { ChallengesDialog } from './sim/ChallengesDialog';
 import { ShortcutsDialog } from './components/ShortcutsDialog';
+import { canCalibrate } from './tools/calibration';
 import { PictureEditor } from './tools/PictureEditor';
 import { SoundRecorder } from './tools/SoundRecorder';
 import { SimulatorWindow } from './sim/SimulatorWindow';
@@ -141,6 +142,10 @@ function Studio() {
   const { issues, issuesByBlock } = useIssues(state);
   const brick = useBrick();
   const [modal, setModal] = useState<Modal>(null);
+  /** True while a file is dragged over the window. */
+  const [dropping, setDropping] = useState(false);
+  /** A dropped picture or sound, handed to the picture editor or sound recorder. */
+  const [droppedFile, setDroppedFile] = useState<File | null>(null);
   const [ready, setReady] = useState(false);
   const fileHandle = useRef<SavedFile>(null);
   // The original NXT-G file, when the program was opened from one (for Save back).
@@ -672,22 +677,41 @@ function Studio() {
     }
   }, []);
 
-  // Drop a .rbt or project file anywhere on the window to open it.
+  // Drop a file anywhere on the window: programs open, pictures go to the picture
+  // editor and sounds to the sound recorder.
   useEffect(() => {
     const isFileDrag = (e: DragEvent) => e.dataTransfer?.types.includes('Files') ?? false;
     const over = (e: DragEvent) => {
-      if (isFileDrag(e)) e.preventDefault();
+      if (!isFileDrag(e)) return;
+      e.preventDefault();
+      setDropping(true);
+    };
+    const leave = (e: DragEvent) => {
+      if (e.relatedTarget === null) setDropping(false);
     };
     const drop = (e: DragEvent) => {
+      setDropping(false);
       if (!isFileDrag(e)) return;
       e.preventDefault();
       const file = e.dataTransfer?.files[0];
-      if (file) void actionsRef.current.openFile(file);
+      if (!file) return;
+      const name = file.name.toLowerCase();
+      if (file.type.startsWith('image/') || name.endsWith('.ric')) {
+        setDroppedFile(file);
+        setModal('picture');
+      } else if (file.type.startsWith('audio/') || name.endsWith('.rso')) {
+        setDroppedFile(file);
+        setModal('recorder');
+      } else {
+        void actionsRef.current.openFile(file);
+      }
     };
     window.addEventListener('dragover', over);
+    window.addEventListener('dragleave', leave);
     window.addEventListener('drop', drop);
     return () => {
       window.removeEventListener('dragover', over);
+      window.removeEventListener('dragleave', leave);
       window.removeEventListener('drop', drop);
     };
   }, []);
@@ -922,7 +946,9 @@ function Studio() {
         {
           label: 'Calibrate sensor…',
           icon: 'color_adjustment',
-          disabled: !state.selected,
+          disabled: !canCalibrate(
+            state.selected ? findBlock(state.program, state.selected)?.block : undefined,
+          ),
           onClick: () => setModal('calibrate'),
         },
         { separator: true },
@@ -1268,8 +1294,29 @@ function Studio() {
         )}
         {modal === 'robot' && <RobotSetupDialog onClose={() => setModal(null)} />}
         {modal === 'shortcuts' && <ShortcutsDialog onClose={() => setModal(null)} />}
-        {modal === 'recorder' && <SoundRecorder onClose={() => setModal(null)} />}
-        {modal === 'picture' && <PictureEditor onClose={() => setModal(null)} />}
+        {modal === 'recorder' && (
+          <SoundRecorder
+            initialFile={droppedFile}
+            onClose={() => {
+              setDroppedFile(null);
+              setModal(null);
+            }}
+          />
+        )}
+        {modal === 'picture' && (
+          <PictureEditor
+            initialFile={droppedFile}
+            onClose={() => {
+              setDroppedFile(null);
+              setModal(null);
+            }}
+          />
+        )}
+        {dropping && (
+          <div className="drop-hint" aria-hidden="true">
+            <span>Drop to open: programs (.rbt, .rbtx, project), pictures or sounds</span>
+          </div>
+        )}
         {modal === 'challenges' && (
           <ChallengesDialog onPlay={playChallenge} onClose={() => setModal(null)} />
         )}

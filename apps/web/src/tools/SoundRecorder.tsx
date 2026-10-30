@@ -1,10 +1,10 @@
-import { encodeRso, fromPcm8, toPcm8 } from '@nxt/media';
+import { decodeRso, encodeRso, fromPcm8, toPcm8 } from '@nxt/media';
 import { useEffect, useRef, useState } from 'react';
 import { useBrick } from '../brick/BrickContext';
 import { friendlyError } from '../brick/errors';
 import { Dialog } from '../components/Dialog';
 import { iconUrl } from '../lib/icons';
-import { brickFileName, decodeAudio, saveFile } from './convert';
+import { brickFileName, decodeAudio, pickFile, saveFile } from './convert';
 
 /** Longest recording, in seconds: an 8 kHz sound takes 8 KB of the brick's memory a second. */
 const MAX_SECONDS = 5;
@@ -48,7 +48,14 @@ function drawWave(canvas: HTMLCanvasElement, rec: Recording, start: number, end:
  * Tools → Sound recorder: record from the microphone, trim, listen to how it will sound
  * on the brick, then save it as an .rso file or send it to the brick.
  */
-export function SoundRecorder({ onClose }: { onClose(): void }) {
+export function SoundRecorder({
+  onClose,
+  initialFile,
+}: {
+  onClose(): void;
+  /** A sound or .rso file to start with (for example one dropped on the window). */
+  initialFile?: File | null;
+}) {
   const brick = useBrick();
   const [state, setState] = useState<'idle' | 'recording' | 'working'>('idle');
   const [elapsed, setElapsed] = useState(0);
@@ -68,6 +75,37 @@ export function SoundRecorder({ onClose }: { onClose(): void }) {
   useEffect(() => {
     if (recording && wave.current) drawWave(wave.current, recording, start, end);
   }, [recording, start, end]);
+
+  /** Loads a sound file (WAV, MP3, … or .rso) to trim and convert. */
+  async function load(file: File) {
+    setState('working');
+    setMessage(null);
+    try {
+      let loaded: Recording;
+      if (/\.rso$/i.test(file.name)) {
+        const rso = decodeRso(new Uint8Array(await file.arrayBuffer()));
+        if (rso.samples.length === 0) throw new Error('compressed .rso');
+        loaded = { samples: fromPcm8(rso.samples), rate: rso.sampleRate };
+      } else {
+        loaded = await decodeAudio(file, MAX_SECONDS);
+      }
+      setRecording(loaded);
+      setStart(0);
+      setEnd(loaded.samples.length / loaded.rate);
+      setName(file.name.replace(/\.[^.]*$/, '').slice(0, 15));
+    } catch {
+      setMessage({ error: true, text: `${file.name} could not be read as a sound.` });
+    } finally {
+      setState('idle');
+    }
+  }
+
+  const startFile = useRef(initialFile);
+  useEffect(() => {
+    if (startFile.current) void load(startFile.current);
+    // Only once, when the recorder opens.
+    startFile.current = null;
+  }, []);
 
   const record = async () => {
     setMessage(null);
@@ -230,6 +268,15 @@ export function SoundRecorder({ onClose }: { onClose(): void }) {
             <img src={iconUrl('microphone')} alt="" /> {recording ? 'Record again' : 'Record'}
           </button>
         )}
+        <button
+          type="button"
+          className="btn"
+          disabled={state !== 'idle'}
+          title="Use a sound file instead (WAV, MP3, OGG or .rso)"
+          onClick={() => void pickFile('audio/*,.rso').then((f) => f && load(f))}
+        >
+          Open…
+        </button>
         <div className="recorder-meter" aria-hidden="true">
           <div style={{ width: `${Math.min(100, level * 140)}%` }} />
         </div>
