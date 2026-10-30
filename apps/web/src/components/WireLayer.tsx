@@ -113,15 +113,27 @@ export function WireLayer({
         rail.setAttribute('x2', String(x));
         rail.setAttribute('y1', String((first.top + first.height / 2 - origin.top) / zoom));
         rail.setAttribute('y2', String((last.top + last.height / 2 - origin.top) / zoom));
+        rail.style.display = '';
       } else {
-        rail.setAttribute('y2', rail.getAttribute('y1') ?? '0');
+        // A zero-length line with round caps would still paint a dot.
+        rail.style.display = 'none';
       }
     }
   });
 
   return (
     <svg ref={svg} className={`wire-layer ${part}`} aria-hidden="false">
-      {part !== 'hit' && <line data-rail="" className="lane-rail" x1="0" y1="0" x2="0" y2="0" />}
+      {part !== 'hit' && (
+        <line
+          data-rail=""
+          className="lane-rail"
+          x1="0"
+          y1="0"
+          x2="0"
+          y2="0"
+          style={{ display: 'none' }}
+        />
+      )}
       {program.wires.map((wire) => {
         const broken = wireWarning(program, wire) !== null;
         const color = broken ? '#8a8a8a' : COLORS[types.get(wire.id) ?? 'number'];

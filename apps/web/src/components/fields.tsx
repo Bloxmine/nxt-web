@@ -1,5 +1,6 @@
-import type { ReactNode } from 'react';
+import { useContext, type ReactNode } from 'react';
 import { iconUrl } from '../lib/icons';
+import { WiredContext } from './wired';
 
 /** A labelled row in the configuration panel. */
 export function Field({
@@ -11,13 +12,25 @@ export function Field({
   icon?: string | undefined;
   children: ReactNode;
 }) {
+  const wired = useContext(WiredContext).has(label);
   return (
     <div className="field" role="group" aria-label={label}>
       <span className="label">
         {icon && <img src={iconUrl(icon)} alt="" />}
         {label}
       </span>
-      <div className="controls">{children}</div>
+      {wired ? (
+        <fieldset
+          className="controls wired"
+          disabled
+          title="This value comes from a data wire, so the setting here is not used."
+        >
+          {children}
+          <span className="wired-note">⇠ from a wire</span>
+        </fieldset>
+      ) : (
+        <div className="controls">{children}</div>
+      )}
     </div>
   );
 }
@@ -65,12 +78,15 @@ export function Slider({
   min,
   max,
   label,
+  end,
 }: {
   value: number;
   onChange(value: number): void;
   min: number;
   max: number;
   label: string;
+  /** Shown at the slider's right end (for example the right-hand motor). */
+  end?: ReactNode;
 }) {
   return (
     <>
@@ -82,6 +98,7 @@ export function Slider({
         value={value}
         onChange={(e) => onChange(e.target.valueAsNumber)}
       />
+      {end}
       <NumberInput
         value={value}
         onChange={onChange}

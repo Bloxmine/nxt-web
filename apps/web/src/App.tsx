@@ -62,6 +62,7 @@ import { loadValue, saveValue } from './lib/storage';
 import { CHALLENGES } from '@nxt/sim';
 import { SimulatorProvider, useSimulator, type SimulatorControls } from './sim/SimulatorContext';
 import { ChallengesDialog } from './sim/ChallengesDialog';
+import { ShortcutsDialog } from './components/ShortcutsDialog';
 import { PictureEditor } from './tools/PictureEditor';
 import { SoundRecorder } from './tools/SoundRecorder';
 import { SimulatorWindow } from './sim/SimulatorWindow';
@@ -99,6 +100,7 @@ type Modal =
   | 'robot'
   | 'challenges'
   | 'recorder'
+  | 'shortcuts'
   | 'picture'
   | 'library'
   | 'snippets'
@@ -582,8 +584,12 @@ function Studio() {
   });
 
   const onKeyDown = useCallback((e: KeyboardEvent) => {
-    const target = e.target as HTMLElement;
-    const typing = target.closest('input, select, textarea, [contenteditable]') !== null;
+    const target = e.target instanceof Element ? e.target : null;
+    const typing = target?.closest('input, select, textarea, [contenteditable]') != null;
+    // Inside a dialog (or behind a modal one) editor shortcuts must not touch the program.
+    const inDialog =
+      target?.closest('.dialog, [role="dialog"]') != null ||
+      document.querySelector('.dialog-backdrop:not(.modeless)') !== null;
     const mod = e.ctrlKey || e.metaKey;
     const a = actionsRef.current;
     if (mod && e.key.toLowerCase() === 's') {
@@ -592,7 +598,10 @@ function Studio() {
     } else if (mod && e.key.toLowerCase() === 'o') {
       e.preventDefault();
       void a.open();
-    } else if (typing) {
+    } else if (e.key === 'F5' && !typing) {
+      e.preventDefault();
+      a.simulate();
+    } else if (typing || inDialog) {
       return;
     } else if (mod && e.key.toLowerCase() === 'z') {
       e.preventDefault();
@@ -646,9 +655,6 @@ function Studio() {
     } else if (e.key === 'F9') {
       e.preventDefault();
       a.toggleBreakpoint();
-    } else if (e.key === 'F5') {
-      e.preventDefault();
-      a.simulate();
     } else if (e.key === 'Escape') {
       dispatch({ type: 'select', id: null });
     } else if (mod && (e.key === '=' || e.key === '+')) {
@@ -767,6 +773,20 @@ function Studio() {
           onClick: () => setModal('search'),
         },
         { label: 'History…', icon: 'clock', onClick: () => setModal('history') },
+        {
+          label: 'Command palette…',
+          icon: 'application_xp_terminal',
+          shortcut: 'Ctrl+K',
+          onClick: () => setModal('palette'),
+        },
+        { separator: true },
+        {
+          label: 'Save selection as snippet…',
+          icon: 'page_copy',
+          disabled: !state.selected,
+          onClick: actions.saveSnippet,
+        },
+        { label: 'Snippets…', icon: 'paste_plain', onClick: () => setModal('snippets') },
         { separator: true },
         {
           label: 'Insert block…',
@@ -784,10 +804,26 @@ function Studio() {
           label: 'Add comment',
           icon: 'comment',
           onClick: () => {
+            // Put the note in free space: below everything on the canvas, near the
+            // visible left edge (or in view, if the program is taller than the window).
             const scroller = document.querySelector('.canvas');
-            const x = ((scroller?.scrollLeft ?? 0) + 40) / state.zoom;
-            const y = ((scroller?.scrollTop ?? 0) + 30) / state.zoom;
-            dispatch({ type: 'edit', update: (p) => addComment(p, state.activeTab, x, y) });
+            const content = document.querySelector('.canvas-content');
+            if (!scroller || !content) return;
+            const origin = content.getBoundingClientRect();
+            let bottom = 0;
+            for (const el of content.querySelectorAll(
+              '.block, .loop, .switch, .canvas-comment, .lane-add',
+            )) {
+              bottom = Math.max(bottom, el.getBoundingClientRect().bottom - origin.top);
+            }
+            const top = scroller.scrollTop;
+            const below = bottom + 16;
+            const y = below < top + scroller.clientHeight - 60 ? below : top + 30;
+            const x = scroller.scrollLeft + 40;
+            dispatch({
+              type: 'edit',
+              update: (p) => addComment(p, state.activeTab, x / state.zoom, y / state.zoom),
+            });
           },
         },
         { separator: true },
@@ -811,14 +847,29 @@ function Studio() {
       label: 'View',
       items: [
         {
+          label: 'Zoom in',
+          icon: 'magnifier_zoom_in',
+          shortcut: 'Ctrl++',
+          onClick: () => actions.zoom(0.1),
+        },
+        {
+          label: 'Zoom out',
+          icon: 'magnifier_zoom_out',
+          shortcut: 'Ctrl+-',
+          onClick: () => actions.zoom(-0.1),
+        },
+        { separator: true },
+        {
           label: 'Classic wires',
-          icon: state.view.classicWires ? 'tick' : 'arrow_join',
+          icon: 'arrow_join',
+          checked: state.view.classicWires,
           onClick: () =>
             dispatch({ type: 'view', view: { classicWires: !state.view.classicWires } }),
         },
         {
           label: 'Modern blocks (Blockly)',
-          icon: state.view.editor === 'modern' ? 'tick' : 'bricks',
+          icon: 'bricks',
+          checked: state.view.editor === 'modern',
           onClick: () =>
             dispatch({
               type: 'view',
@@ -827,7 +878,8 @@ function Studio() {
         },
         {
           label: 'Work Map',
-          icon: state.view.workMap ? 'tick' : 'map',
+          icon: 'map',
+          checked: state.view.workMap,
           onClick: () => dispatch({ type: 'view', view: { workMap: !state.view.workMap } }),
         },
         { separator: true },
@@ -840,7 +892,7 @@ function Studio() {
           ] as const
         ).map(([theme, label]) => ({
           label,
-          icon: state.view.theme === theme ? 'tick' : 'color_wheel',
+          checked: state.view.theme === theme,
           onClick: () => dispatch({ type: 'view', view: { theme } }),
         })),
         { separator: true },
@@ -854,14 +906,25 @@ function Studio() {
     {
       label: 'Tools',
       items: [
+        { section: 'Brick' },
         { label: 'NXT Window', icon: 'monitor_window', onClick: () => setModal('nxt') },
         { label: 'Files on the brick…', icon: 'folder', onClick: () => setModal({ nxt: 'files' }) },
         { label: 'Remote control…', icon: 'joystick', onClick: () => setModal({ nxt: 'remote' }) },
         { label: 'Health check…', icon: 'heart', onClick: () => setModal({ nxt: 'health' }) },
         { label: 'Brick screen…', icon: 'monitor', onClick: () => setModal({ nxt: 'screen' }) },
+        { label: 'Data logging…', icon: 'chart_line', onClick: () => setModal('datalog') },
+        {
+          label: 'Calibrate sensor…',
+          icon: 'color_adjustment',
+          disabled: !state.selected,
+          onClick: () => setModal('calibrate'),
+        },
+        { separator: true },
+        { section: 'Sounds and pictures' },
         { label: 'Sound recorder…', icon: 'microphone', onClick: () => setModal('recorder') },
         { label: 'Picture editor…', icon: 'picture_edit', onClick: () => setModal('picture') },
-        { label: 'Data logging…', icon: 'chart_line', onClick: () => setModal('datalog') },
+        { separator: true },
+        { section: 'Program' },
         { label: 'Check program…', icon: 'tick', onClick: () => setModal('checker') },
         {
           label: 'Distance and turn calculator…',
@@ -869,31 +932,8 @@ function Studio() {
           onClick: () => setModal('calculator'),
         },
         { label: 'Robot setup…', icon: 'wrench', onClick: () => setModal('robot') },
-        {
-          label: 'Calibrate sensor…',
-          icon: 'color_adjustment',
-          disabled: !state.selected,
-          onClick: () => setModal('calibrate'),
-        },
-        {
-          label: brick.recording ? 'Stop recording and save…' : 'Record USB traffic',
-          icon: 'transmit',
-          disabled: !connected,
-          onClick: () => {
-            if (!brick.recording) return brick.startRecording();
-            const note =
-              window.prompt('What did you do while recording? (saved in the file)', '') ?? '';
-            const capture = brick.stopRecording(note);
-            if (capture) {
-              saveFile(
-                `capture-${new Date().toISOString().slice(0, 19).replace(/[:T]/g, '-')}.json`,
-                JSON.stringify(capture, null, 2),
-                'application/json',
-              );
-            }
-          },
-        },
         { separator: true },
+        { section: 'Connection' },
         {
           label: 'Connect via USB',
           icon: 'connect',
@@ -912,18 +952,23 @@ function Studio() {
           disabled: !connected,
           onClick: () => void brick.disconnect(),
         },
-        { separator: true },
         {
-          label: 'Zoom in',
-          icon: 'magnifier_zoom_in',
-          shortcut: 'Ctrl++',
-          onClick: () => actions.zoom(0.1),
-        },
-        {
-          label: 'Zoom out',
-          icon: 'magnifier_zoom_out',
-          shortcut: 'Ctrl+-',
-          onClick: () => actions.zoom(-0.1),
+          label: brick.recording ? 'Stop recording and save…' : 'Record USB traffic',
+          icon: 'transmit',
+          disabled: !connected,
+          onClick: () => {
+            if (!brick.recording) return brick.startRecording();
+            const note =
+              window.prompt('What did you do while recording? (saved in the file)', '') ?? '';
+            const capture = brick.stopRecording(note);
+            if (capture) {
+              saveFile(
+                `capture-${new Date().toISOString().slice(0, 19).replace(/[:T]/g, '-')}.json`,
+                JSON.stringify(capture, null, 2),
+                'application/json',
+              );
+            }
+          },
         },
       ],
     },
@@ -951,6 +996,7 @@ function Studio() {
       items: [
         { label: 'Tutorials…', icon: 'help', onClick: () => setModal('tutorials') },
         { label: 'Example gallery…', icon: 'star', onClick: () => setModal('gallery') },
+        { label: 'Keyboard shortcuts…', icon: 'keyboard', onClick: () => setModal('shortcuts') },
         { separator: true },
         { label: 'About NXT Web Studio', icon: 'information', onClick: () => setModal('about') },
       ],
@@ -1215,6 +1261,7 @@ function Studio() {
           />
         )}
         {modal === 'robot' && <RobotSetupDialog onClose={() => setModal(null)} />}
+        {modal === 'shortcuts' && <ShortcutsDialog onClose={() => setModal(null)} />}
         {modal === 'recorder' && <SoundRecorder onClose={() => setModal(null)} />}
         {modal === 'picture' && <PictureEditor onClose={() => setModal(null)} />}
         {modal === 'challenges' && (

@@ -396,3 +396,23 @@
 [data-theme='dark'] .sim-brick-tabs button.active {
   background: #3a3d42;
 }
+
+/* Blockly's dropdowns and context menus (outside the workspace). */
+[data-theme='dark'] .blocklyDropDownDiv,
+[data-theme='dark'] .blocklyWidgetDiv .blocklyMenu {
+  background-color: #2b2d31 !important;
+  border-color: #4f535a !important;
+  color: var(--text);
+}
+[data-theme='dark'] .blocklyMenuItem {
+  color: var(--text);
+}
+[data-theme='dark'] .blocklyMenuItemDisabled {
+  color: #6b7078;
+}
+[data-theme='dark'] .blocklyMenuItemHighlight {
+  background-color: #3c4d66;
+}
+[data-theme='dark'] .blocklyDropDownDiv .blocklyMenuItemCheckbox {
+  filter: invert(1);
+}

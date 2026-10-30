@@ -3,6 +3,7 @@ import {
   findBlock,
   iconOf,
   labelOf,
+  plugsOf,
   updateBlock,
   type Block,
   type Condition,
@@ -16,6 +17,7 @@ import { useEditor } from '../editor/EditorContext';
 import { iconUrl } from '../lib/icons';
 import { DataFields } from './DataFields';
 import { DirectionButtons, Field, NumberInput, Radios, Select, Slider } from './fields';
+import { WiredContext } from './wired';
 
 const SENSOR_PORTS = [
   [1, '1'],
@@ -59,14 +61,26 @@ export function ConfigPanel({ onEditVariables }: { onEditVariables(): void }) {
           : labelOf(block)}
       </div>
       <div className="config-body">
-        <BlockFields
-          block={block}
-          update={update}
-          program={state.program}
-          onEditVariables={onEditVariables}
-        />
+        <WiredContext.Provider value={wiredLabels(state.program, block)}>
+          <BlockFields
+            block={block}
+            update={update}
+            program={state.program}
+            onEditVariables={onEditVariables}
+          />
+        </WiredContext.Provider>
       </div>
     </section>
+  );
+}
+
+/** Labels of the block's input plugs that have a wire going in. */
+function wiredLabels(program: Program, block: Block): ReadonlySet<string> {
+  const into = new Set(program.wires.filter((w) => w.to.block === block.id).map((w) => w.to.plug));
+  return new Set(
+    plugsOf(block)
+      .filter((p) => into.has(p.name))
+      .map((p) => p.label),
   );
 }
 
@@ -175,8 +189,8 @@ function BlockFields({ block, update, program, onEditVariables }: FieldsProps) {
               max={100}
               value={block.steering}
               onChange={(steering) => update({ steering })}
+              end={<span>{block.ports[1] ?? ''}</span>}
             />
-            <span>{block.ports[1] ?? ''}</span>
           </Field>
           <Field label="Power">
             <Slider
@@ -585,6 +599,11 @@ function BlockFields({ block, update, program, onEditVariables }: FieldsProps) {
               onChange={(condition) => update({ control: { type: 'sensor', condition } })}
             />
           )}
+          {control.type !== 'forever' && (
+            <p className="sim-muted" style={{ margin: 0 }}>
+              Checked after each pass.
+            </p>
+          )}
           <Field label="Counter">
             <label className="check">
               <input
@@ -595,9 +614,6 @@ function BlockFields({ block, update, program, onEditVariables }: FieldsProps) {
               Show counter plug
             </label>
           </Field>
-          {control.type !== 'forever' && (
-            <p style={{ margin: 0, color: '#555' }}>Checked after each pass.</p>
-          )}
         </>
       );
     }
@@ -639,7 +655,7 @@ function BlockFields({ block, update, program, onEditVariables }: FieldsProps) {
                 variables={variableOptions}
                 onChange={(condition) => update({ condition, cases: undefined } as Partial<Block>)}
               />
-              <p style={{ margin: 0, color: '#555' }}>
+              <p style={{ margin: 0, color: 'var(--text-muted)' }}>
                 Top branch runs when true, bottom when false.
               </p>
             </>
@@ -1092,7 +1108,7 @@ function CaseFields({
           </button>
         </div>
       </Field>
-      <p style={{ margin: 0, color: '#555' }}>
+      <p style={{ margin: 0, color: 'var(--text-muted)' }}>
         Wire a value into the switch plug. The marked case runs when no value matches.
       </p>
     </>

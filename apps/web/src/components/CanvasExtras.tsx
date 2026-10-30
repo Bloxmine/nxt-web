@@ -178,16 +178,22 @@ export function WorkMap({
     const redraw = () => setTick((t) => t + 1);
     el.addEventListener('scroll', redraw);
     window.addEventListener('resize', redraw);
+    // Zooming or folding hubs changes the content's size without a program change.
+    const observer = new ResizeObserver(redraw);
+    if (content.current) observer.observe(content.current);
     return () => {
       el.removeEventListener('scroll', redraw);
       window.removeEventListener('resize', redraw);
+      observer.disconnect();
     };
-  }, [scroller]);
+  }, [scroller, content]);
 
-  const scale = () => {
+  /** Scale and offset that fit the whole scroll area into the map, centred. */
+  const layout = () => {
     const el = scroller.current!;
     const c = canvas.current!;
-    return Math.min(c.width / el.scrollWidth, c.height / el.scrollHeight);
+    const s = Math.min(c.width / el.scrollWidth, c.height / el.scrollHeight);
+    return { s, ox: (c.width - el.scrollWidth * s) / 2, oy: (c.height - el.scrollHeight * s) / 2 };
   };
 
   useEffect(() => {
@@ -195,18 +201,21 @@ export function WorkMap({
     const root = content.current;
     const ctx = canvas.current?.getContext('2d');
     if (!el || !root || !ctx) return;
-    const s = scale();
+    const { s, ox, oy } = layout();
+    const css = getComputedStyle(el);
+    const v = (name: string, fallback: string) => css.getPropertyValue(name).trim() || fallback;
     const origin = el.getBoundingClientRect();
-    ctx.clearRect(0, 0, ctx.canvas.width, ctx.canvas.height);
-    ctx.fillStyle = '#efede4';
-    ctx.fillRect(0, 0, el.scrollWidth * s, el.scrollHeight * s);
+    ctx.fillStyle = v('--chrome-dark', '#c9c6b5');
+    ctx.fillRect(0, 0, ctx.canvas.width, ctx.canvas.height);
+    ctx.fillStyle = v('--canvas', '#efede4');
+    ctx.fillRect(ox, oy, el.scrollWidth * s, el.scrollHeight * s);
     const colors: Record<string, string> = {
-      action: '#39a12f',
-      sensor: '#d8b800',
-      flow: '#f39012',
-      data: '#d8402f',
-      advanced: '#7b5bd6',
-      custom: '#3b9be0',
+      action: v('--action-bottom', '#39a12f'),
+      sensor: v('--sensor-bottom', '#d8b800'),
+      flow: v('--flow-bottom', '#f39012'),
+      data: v('--data-bottom', '#d8402f'),
+      advanced: v('--advanced-bottom', '#7b5bd6'),
+      custom: v('--custom-bottom', '#3b9be0'),
     };
     for (const b of root.querySelectorAll<HTMLElement>('[data-block-id]')) {
       const r = b.getBoundingClientRect();
@@ -216,15 +225,20 @@ export function WorkMap({
           ? 'rgba(243,144,18,0.35)'
           : (colors[cat ?? ''] ?? '#888');
       ctx.fillRect(
-        (r.left - origin.left + el.scrollLeft) * s,
-        (r.top - origin.top + el.scrollTop) * s,
+        ox + (r.left - origin.left + el.scrollLeft) * s,
+        oy + (r.top - origin.top + el.scrollTop) * s,
         Math.max(2, r.width * s),
         Math.max(2, r.height * s),
       );
     }
-    ctx.strokeStyle = '#2f6fd1';
+    ctx.strokeStyle = v('--selection', '#2f6fd1');
     ctx.lineWidth = 1.5;
-    ctx.strokeRect(el.scrollLeft * s, el.scrollTop * s, el.clientWidth * s, el.clientHeight * s);
+    ctx.strokeRect(
+      ox + el.scrollLeft * s,
+      oy + el.scrollTop * s,
+      el.clientWidth * s,
+      el.clientHeight * s,
+    );
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [tick, version]);
 
@@ -233,10 +247,11 @@ export function WorkMap({
     if (!el) return;
     const go = (clientX: number, clientY: number) => {
       const r = canvas.current!.getBoundingClientRect();
-      const s = scale() * (r.width / canvas.current!.width);
+      const ratio = r.width / canvas.current!.width;
+      const { s, ox, oy } = layout();
       el.scrollTo({
-        left: (clientX - r.left) / s - el.clientWidth / 2,
-        top: (clientY - r.top) / s - el.clientHeight / 2,
+        left: ((clientX - r.left) / ratio - ox) / s - el.clientWidth / 2,
+        top: ((clientY - r.top) / ratio - oy) / s - el.clientHeight / 2,
       });
     };
     go(e.clientX, e.clientY);

@@ -82,6 +82,9 @@ export function SearchDialog({ onClose }: { onClose(): void }) {
           </li>
         ))}
         {query.trim() && hits.length === 0 && <li className="empty">Nothing found.</li>}
+        {!query.trim() && (
+          <li className="empty">Type to search blocks, settings, variables and comments.</li>
+        )}
       </ul>
     </Dialog>
   );

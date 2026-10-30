@@ -2,7 +2,15 @@ import { useEffect, useRef, useState } from 'react';
 import { iconUrl } from '../lib/icons';
 
 export type MenuItem =
-  | { label: string; icon?: string; shortcut?: string; disabled?: boolean; onClick(): void }
+  | {
+      label: string;
+      icon?: string;
+      shortcut?: string;
+      disabled?: boolean;
+      /** For on/off settings: shows a tick column. */
+      checked?: boolean;
+      onClick(): void;
+    }
   | { separator: true }
   | { section: string };
 
@@ -45,36 +53,45 @@ export function MenuBar({ menus }: { menus: Menu[] }) {
           </button>
           {open === menu.label && (
             <div className="menu-list" role="menu">
-              {menu.items.map((item, i) => {
-                if ('separator' in item) return <hr key={i} />;
-                if ('section' in item) {
+              {(() => {
+                const checks = menu.items.some((it) => 'checked' in it && it.checked !== undefined);
+                return menu.items.map((item, i) => {
+                  if ('separator' in item) return <hr key={i} />;
+                  if ('section' in item) {
+                    return (
+                      <div key={i} className="section">
+                        {item.section}
+                      </div>
+                    );
+                  }
                   return (
-                    <div key={i} className="section">
-                      {item.section}
-                    </div>
+                    <button
+                      key={i}
+                      type="button"
+                      role={item.checked === undefined ? 'menuitem' : 'menuitemcheckbox'}
+                      aria-checked={item.checked}
+                      disabled={item.disabled}
+                      onClick={() => {
+                        setOpen(null);
+                        item.onClick();
+                      }}
+                    >
+                      {checks && (
+                        <span className="check-mark" aria-hidden="true">
+                          {item.checked ? '✓' : ''}
+                        </span>
+                      )}
+                      {item.icon ? (
+                        <img src={iconUrl(item.icon)} alt="" />
+                      ) : (
+                        <span className="no-icon" />
+                      )}
+                      {item.label}
+                      {item.shortcut && <span className="shortcut">{item.shortcut}</span>}
+                    </button>
                   );
-                }
-                return (
-                  <button
-                    key={i}
-                    type="button"
-                    role="menuitem"
-                    disabled={item.disabled}
-                    onClick={() => {
-                      setOpen(null);
-                      item.onClick();
-                    }}
-                  >
-                    {item.icon ? (
-                      <img src={iconUrl(item.icon)} alt="" />
-                    ) : (
-                      <span className="no-icon" />
-                    )}
-                    {item.label}
-                    {item.shortcut && <span className="shortcut">{item.shortcut}</span>}
-                  </button>
-                );
-              })}
+                });
+              })()}
             </div>
           )}
         </div>

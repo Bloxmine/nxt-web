@@ -128,7 +128,7 @@ function Communications() {
             Disconnect
           </button>
         </div>
-        <p style={{ margin: '8px 0 0', color: '#555' }}>
+        <p style={{ margin: '8px 0 0', color: 'var(--text-muted)' }}>
           {brick.state === 'connecting'
             ? 'Connecting…'
             : connected

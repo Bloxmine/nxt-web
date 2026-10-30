@@ -177,6 +177,19 @@ select {
   width: 16px;
 }
 
+.menu-list button .check-mark,
+.menu-list button img,
+.menu-list button .no-icon {
+  flex-shrink: 0;
+}
+
+.menu-list button .check-mark {
+  width: 10px;
+  margin-right: -4px;
+  font-weight: bold;
+  text-align: center;
+}
+
 .menu-list button .shortcut {
   margin-left: auto;
   padding-left: 24px;
@@ -995,7 +1008,7 @@ select {
 
 .field {
   display: grid;
-  grid-template-columns: 74px auto;
+  grid-template-columns: minmax(74px, max-content) auto;
   align-items: center;
   gap: 6px;
   min-height: 24px;
@@ -1604,8 +1617,14 @@ input[type='range'] {
 }
 
 .block-bottom .summary {
+  min-width: 0;
   overflow: hidden;
   text-overflow: ellipsis;
+}
+
+/* Keep the caption clear of the data hub tab in the bottom-left corner. */
+.block-bottom:has(.hub-tab) {
+  padding-left: 16px;
 }
 
 .hub-tab {
@@ -3193,4 +3212,43 @@ svg[display='none'] {
   .picture-editor .mat-props {
     width: 100%;
   }
+}
+
+/* Small icons inside running text (Tailwind's preflight makes images blocks). */
+p img,
+.sim-muted img {
+  display: inline-block;
+  vertical-align: -2px;
+}
+
+.shortcut-table {
+  width: 100%;
+  border-collapse: collapse;
+}
+
+.shortcut-table th {
+  width: 40%;
+  padding: 2px 8px 2px 0;
+  text-align: left;
+  font-weight: normal;
+  white-space: nowrap;
+}
+
+.shortcut-table td {
+  padding: 2px 0;
+}
+
+/* A setting decided by a data wire. */
+fieldset.controls.wired {
+  min-width: 0;
+  margin: 0;
+  padding: 0;
+  border: 0;
+  opacity: 0.75;
+}
+
+.wired-note {
+  color: var(--selection);
+  font-style: italic;
+  white-space: nowrap;
 }

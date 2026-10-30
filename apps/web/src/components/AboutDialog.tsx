@@ -70,8 +70,8 @@ export function MessageDialog({
         </button>
       }
     >
-      <div style={{ display: 'flex', gap: 12 }}>
-        <img src={iconUrl(icon, 32)} alt="" width={32} height={32} />
+      <div style={{ display: 'flex', gap: 12, alignItems: 'flex-start' }}>
+        <img src={iconUrl(icon, 32)} alt="" width={32} height={32} style={{ flexShrink: 0 }} />
         <div>{children}</div>
       </div>
     </Dialog>

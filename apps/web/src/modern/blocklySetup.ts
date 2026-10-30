@@ -98,7 +98,6 @@ function updateVisibility(block: Blockly.Block): void {
   show('L_TIMES', mode === 'count');
   show('SECONDS', mode === 'time');
   show('L_S', mode === 'time');
-  show('L_UNTIL', mode === 'sensor');
   const sensor = mode === 'sensor';
   const source = block.getFieldValue('SOURCE');
   const pressed = source === 'touch' || source === 'button';
@@ -114,6 +113,42 @@ function updateVisibility(block: Blockly.Block): void {
   if (block instanceof Blockly.BlockSvg && block.rendered) block.queueRender();
 }
 
+/** Shows only the fields that matter for a move, motor, sound or display block's settings. */
+function updateFields(block: Blockly.Block): void {
+  const show = (name: string, visible: boolean) => block.getField(name)?.setVisible(visible);
+  const value = (name: string) => (block.getField(name) ? block.getFieldValue(name) : null);
+  switch (block.type) {
+    case 'nxt_move':
+    case 'nxt_motor': {
+      const running = value('DIRECTION') !== 'stop';
+      const limited = value('UNIT') !== 'unlimited';
+      for (const f of ['L_STEERING', 'STEERING', 'L_POWER', 'POWER', 'UNIT']) show(f, running);
+      show('VALUE', running && limited);
+      show('L_WAIT', running && limited);
+      show('WAIT', running && limited);
+      break;
+    }
+    case 'nxt_sound': {
+      const action = value('ACTION');
+      const tone = action === 'tone';
+      const playing = action !== 'stop';
+      for (const f of ['FREQ', 'L_HZ', 'L_FOR', 'SECONDS', 'L_S']) show(f, tone);
+      show('FILE', action === 'file');
+      for (const f of ['L_VOLUME', 'VOLUME', 'L_WAIT', 'WAIT']) show(f, playing);
+      break;
+    }
+    case 'nxt_display': {
+      const action = value('ACTION');
+      const text = action === 'text';
+      for (const f of ['TEXT', 'L_AT', 'X', 'L_LINE', 'LINE']) show(f, text);
+      show('L_CLEAR', action !== 'reset');
+      show('CLEAR', action !== 'reset');
+      break;
+    }
+  }
+  if (block instanceof Blockly.BlockSvg && block.rendered) block.queueRender();
+}
+
 /** Registers the NXT blocks (once). */
 export function defineBlocks(): void {
   if (defined) return;
@@ -121,6 +156,10 @@ export function defineBlocks(): void {
   Blockly.Extensions.register('nxt_visibility', function (this: Blockly.Block) {
     updateVisibility(this);
     this.setOnChange(() => updateVisibility(this));
+  });
+  Blockly.Extensions.register('nxt_fields', function (this: Blockly.Block) {
+    updateFields(this);
+    this.setOnChange(() => updateFields(this));
   });
   const cond = (n: number) => conditionArgs(n);
   Blockly.common.defineBlocksWithJsonArray([
@@ -142,7 +181,7 @@ export function defineBlocks(): void {
     },
     {
       type: 'nxt_move',
-      message0: 'move %1 %2 steering %3 power %4 %5 %6 then %7',
+      message0: 'move %1 %2 %3 %4 %5 %6 %7 %8 then %9',
       args0: [
         {
           type: 'field_dropdown',
@@ -150,7 +189,9 @@ export function defineBlocks(): void {
           options: dd(PORT_SET_NAMES.map((p) => [p, p] as const)),
         },
         { type: 'field_dropdown', name: 'DIRECTION', options: DIRECTION },
+        { type: 'field_label', name: 'L_STEERING', text: 'steering' },
         { type: 'field_number', name: 'STEERING', value: 0, min: -100, max: 100 },
+        { type: 'field_label', name: 'L_POWER', text: 'power' },
         { type: 'field_number', name: 'POWER', value: 75, min: 0, max: 100 },
         { type: 'field_number', name: 'VALUE', value: 1, min: 0 },
         { type: 'field_dropdown', name: 'UNIT', options: UNIT },
@@ -159,11 +200,12 @@ export function defineBlocks(): void {
       previousStatement: null,
       nextStatement: null,
       colour: COLOR.action,
+      extensions: ['nxt_fields'],
       tooltip: 'Drives two motors together.',
     },
     {
       type: 'nxt_motor',
-      message0: 'motor %1 %2 power %3 %4 %5 wait %6 then %7',
+      message0: 'motor %1 %2 %3 %4 %5 %6 %7 %8 then %9',
       args0: [
         {
           type: 'field_dropdown',
@@ -175,19 +217,22 @@ export function defineBlocks(): void {
           ]),
         },
         { type: 'field_dropdown', name: 'DIRECTION', options: DIRECTION },
+        { type: 'field_label', name: 'L_POWER', text: 'power' },
         { type: 'field_number', name: 'POWER', value: 75, min: 0, max: 100 },
         { type: 'field_number', name: 'VALUE', value: 1, min: 0 },
         { type: 'field_dropdown', name: 'UNIT', options: UNIT },
+        { type: 'field_label', name: 'L_WAIT', text: 'wait' },
         { type: 'field_checkbox', name: 'WAIT', checked: true },
         { type: 'field_dropdown', name: 'NEXT', options: NEXT },
       ],
       previousStatement: null,
       nextStatement: null,
       colour: COLOR.action,
+      extensions: ['nxt_fields'],
     },
     {
       type: 'nxt_sound',
-      message0: 'sound %1 %2 Hz file %3 for %4 s volume %5 wait %6',
+      message0: 'sound %1 %2 %3 %4 %5 %6 %7 %8 %9 %10 %11',
       args0: [
         {
           type: 'field_dropdown',
@@ -199,18 +244,24 @@ export function defineBlocks(): void {
           ]),
         },
         { type: 'field_number', name: 'FREQ', value: 440, min: 100, max: 14000 },
+        { type: 'field_label', name: 'L_HZ', text: 'Hz' },
         { type: 'field_input', name: 'FILE', text: 'Good Job' },
+        { type: 'field_label', name: 'L_FOR', text: 'for' },
         { type: 'field_number', name: 'SECONDS', value: 0.5, min: 0 },
+        { type: 'field_label', name: 'L_S', text: 's' },
+        { type: 'field_label', name: 'L_VOLUME', text: 'volume' },
         { type: 'field_number', name: 'VOLUME', value: 75, min: 0, max: 100 },
+        { type: 'field_label', name: 'L_WAIT', text: 'wait' },
         { type: 'field_checkbox', name: 'WAIT', checked: true },
       ],
       previousStatement: null,
       nextStatement: null,
       colour: '#a3c425',
+      extensions: ['nxt_fields'],
     },
     {
       type: 'nxt_display',
-      message0: 'display %1 %2 at x %3 line %4 clear %5',
+      message0: 'display %1 %2 %3 %4 %5 %6 %7 %8',
       args0: [
         {
           type: 'field_dropdown',
@@ -222,13 +273,17 @@ export function defineBlocks(): void {
           ]),
         },
         { type: 'field_input', name: 'TEXT', text: 'Hello' },
+        { type: 'field_label', name: 'L_AT', text: 'at x' },
         { type: 'field_number', name: 'X', value: 0, min: 0, max: 99 },
+        { type: 'field_label', name: 'L_LINE', text: 'line' },
         { type: 'field_number', name: 'LINE', value: 4, min: 1, max: 8 },
+        { type: 'field_label', name: 'L_CLEAR', text: 'clear' },
         { type: 'field_checkbox', name: 'CLEAR', checked: true },
       ],
       previousStatement: null,
       nextStatement: null,
       colour: COLOR.action,
+      extensions: ['nxt_fields'],
     },
     {
       type: 'nxt_wait_time',
@@ -250,7 +305,7 @@ export function defineBlocks(): void {
     },
     {
       type: 'nxt_loop',
-      message0: `repeat %1 %2 %3 %4 %5 %6 ${cond(7).text}`,
+      message0: `repeat %1 %2 %3 %4 %5 ${cond(6).text}`,
       args0: [
         {
           type: 'field_dropdown',
@@ -259,15 +314,14 @@ export function defineBlocks(): void {
             ['forever', 'forever'],
             ['count', 'count'],
             ['time', 'time'],
-            ['until sensor', 'sensor'],
+            ['until', 'sensor'],
           ]),
         },
         { type: 'field_number', name: 'COUNT', value: 4, min: 0 },
         { type: 'field_label', name: 'L_TIMES', text: 'times' },
         { type: 'field_number', name: 'SECONDS', value: 5, min: 0 },
         { type: 'field_label', name: 'L_S', text: 's' },
-        { type: 'field_label', name: 'L_UNTIL', text: 'until' },
-        ...cond(7).args,
+        ...cond(6).args,
       ],
       extensions: ['nxt_visibility'],
       message1: '%1',
@@ -438,7 +492,7 @@ export function theme(dark: boolean): Blockly.Theme {
           toolboxForegroundColour: '#e4e6ea',
           flyoutBackgroundColour: '#34373c',
           flyoutForegroundColour: '#e4e6ea',
-          flyoutOpacity: 0.95,
+          flyoutOpacity: 1,
           scrollbarColour: '#5a5e66',
           insertionMarkerColour: '#ffffff',
           insertionMarkerOpacity: 0.3,
@@ -448,7 +502,7 @@ export function theme(dark: boolean): Blockly.Theme {
           workspaceBackgroundColour: '#f8f7f1',
           toolboxBackgroundColour: '#ece9d8',
           flyoutBackgroundColour: '#dcd9cb',
-          flyoutOpacity: 0.95,
+          flyoutOpacity: 1,
         },
   });
 }
