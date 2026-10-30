@@ -222,3 +222,15 @@ describe('debugging', () => {
     expect(sim.error).toContain('missing');
   });
 });
+
+describe('remote control', () => {
+  it('drives the robot by hand when no program runs', () => {
+    const sim = new Simulation(ir([]), scenarioById('empty'));
+    const x0 = sim.world.pose.x;
+    sim.driveManually(60, 60);
+    for (let i = 0; i < 100; i++) sim.stepWorld(10);
+    expect(sim.world.pose.x).toBeGreaterThan(x0 + 20);
+    sim.driveManually(0, 0);
+    expect(sim.motors[1]!.mode).toBe('brake');
+  });
+});

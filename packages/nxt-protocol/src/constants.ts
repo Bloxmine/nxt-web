@@ -163,5 +163,8 @@ export const Status = {
   FileExists: 0x8f,
 } as const;
 
+/** Largest READ payload: a 64-byte reply minus type, opcode, status, handle and count. */
+export const MAX_READ_CHUNK = MAX_TELEGRAM_LENGTH - 6;
+
 /** Largest WRITE payload: a 64-byte telegram minus type, opcode and handle. */
 export const MAX_WRITE_CHUNK = MAX_TELEGRAM_LENGTH - 3;

@@ -1,0 +1,13 @@
+{
+  "format": "nxt-capture",
+  "version": 1,
+  "kind": "Synthetic",
+  "recordedAt": "2026-10-30T00:00:00.000Z",
+  "note": "SYNTHETIC, written by hand from docs/spec to show the format: battery level (8000 mV), then GET FIRMWARE VERSION (firmware 1.31, protocol 1.124). Replace with real recordings (Tools > Record USB traffic).",
+  "telegrams": [
+    { "dir": "out", "at": 0, "hex": "000b" },
+    { "dir": "in", "at": 3, "hex": "020b00401f" },
+    { "dir": "out", "at": 10, "hex": "0188" },
+    { "dir": "in", "at": 13, "hex": "0288007c011f01" }
+  ]
+}

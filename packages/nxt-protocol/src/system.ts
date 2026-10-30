@@ -114,6 +114,17 @@ export function decodeHandle(reply: Uint8Array): number {
   return new TelegramReader(reply).u8(3);
 }
 
+/** READ (0x82): reads up to `count` bytes from an open file. */
+export function encodeRead(handle: number, count: number): Uint8Array {
+  return system(SystemOpcode.Read).u8(handle).u16(count).done();
+}
+
+/** Decodes the data from a READ reply (bytes 4–5 count, 6.. data). */
+export function decodeRead(reply: Uint8Array): Uint8Array {
+  const count = new TelegramReader(reply).u16(4);
+  return reply.slice(6, 6 + count);
+}
+
 /** WRITE (0x83): appends data to an open file. */
 export function encodeWrite(handle: number, data: Uint8Array): Uint8Array {
   return system(SystemOpcode.Write).u8(handle).raw(data).done();

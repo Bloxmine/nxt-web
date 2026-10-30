@@ -205,6 +205,9 @@ importers:
       '@nxt/compiler':
         specifier: workspace:*
         version: link:../../packages/nxt-compiler
+      '@nxt/media':
+        specifier: workspace:*
+        version: link:../../packages/nxt-media
       '@nxt/protocol':
         specifier: workspace:*
         version: link:../../packages/nxt-protocol
@@ -260,6 +263,8 @@ importers:
       '@nxt/rxe':
         specifier: workspace:*
         version: link:../nxt-rxe
+
+  packages/nxt-media: {}
 
   packages/nxt-protocol:
     dependencies:

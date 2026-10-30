@@ -37,6 +37,23 @@ describe('NxtClient', () => {
     expect(mock.sent.every((t) => t.length <= 64)).toBe(true);
   });
 
+  it('downloads a file in chunks', async () => {
+    const data = Uint8Array.from({ length: 130 }, (_, i) => 255 - i);
+    let pos = 0;
+    const { mock, client } = await setup((req) => {
+      if (req[1] === 0x80) return reply(0x80, 0, 3, data.length, 0, 0, 0);
+      if (req[1] === 0x82) {
+        const n = req[3]! | (req[4]! << 8);
+        const chunk = data.slice(pos, pos + n);
+        pos += chunk.length;
+        return reply(0x82, 0, 3, chunk.length, 0, ...chunk);
+      }
+      return reply(req[1]!, 0, 3);
+    });
+    expect([...(await client.downloadFile('log.txt'))]).toEqual([...data]);
+    expect(mock.sent.map((t) => t[1])).toEqual([0x80, 0x82, 0x82, 0x82, 0x84]);
+  });
+
   it('reads the battery level', async () => {
     const { client } = await setup(() => reply(0x0b, 0, 0x40, 0x1f));
     expect(await client.getBatteryLevel()).toBe(8000);

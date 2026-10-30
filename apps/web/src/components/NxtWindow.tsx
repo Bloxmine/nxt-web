@@ -1,25 +1,36 @@
 import { SensorMode, SensorType, type InputPort, type OutputPort } from '@nxt/protocol';
-import { useEffect, useState } from 'react';
+import { useState } from 'react';
 import { useBrick } from '../brick/BrickContext';
 import { friendlyError } from '../brick/errors';
 import { usePolling } from '../brick/usePolling';
 import { formatBattery, formatBytes } from '../lib/format';
 import { iconUrl } from '../lib/icons';
 import { Dialog } from './Dialog';
+import { FileManager } from '../tools/FileManager';
+import { HealthPanel } from '../tools/HealthPanel';
+import { RemotePanel } from '../tools/RemotePanel';
 
-type Tab = 'communications' | 'memory' | 'monitor';
+export type NxtTab = 'communications' | 'files' | 'monitor' | 'remote' | 'health';
+type Tab = NxtTab;
 
 /** Connection, brick info, files on the brick and a live sensor/motor monitor. */
-export function NxtWindow({ onClose }: { onClose(): void }) {
+export function NxtWindow({
+  onClose,
+  initialTab = 'communications',
+}: {
+  onClose(): void;
+  initialTab?: NxtTab;
+}) {
   const brick = useBrick();
-  const [tab, setTab] = useState<Tab>('communications');
+  const [tab, setTab] = useState<Tab>(initialTab);
   const connected = brick.state === 'connected';
 
   return (
     <Dialog
       title="NXT Window"
       icon="monitor_window"
-      width={600}
+      width={640}
+      modeless
       onClose={onClose}
       footer={
         <button type="button" className="btn" onClick={onClose}>
@@ -40,8 +51,10 @@ export function NxtWindow({ onClose }: { onClose(): void }) {
         {(
           [
             ['communications', 'Communications'],
-            ['memory', 'Memory'],
+            ['files', 'Files'],
             ['monitor', 'Monitor'],
+            ['remote', 'Remote control'],
+            ['health', 'Health check'],
           ] as const
         ).map(([key, label]) => (
           <button
@@ -58,8 +71,10 @@ export function NxtWindow({ onClose }: { onClose(): void }) {
       </div>
       <div className="panel" role="tabpanel">
         {tab === 'communications' && <Communications />}
-        {tab === 'memory' && (connected ? <Memory /> : <NotConnected />)}
+        {tab === 'files' && <FileManager />}
         {tab === 'monitor' && (connected ? <Monitor /> : <NotConnected />)}
+        {tab === 'remote' && <RemotePanel />}
+        {tab === 'health' && <HealthPanel />}
       </div>
     </Dialog>
   );
@@ -198,76 +213,8 @@ function RenameButton({ current }: { current: string }) {
   );
 }
 
-function Memory() {
-  const brick = useBrick();
-  const [files, setFiles] = useState<{ name: string; size: number }[] | null>(null);
-  const [error, setError] = useState<string | null>(null);
-
-  const [reload, setReload] = useState(0);
-
-  useEffect(() => {
-    const client = brick.client;
-    if (!client) return;
-    let cancelled = false;
-    client
-      .listFiles('*.*')
-      .then((list) => {
-        if (cancelled) return;
-        setFiles(list);
-        setError(null);
-      })
-      .catch((e: unknown) => {
-        if (!cancelled) setError(friendlyError(e));
-      });
-    return () => {
-      cancelled = true;
-    };
-  }, [brick.client, reload]);
-
-  return (
-    <>
-      {error && <div className="notice error">{error}</div>}
-      <div className="list-box">
-        <table>
-          <thead>
-            <tr>
-              <th>File</th>
-              <th>Size</th>
-            </tr>
-          </thead>
-          <tbody>
-            {files === null ? (
-              <tr>
-                <td colSpan={2}>Loading…</td>
-              </tr>
-            ) : files.length === 0 ? (
-              <tr>
-                <td colSpan={2}>No files on the brick.</td>
-              </tr>
-            ) : (
-              files.map((f) => (
-                <tr key={f.name}>
-                  <td>{f.name}</td>
-                  <td>{formatBytes(f.size)}</td>
-                </tr>
-              ))
-            )}
-          </tbody>
-        </table>
-      </div>
-      <p style={{ color: '#555' }}>
-        Free: {brick.summary ? formatBytes(brick.summary.freeFlashBytes) : '…'}. Upload, download
-        and delete arrive with the file manager.
-      </p>
-      <button type="button" className="btn" onClick={() => setReload((n) => n + 1)}>
-        <img src={iconUrl('arrow_refresh')} alt="" />
-        Refresh
-      </button>
-    </>
-  );
-}
-
-type SensorChoice = 'none' | 'touch' | 'lightActive' | 'lightAmbient' | 'soundDb' | 'soundDba';
+type SensorChoice =
+  'none' | 'touch' | 'lightActive' | 'lightAmbient' | 'soundDb' | 'soundDba' | 'ultrasonic';
 
 // Sensor type and mode values from docs/spec/direct-commands.md.
 const SENSOR_SETUP: Record<SensorChoice, { type: number; mode: number; unit: string }> = {
@@ -277,6 +224,7 @@ const SENSOR_SETUP: Record<SensorChoice, { type: number; mode: number; unit: str
   lightAmbient: { type: SensorType.LightInactive, mode: SensorMode.PercentFullScale, unit: '%' },
   soundDb: { type: SensorType.SoundDb, mode: SensorMode.PercentFullScale, unit: '%' },
   soundDba: { type: SensorType.SoundDba, mode: SensorMode.PercentFullScale, unit: '%' },
+  ultrasonic: { type: SensorType.LowSpeed9V, mode: SensorMode.Raw, unit: ' cm' },
 };
 
 const SENSOR_LABELS: Record<SensorChoice, string> = {
@@ -286,6 +234,7 @@ const SENSOR_LABELS: Record<SensorChoice, string> = {
   lightAmbient: 'Light (ambient)',
   soundDb: 'Sound (dB)',
   soundDba: 'Sound (dBA)',
+  ultrasonic: 'Ultrasonic',
 };
 
 function Monitor() {
@@ -316,6 +265,10 @@ function Monitor() {
       for (let p = 0; p < 4; p++) {
         if (sensors[p] === 'none') {
           nextValues[p] = null;
+          continue;
+        }
+        if (sensors[p] === 'ultrasonic') {
+          nextValues[p] = await client.readUltrasonic(p as InputPort);
           continue;
         }
         const v = await client.getInputValues(p as InputPort);
@@ -350,7 +303,11 @@ function Monitor() {
                     const choice = e.target.value as SensorChoice;
                     const setup = SENSOR_SETUP[choice];
                     setSensors((s) => s.map((x, i) => (i === p ? choice : x)));
-                    void act(() => client!.setInputMode(p as InputPort, setup.type, setup.mode));
+                    void act(() =>
+                      choice === 'ultrasonic'
+                        ? client!.readUltrasonic(p as InputPort, true)
+                        : client!.setInputMode(p as InputPort, setup.type, setup.mode),
+                    );
                   }}
                 >
                   {Object.entries(SENSOR_LABELS).map(([k, v]) => (
@@ -372,9 +329,6 @@ function Monitor() {
             </div>
           ))}
         </div>
-        <p style={{ margin: '6px 0 0', color: '#555' }}>
-          The ultrasonic sensor needs its own protocol document before it can be read here.
-        </p>
       </fieldset>
       <fieldset className="groupbox">
         <legend>Motors</legend>

@@ -15,6 +15,7 @@
   "dependencies": {
     "@nxt/blocks": "workspace:*",
     "@nxt/compiler": "workspace:*",
+    "@nxt/media": "workspace:*",
     "@nxt/protocol": "workspace:*",
     "@nxt/rbt": "workspace:*",
     "@nxt/sim": "workspace:*",

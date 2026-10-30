@@ -79,3 +79,28 @@ confirmed" in [spec/rxe.md](spec/rxe.md). Connect over USB, then:
 8. **Two beams.** Drive and sing: the robot drives while the tune plays.
 9. **Bluetooth messages (two bricks).** 5ButtonRemote/5ButtonSteer from nxtprograms.com:
    messages arrive in mailboxes 1 and 2.
+
+## Brick tools (file manager, monitor, remote, health, data logging)
+
+1. **Files** (Tools → Files on the brick): the list matches the brick's My Files. Upload
+   a WAV file: it becomes an .rso; Preview plays it in the browser, and the brick plays it
+   from My Files › Sound files. Upload a PNG: it becomes an .ric; check it on the brick's
+   screen (e.g. with a Display block). If the picture is mirrored or upside down, tell us
+   (the sprite bit order in docs/spec/media.md is unconfirmed). Download, Delete and Run
+   (on an .rxe) work.
+2. **Monitor**: choose Ultrasonic on port 4; the distance changes as you move a hand.
+3. **Remote control**: with motors on B and C, click the panel and drive with the arrow
+   keys; release stops the robot. Try the joystick area.
+4. **Health check**: lift the robot, run it; each connected motor shows "turned …°", an
+   empty port shows a problem. The battery chart grows every 5 s.
+5. **Data logging** (Tools → Data logging): light sensor on port 3, record for 10 s while
+   moving it over black and white; Save CSV opens in a spreadsheet.
+6. **Calibrate sensor**: select a Wait for light block, Tools → Calibrate sensor, read
+   dark and light, Use: the block's trigger value is the midpoint.
+
+## Recording a capture
+
+Real replies make the best protocol tests. Connect over USB, then **Tools → Record USB
+traffic**, do something (open the NXT window, play a tone, upload a program), and choose
+**Tools → Stop recording and save…**. Describe what you did when asked, and add the saved
+`capture-….json` to `fixtures/captures/`: `pnpm test` replays it through the client.

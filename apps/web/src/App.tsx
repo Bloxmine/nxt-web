@@ -29,7 +29,10 @@ import { ConfigPanel } from './components/ConfigPanel';
 import { Controller } from './components/Controller';
 import { HelpPanel } from './components/HelpPanel';
 import { MenuBar, type Menu } from './components/MenuBar';
-import { NxtWindow } from './components/NxtWindow';
+import { NxtWindow, type NxtTab } from './components/NxtWindow';
+import { CalibrateDialog } from './tools/CalibrateDialog';
+import { DataLogDialog } from './tools/DataLogDialog';
+import { saveFile } from './tools/convert';
 import { Palette } from './components/Palette';
 import { SupportBanner } from './components/SupportBanner';
 import { Toolbar } from './components/Toolbar';
@@ -82,6 +85,9 @@ const EXAMPLE_MATS: Record<string, string> = {
 
 type Modal =
   | 'nxt'
+  | { nxt: NxtTab }
+  | 'datalog'
+  | 'calibrate'
   | 'variables'
   | 'about'
   | 'search'
@@ -649,6 +655,35 @@ function Studio() {
       label: 'Tools',
       items: [
         { label: 'NXT Window', icon: 'monitor_window', onClick: () => setModal('nxt') },
+        { label: 'Files on the brick…', icon: 'folder', onClick: () => setModal({ nxt: 'files' }) },
+        { label: 'Remote control…', icon: 'joystick', onClick: () => setModal({ nxt: 'remote' }) },
+        { label: 'Health check…', icon: 'heart', onClick: () => setModal({ nxt: 'health' }) },
+        { label: 'Data logging…', icon: 'chart_line', onClick: () => setModal('datalog') },
+        {
+          label: 'Calibrate sensor…',
+          icon: 'color_adjustment',
+          disabled: !state.selected,
+          onClick: () => setModal('calibrate'),
+        },
+        {
+          label: brick.recording ? 'Stop recording and save…' : 'Record USB traffic',
+          icon: 'transmit',
+          disabled: !connected,
+          onClick: () => {
+            if (!brick.recording) return brick.startRecording();
+            const note =
+              window.prompt('What did you do while recording? (saved in the file)', '') ?? '';
+            const capture = brick.stopRecording(note);
+            if (capture) {
+              saveFile(
+                `capture-${new Date().toISOString().slice(0, 19).replace(/[:T]/g, '-')}.json`,
+                JSON.stringify(capture, null, 2),
+                'application/json',
+              );
+            }
+          },
+        },
+        { separator: true },
         {
           label: 'Connect via USB',
           icon: 'connect',
@@ -707,6 +742,8 @@ function Studio() {
       ],
     },
   ];
+
+  const nxtTab = modal !== null && typeof modal === 'object' && 'nxt' in modal ? modal.nxt : null;
 
   if (!ready) return null;
 
@@ -851,8 +888,10 @@ function Studio() {
             </div>
           </div>
         </div>
-        {(modal === 'nxt' || (modal === null && brick.error)) && (
+        {(modal === 'nxt' || nxtTab !== null || (modal === null && brick.error)) && (
           <NxtWindow
+            key={nxtTab ?? 'communications'}
+            initialTab={nxtTab ?? 'communications'}
             onClose={() => {
               brick.clearError();
               setModal(null);
@@ -878,7 +917,9 @@ function Studio() {
             </pre>
           </MessageDialog>
         )}
-        {modal !== null && typeof modal === 'object' && (
+        {modal === 'datalog' && <DataLogDialog onClose={() => setModal(null)} />}
+        {modal === 'calibrate' && <CalibrateDialog onClose={() => setModal(null)} />}
+        {modal !== null && typeof modal === 'object' && 'title' in modal && (
           <MessageDialog title={modal.title} icon={modal.icon} onClose={() => setModal(null)}>
             {modal.body}
           </MessageDialog>

@@ -1,5 +1,10 @@
 import { ALL_OUTPUTS, NxtClient, type BrickSummary } from '@nxt/protocol';
-import type { Transport, TransportState } from '@nxt/transport';
+import {
+  RecordingTransport,
+  type Capture,
+  type Transport,
+  type TransportState,
+} from '@nxt/transport';
 import { WebSerialTransport, WebUsbTransport } from '@nxt/transport/browser';
 import {
   createContext,
@@ -26,6 +31,11 @@ export interface BrickContextValue {
   refresh(): Promise<void>;
   /** Stops the program, all motors and sound. */
   stopEverything(): Promise<void>;
+  /** True while telegrams are being recorded (Tools → Record USB traffic). */
+  recording: boolean;
+  startRecording(): void;
+  /** Stops recording and returns what was captured (null if nothing was recording). */
+  stopRecording(note: string): Capture | null;
   /** Uploads a compiled program and optionally starts it. Resolves to false on failure. */
   downloadProgram(
     fileName: string,
@@ -51,7 +61,12 @@ export function BrickProvider({ children }: { children: ReactNode }) {
   const [state, setState] = useState<TransportState>('disconnected');
   const [summary, setSummary] = useState<BrickSummary | null>(null);
   const [error, setError] = useState<string | null>(null);
-  const client = useMemo(() => (transport ? new NxtClient(transport) : null), [transport]);
+  // While recording, every telegram goes through a RecordingTransport wrapper.
+  const [recorder, setRecorder] = useState<RecordingTransport | null>(null);
+  const client = useMemo(
+    () => (transport ? new NxtClient(recorder ?? transport) : null),
+    [transport, recorder],
+  );
   const clientRef = useRef(client);
   useEffect(() => {
     clientRef.current = client;
@@ -76,6 +91,7 @@ export function BrickProvider({ children }: { children: ReactNode }) {
         if (s === 'disconnected') setSummary(null);
       });
       setTransport(t);
+      setRecorder(null);
       await t.connect();
       setState(t.state);
       clientRef.current = new NxtClient(t);
@@ -165,6 +181,15 @@ export function BrickProvider({ children }: { children: ReactNode }) {
     refresh,
     stopEverything,
     downloadProgram,
+    recording: recorder !== null,
+    startRecording: () => {
+      if (transport) setRecorder(new RecordingTransport(transport));
+    },
+    stopRecording: (note: string) => {
+      const capture = recorder?.capture(note) ?? null;
+      setRecorder(null);
+      return capture;
+    },
     clearError: () => setError(null),
   };
   return <BrickContext.Provider value={value}>{children}</BrickContext.Provider>;

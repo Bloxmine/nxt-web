@@ -8,10 +8,20 @@ interface Props {
   onClose(): void;
   children: ReactNode;
   footer?: ReactNode;
+  /** Leave the rest of the window usable (no dimmed backdrop). */
+  modeless?: boolean;
 }
 
 /** A modal window in the classic desktop style. Escape closes it. */
-export function Dialog({ title, icon = 'brick', width, onClose, children, footer }: Props) {
+export function Dialog({
+  title,
+  icon = 'brick',
+  width,
+  onClose,
+  children,
+  footer,
+  modeless,
+}: Props) {
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
       if (e.key === 'Escape') onClose();
@@ -21,11 +31,14 @@ export function Dialog({ title, icon = 'brick', width, onClose, children, footer
   }, [onClose]);
 
   return (
-    <div className="dialog-backdrop" onMouseDown={(e) => e.target === e.currentTarget && onClose()}>
+    <div
+      className={`dialog-backdrop ${modeless ? 'modeless' : ''}`}
+      onMouseDown={(e) => !modeless && e.target === e.currentTarget && onClose()}
+    >
       <div
         className="dialog"
         role="dialog"
-        aria-modal="true"
+        aria-modal={!modeless}
         aria-label={title}
         style={width ? { width: `min(${width}px, calc(100vw - 32px))` } : undefined}
       >

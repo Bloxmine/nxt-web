@@ -2379,3 +2379,186 @@ input[type='range'] {
   font: 12px/1.4 var(--font-ui);
   white-space: pre;
 }
+
+/* ---------- Charts (data logging, battery) ---------- */
+
+.chart {
+  margin: 0 0 8px;
+}
+
+.chart figcaption {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-weight: bold;
+  font-size: 11px;
+  color: var(--text);
+}
+
+.chart-key {
+  width: 10px;
+  height: 10px;
+  border-radius: 2px;
+}
+
+.chart-latest {
+  margin-left: auto;
+  font-weight: normal;
+  font-variant-numeric: tabular-nums;
+  color: var(--text-muted);
+}
+
+.chart svg {
+  display: block;
+  width: 100%;
+  height: auto;
+  background: #fcfcfb;
+  border: 1px solid #d6d4cc;
+}
+
+.chart-grid {
+  stroke: #e6e4dc;
+  stroke-width: 1;
+}
+
+.chart-tick {
+  font: 9px var(--font-ui);
+  fill: #6b6a65;
+}
+
+.chart-cross {
+  stroke: #8a8984;
+  stroke-dasharray: 3 3;
+}
+
+.chart-tip {
+  fill: #fff;
+  stroke: #b8b6ad;
+}
+
+.chart-tip-text {
+  font: 10px var(--font-ui);
+  fill: #1b1b1b;
+}
+
+.dialog-backdrop.modeless {
+  background: none;
+  pointer-events: none;
+  place-items: start end;
+  padding: 70px 16px;
+}
+
+.dialog-backdrop.modeless .dialog {
+  pointer-events: auto;
+}
+
+.log-setup,
+.log-ports {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px 14px;
+  margin-bottom: 8px;
+}
+
+.log-charts {
+  max-height: 52vh;
+  overflow: auto;
+}
+
+.calibrate-steps {
+  padding-left: 20px;
+}
+
+.calibrate-steps li {
+  margin: 8px 0;
+}
+
+/* ---------- File manager, remote control ---------- */
+
+.file-toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 4px;
+  margin: 6px 0;
+}
+
+.file-toolbar .btn {
+  min-width: 0;
+}
+
+.file-icon {
+  width: 16px;
+  height: 16px;
+  vertical-align: -3px;
+}
+
+.list-box tr.selected-row td {
+  background: #316ac5;
+  color: #fff;
+}
+
+.ric-preview {
+  display: block;
+  image-rendering: pixelated;
+  border: 4px solid #8b8f86;
+  border-radius: 3px;
+}
+
+.remote:focus-visible {
+  outline: 2px dashed var(--selection);
+}
+
+.remote-body {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 18px;
+}
+
+.remote-pad {
+  display: grid;
+  grid-template-columns: repeat(3, 44px);
+  grid-template-rows: repeat(3, 44px);
+  gap: 4px;
+}
+
+.remote-pad button {
+  border: 1px solid #85888b;
+  border-radius: 7px;
+  background: linear-gradient(#fdfdfd, #d5d7d9);
+  font-size: 16px;
+  touch-action: none;
+}
+
+.remote-pad button:active {
+  background: linear-gradient(#ffd08a, #f68b16);
+}
+
+.remote-stick {
+  position: relative;
+  width: 140px;
+  height: 140px;
+  border: 2px solid #8a8a8a;
+  border-radius: 50%;
+  background: radial-gradient(circle, #f4f4f4, #cfcfcf);
+  touch-action: none;
+  cursor: grab;
+}
+
+.remote-knob {
+  position: absolute;
+  width: 34px;
+  height: 34px;
+  margin: -17px 0 0 -17px;
+  border-radius: 50%;
+  background: radial-gradient(circle at 35% 35%, #ffb35c, #e06f00);
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.4);
+  pointer-events: none;
+}
+
+.remote-readout img {
+  width: 32px;
+  height: 32px;
+}

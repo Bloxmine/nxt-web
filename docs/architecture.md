@@ -22,6 +22,7 @@ Blockly workspace ──► IR ──► VM instructions ──► .rxe file ─
 | `@nxt/sim`       | `packages/nxt-sim`       | Small VM interpreter for testing compiled programs                     |
 | `@nxt/blocks`    | `packages/blocks`        | Classic block program model, validation and lowering to IR             |
 | `@nxt/rbt`       | `packages/nxt-rbt`       | Importer for original NXT-G `.rbt` programs                            |
+| `@nxt/media`     | `packages/nxt-media`     | Brick sound (.rso) and picture (.ric) files: read, write, render       |
 | `@nxt/web`       | `apps/web`               | React + Tailwind UI, Blockly host, PWA shell                           |
 
 ```
@@ -41,6 +42,13 @@ running blocks, stop at breakpoints and show values on data wires.
 
 `RxeVm` (same package) runs compiled `.rxe` files on that brick. Compiler tests run every
 example both ways and compare the results.
+
+## Captures
+
+`RecordingTransport` (in `@nxt/transport`) wraps a transport and records every telegram;
+**Tools → Record USB traffic** saves the recording as JSON. `replayCapture` turns a
+recording into a mock brick, and `nxt-protocol` replays everything in
+`fixtures/captures/` in its tests.
 
 ## Offline
 

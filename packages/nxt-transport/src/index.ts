@@ -5,3 +5,11 @@ export { TransportClosedError, TransportTimeoutError } from './transport.js';
 export { PacketInbox } from './inbox.js';
 export { MockTransport, type MockResponder } from './mock.js';
 export { BluetoothDeframer, frameBluetooth } from './framing.js';
+export {
+  RecordingTransport,
+  replayCapture,
+  toHex,
+  fromHex,
+  type Capture,
+  type CapturedTelegram,
+} from './recording.js';

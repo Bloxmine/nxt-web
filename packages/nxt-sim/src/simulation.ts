@@ -206,6 +206,21 @@ export class Simulation {
     this.world.soundLevel = level;
   }
 
+  /**
+   * Drives the robot by hand (remote control): powers for the left (B) and right (C)
+   * wheels, −100…100. Only while no program is running; call {@link stepWorld} to move.
+   */
+  driveManually(left: number, right: number): void {
+    if (this.status === 'running') return;
+    for (const [port, power] of [
+      [1, left],
+      [2, right],
+    ] as const) {
+      if (power === 0) stopMotors(this.motors, [port], 'brake');
+      else startMotors(this.motors, [port], power, 0, null, 'brake');
+    }
+  }
+
   /** Moves the robot (for example when the user drags it); clears its trail. */
   placeRobot(pose: Partial<Pose>): void {
     const next = { ...this.world.pose, ...pose };

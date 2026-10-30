@@ -5,7 +5,10 @@ import {
   OutputMode,
   RegulationMode,
   RunState,
+  MAX_READ_CHUNK,
   MAX_WRITE_CHUNK,
+  SensorMode,
+  SensorType,
   Status,
   TelegramType,
   type InputPort,
@@ -253,6 +256,53 @@ export class NxtClient {
     }
   }
 
+  /** Reads a whole file from the brick. */
+  async downloadFile(
+    fileName: string,
+    onProgress?: (received: number, total: number) => void,
+  ): Promise<Uint8Array> {
+    const { handle, size } = s.decodeOpenRead(await this.call(s.encodeOpenRead(fileName)));
+    const data = new Uint8Array(size);
+    try {
+      for (let got = 0; got < size;) {
+        const chunk = s.decodeRead(
+          await this.call(s.encodeRead(handle, Math.min(MAX_READ_CHUNK, size - got))),
+        );
+        if (chunk.length === 0) throw new Error(`The brick stopped sending ${fileName} early`);
+        data.set(chunk, got);
+        got += chunk.length;
+        onProgress?.(got, size);
+      }
+    } finally {
+      await this.call(s.encodeClose(handle));
+    }
+    return data;
+  }
+
+  /** Deletes a file from the brick. */
+  async deleteFile(fileName: string): Promise<void> {
+    await this.call(s.encodeDelete(fileName));
+  }
+
+  /**
+   * Reads an ultrasonic sensor's distance in cm (255 = nothing seen). Sets the port up
+   * for I2C the first time; register 0x42 at address 0x02 (Ultrasonic I2C Appendix 7).
+   */
+  async readUltrasonic(port: InputPort, setUp = false): Promise<number> {
+    if (setUp) {
+      await this.setInputMode(port, SensorType.LowSpeed9V, SensorMode.Raw);
+      await sleep(60);
+    }
+    await this.call(d.encodeLsWrite(port, Uint8Array.of(0x02, 0x42), 1));
+    for (let i = 0; i < 20; i++) {
+      if (d.decodeLsGetStatus(await this.call(d.encodeLsGetStatus(port))) >= 1) {
+        return d.decodeLsRead(await this.call(d.encodeLsRead(port)))[0] ?? 255;
+      }
+      await sleep(10);
+    }
+    return 255;
+  }
+
   /** Lists files matching a wildcard such as "*.rxe" or "*.*". */
   async listFiles(pattern = '*.*'): Promise<{ name: string; size: number }[]> {
     const files: { name: string; size: number }[] = [];
@@ -277,6 +327,10 @@ export class NxtClient {
     return files;
   }
 }
+
+// Timers are not in the core packages' lib (no DOM or Node types).
+const timers = globalThis as unknown as { setTimeout(fn: () => void, ms: number): unknown };
+const sleep = (ms: number) => new Promise<void>((resolve) => timers.setTimeout(resolve, ms));
 
 function isEndOfListing(error: unknown): boolean {
   return (
