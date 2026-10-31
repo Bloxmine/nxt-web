@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { animationProgram, frameNames } from './animation.js';
+import { animationProgram, filesUsedBy, frameNames } from './animation.js';
 import { lowerProgram } from './lower.js';
 import { validateProgram } from './validate.js';
 
@@ -44,5 +44,16 @@ describe('animation programs', () => {
       repeat: 3,
     });
     expect(counted.body[0]).toMatchObject({ control: { type: 'count', count: 3 } });
+  });
+
+  it('lists the pictures and sounds a program uses', () => {
+    const p = animationProgram('Cat', {
+      frames: ['cat01', 'cat02', 'cat01'],
+      x: 0,
+      y: 0,
+      secondsPerFrame: 1,
+      repeat: 0,
+    });
+    expect(filesUsedBy(p).sort()).toEqual(['cat01.ric', 'cat02.ric']);
   });
 });

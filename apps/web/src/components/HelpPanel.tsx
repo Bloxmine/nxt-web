@@ -1,6 +1,31 @@
-import { findBlock, labelOf, PALETTE, tabOf, type Block } from '@nxt/blocks';
+import {
+  EXAMPLES,
+  findBlock,
+  labelOf,
+  PALETTE,
+  tabOf,
+  walkProgram,
+  type Block,
+  type Example,
+} from '@nxt/blocks';
 import { useEditor } from '../editor/EditorContext';
+import { BLOCK_TIPS } from '../lib/blockTips';
 import { iconUrl } from '../lib/icons';
+
+let examplesByKind: Map<Block['kind'], Example[]> | null = null;
+
+/** Examples that use a kind of block (worked out once). */
+function examplesWith(kind: Block['kind']): Example[] {
+  if (!examplesByKind) {
+    examplesByKind = new Map();
+    for (const ex of EXAMPLES) {
+      const kinds = new Set<Block['kind']>();
+      walkProgram(ex.create(), (b) => kinds.add(b.kind));
+      for (const k of kinds) examplesByKind.set(k, [...(examplesByKind.get(k) ?? []), ex]);
+    }
+  }
+  return examplesByKind.get(kind) ?? [];
+}
 
 function helpFor(block: Block): string {
   const key =
@@ -30,8 +55,11 @@ function helpFor(block: Block): string {
   );
 }
 
-/** "Little help" box: describes the selected block and lists problems. */
-export function HelpPanel() {
+/**
+ * "Little help" box: describes the selected block with tips and examples that use it,
+ * and lists problems.
+ */
+export function HelpPanel({ onOpenExample }: { onOpenExample(key: string): void }) {
   const { state, dispatch, issues, issuesByBlock } = useEditor();
   const found = state.selected ? findBlock(state.program, state.selected) : null;
   const own = found ? (issuesByBlock.get(found.block.id) ?? []) : [];
@@ -46,6 +74,33 @@ export function HelpPanel() {
         {found ? (
           <>
             <p>{helpFor(found.block)}</p>
+            {(BLOCK_TIPS[found.block.kind] ?? []).length > 0 && (
+              <ul className="help-tips">
+                {BLOCK_TIPS[found.block.kind]!.map((tip) => (
+                  <li key={tip}>{tip}</li>
+                ))}
+              </ul>
+            )}
+            {examplesWith(found.block.kind).length > 0 && (
+              <p className="help-examples">
+                <span className="sim-muted">See it in: </span>
+                {examplesWith(found.block.kind)
+                  .slice(0, 4)
+                  .map((ex, i) => (
+                    <span key={ex.key}>
+                      {i > 0 && ', '}
+                      <button
+                        type="button"
+                        className="link-btn"
+                        title={`Open the example "${ex.name}"`}
+                        onClick={() => onOpenExample(ex.key)}
+                      >
+                        {ex.name}
+                      </button>
+                    </span>
+                  ))}
+              </p>
+            )}
             {own.map((issue, i) => (
               <div key={i} className="issue-line">
                 <img

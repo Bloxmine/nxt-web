@@ -8,9 +8,10 @@ import {
 import { useEffect, useRef, useState } from 'react';
 import { endDrag, startDrag } from '../editor/drag';
 import { useEditor } from '../editor/EditorContext';
+import { loadUsage, noteUsed, toggleFavorite, USAGE_CHANGED } from '../lib/blockUsage';
 import { iconUrl } from '../lib/icons';
 
-type Tab = 'common' | 'complete' | 'custom';
+type Tab = 'common' | 'complete' | 'custom' | 'mine';
 
 interface Flyout {
   title: string;
@@ -23,7 +24,15 @@ export function Palette() {
   const { state } = useEditor();
   const [tab, setTab] = useState<Tab>('common');
   const [flyout, setFlyout] = useState<Flyout | null>(null);
+  const [usage, setUsage] = useState(loadUsage);
   const ref = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    const changed = () => setUsage(loadUsage());
+    window.addEventListener(USAGE_CHANGED, changed);
+    return () => window.removeEventListener(USAGE_CHANGED, changed);
+  }, []);
+  const recent = usage.recent.filter((k) => !usage.favorites.includes(k) && PALETTE[k]);
 
   useEffect(() => {
     if (!flyout) return;
@@ -42,7 +51,13 @@ export function Palette() {
   return (
     <div className="palette" ref={ref}>
       <div className="palette-title">
-        {tab === 'common' ? 'Common' : tab === 'complete' ? 'Complete' : 'Custom'}
+        {tab === 'common'
+          ? 'Common'
+          : tab === 'complete'
+            ? 'Complete'
+            : tab === 'custom'
+              ? 'Custom'
+              : 'Mine'}
       </div>
       <div className="palette-items" onScroll={() => setFlyout(null)}>
         {tab === 'common' &&
@@ -60,6 +75,38 @@ export function Palette() {
               />
             );
           })}
+        {tab === 'mine' && (
+          <>
+            {usage.favorites.length === 0 && recent.length === 0 && (
+              <div className="palette-empty">
+                Blocks you use show up here. Right-click any block in the palette to make it a
+                favourite.
+              </div>
+            )}
+            {usage.favorites
+              .filter((k) => PALETTE[k])
+              .map((key) => (
+                <PaletteButton
+                  key={`f:${key}`}
+                  entry={PALETTE[key]!}
+                  label={PALETTE[key]!.label}
+                  favorite
+                  onDragStart={() => setFlyout(null)}
+                />
+              ))}
+            {usage.favorites.length > 0 && recent.length > 0 && (
+              <div className="palette-sep" aria-hidden="true" />
+            )}
+            {recent.map((key) => (
+              <PaletteButton
+                key={`r:${key}`}
+                entry={PALETTE[key]!}
+                label={`${PALETTE[key]!.label} (recently used)`}
+                onDragStart={() => setFlyout(null)}
+              />
+            ))}
+          </>
+        )}
         {tab === 'complete' &&
           COMPLETE_PALETTE.map((group) => (
             <button
@@ -103,6 +150,7 @@ export function Palette() {
             ['common', 'star', 'Common palette'],
             ['complete', 'bricks', 'Complete palette'],
             ['custom', 'user', 'Custom palette (My Blocks)'],
+            ['mine', 'heart', 'Favourite and recent blocks'],
           ] as const
         ).map(([key, icon, label]) => (
           <button
@@ -143,12 +191,14 @@ function PaletteButton({
   entry,
   label,
   more,
+  favorite,
   onClick,
   onDragStart,
 }: {
   entry: PaletteEntry;
   label: string;
   more?: boolean;
+  favorite?: boolean;
   onClick?: ((el: HTMLElement) => void) | undefined;
   onDragStart(): void;
 }) {
@@ -156,7 +206,11 @@ function PaletteButton({
     <button
       type="button"
       className={`palette-btn cat-${entry.category}`}
-      title={`${label}: ${entry.help}`}
+      title={`${label}: ${entry.help}\nRight-click: ${favorite ? 'remove from' : 'add to'} favourites`}
+      onContextMenu={(e) => {
+        e.preventDefault();
+        toggleFavorite(entry.key);
+      }}
       aria-label={label}
       draggable
       onClick={onClick ? (e) => onClick(e.currentTarget) : undefined}
@@ -164,11 +218,13 @@ function PaletteButton({
       onDragStart={(e) => {
         onDragStart();
         startDrag(e, { type: 'palette', key: entry.key });
+        noteUsed(entry.key);
       }}
       onDragEnd={endDrag}
     >
       <img src={iconUrl(entry.icon, 32)} alt="" draggable={false} />
       {more && <span className="more">▸</span>}
+      {favorite && <span className="fav">★</span>}
     </button>
   );
 }

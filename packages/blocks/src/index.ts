@@ -10,4 +10,5 @@ export * from './examples.js';
 export * from './edit.js';
 export * from './lint.js';
 export * from './animation.js';
+export * from './tidy.js';
 export { newId } from './ids.js';

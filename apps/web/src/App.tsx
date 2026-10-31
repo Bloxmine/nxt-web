@@ -9,6 +9,7 @@ import {
   PALETTE,
   disconnect,
   tabOf,
+  tidyProgram,
   updateSequence,
   type Block,
   type Program,
@@ -361,6 +362,70 @@ function Studio() {
       setModal(null);
       // Run it once the new program has rendered (the simulator builds from the program).
       if (simulate) setTimeout(() => actionsRef.current.simulate(), 50);
+    },
+    /** Edit → Tidy up: clear clutter and move notes that cover blocks to free space. */
+    tidyUp: () => {
+      const { program, changes } = tidyProgram(state.program);
+      // Notes lying over blocks go in a row under the program (measured on screen).
+      const moves = new Map<string, { x: number; y: number }>();
+      const content = document.querySelector<HTMLElement>('.canvas-content');
+      if (content) {
+        const origin = content.getBoundingClientRect();
+        const z = state.zoom;
+        const rectOf = (el: Element) => {
+          const r = el.getBoundingClientRect();
+          return {
+            left: (r.left - origin.left) / z,
+            top: (r.top - origin.top) / z,
+            right: (r.right - origin.left) / z,
+            bottom: (r.bottom - origin.top) / z,
+          };
+        };
+        const blocks = [...content.querySelectorAll('[data-block-id], [data-lane-node]')].map(
+          rectOf,
+        );
+        const bottom = Math.max(0, ...blocks.map((b) => b.bottom));
+        let x = 20;
+        for (const el of content.querySelectorAll<HTMLElement>('[data-comment-id]')) {
+          const r = rectOf(el);
+          const covers = blocks.some(
+            (b) => r.left < b.right && r.right > b.left && r.top < b.bottom && r.bottom > b.top,
+          );
+          if (!covers) continue;
+          moves.set(el.dataset['commentId']!, { x, y: Math.round(bottom + 40) });
+          x += Math.round(r.right - r.left) + 16;
+        }
+      }
+      if (moves.size > 0) {
+        changes.push(`moved ${moves.size} ${moves.size === 1 ? 'note' : 'notes'} off the blocks`);
+      }
+      if (changes.length === 0) {
+        setAnnouncement('Nothing to tidy up.');
+        message('Tidy up', 'tick', <p style={{ marginTop: 0 }}>The program is already tidy.</p>);
+        return;
+      }
+      dispatch({
+        type: 'edit',
+        update: () => ({
+          ...program,
+          comments: (program.comments ?? []).map((c) => ({ ...c, ...moves.get(c.id) })),
+        }),
+      });
+      const text = changes.join('; ');
+      setAnnouncement(`Tidied up: ${text}.`);
+      message(
+        'Tidy up',
+        'tick',
+        <>
+          <p style={{ marginTop: 0 }}>Tidied up:</p>
+          <ul style={{ paddingLeft: 18 }}>
+            {changes.map((c) => (
+              <li key={c}>{c}</li>
+            ))}
+          </ul>
+          <p className="sim-muted">Edit → Undo puts everything back.</p>
+        </>,
+      );
     },
     /** File → Export as picture: the program's beams as a PNG (2×) or SVG. */
     exportPicture: async (kind: 'png' | 'svg') => {
@@ -917,6 +982,12 @@ function Studio() {
         { label: 'Snippets…', icon: 'paste_plain', onClick: () => setModal('snippets') },
         { separator: true },
         {
+          label: 'Tidy up',
+          icon: 'wand',
+          onClick: actions.tidyUp,
+        },
+        { separator: true },
+        {
           label: 'Insert block…',
           icon: 'brick_add',
           shortcut: 'I',
@@ -1317,7 +1388,7 @@ function Studio() {
               )}
               <div className="bottom-area">
                 <ConfigPanel onEditVariables={() => setModal('variables')} />
-                <HelpPanel />
+                <HelpPanel onOpenExample={(key) => actions.loadExample(key)} />
               </div>
             </div>
           </div>

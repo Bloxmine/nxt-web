@@ -1,8 +1,11 @@
 import { useEffect, useRef, useState } from 'react';
+import { filesUsedBy } from '@nxt/blocks';
 import { useBrick } from '../brick/BrickContext';
+import { useEditor } from '../editor/EditorContext';
 import { friendlyError } from '../brick/errors';
 import { formatBytes } from '../lib/format';
 import { iconUrl } from '../lib/icons';
+import { listLibrary } from '../lib/library';
 import { rememberMedia } from '../lib/media';
 import { audioToRso, brickFileName, imageToRic, pickFile, saveFile } from './convert';
 import { FilePreview } from './FilePreview';
@@ -52,6 +55,7 @@ async function prepare(file: File): Promise<{ name: string; bytes: Uint8Array }>
  */
 export function FileManager() {
   const brick = useBrick();
+  const { state } = useEditor();
   const client = brick.client;
   const [files, setFiles] = useState<{ name: string; size: number }[] | null>(null);
   const [selected, setSelected] = useState<string | null>(null);
@@ -195,6 +199,26 @@ export function FileManager() {
     setSelected(null);
     setReload((n) => n + 1);
     void brick.refresh();
+  };
+
+  /** Ticks the pictures and sounds on the brick that no program in this browser uses. */
+  const tickUnused = async () => {
+    if (!files) return;
+    const programs = [state.program, ...(await listLibrary()).map((e) => e.program)];
+    const used = new Set(programs.flatMap((p) => filesUsedBy(p)).map((n) => n.toLowerCase()));
+    const unused = files.filter(
+      (f) =>
+        /\.(ric|rso)$/i.test(f.name) && !f.name.startsWith('!') && !used.has(f.name.toLowerCase()),
+    );
+    setChecked(new Set(unused.map((f) => f.name)));
+    setError(null);
+    setStatus(
+      unused.length === 0
+        ? 'Every picture and sound on the brick is used by a program in this browser.'
+        : `Ticked ${unused.length} ${unused.length === 1 ? 'file' : 'files'} (${formatBytes(
+            unused.reduce((n, f) => n + f.size, 0),
+          )}) that no program in this browser uses. Check the list (the brick's own Try Me programs may use some), then Delete.`,
+    );
   };
 
   const sel = selected;
@@ -359,6 +383,15 @@ export function FileManager() {
           onClick={() => setReload((n) => n + 1)}
         >
           <img src={iconUrl('arrow_refresh')} alt="" /> Refresh
+        </button>
+        <button
+          type="button"
+          className="btn"
+          disabled={!client || !files || deleting}
+          title="Pictures and sounds that none of your programs here use"
+          onClick={() => void tickUnused()}
+        >
+          <img src={iconUrl('bin')} alt="" /> Tick unused
         </button>
         <button
           type="button"

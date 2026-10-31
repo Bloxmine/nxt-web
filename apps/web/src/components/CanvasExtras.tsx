@@ -29,6 +29,7 @@ export function Comments({ zoom }: { zoom: number }) {
       {comments.map((c) => (
         <div
           key={c.id}
+          data-comment-id={c.id}
           className="canvas-comment"
           style={{ left: c.x, top: c.y }}
           onClick={(e) => e.stopPropagation()}

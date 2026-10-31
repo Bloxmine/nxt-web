@@ -1,6 +1,7 @@
 import { createBlock } from './catalog.js';
 import type { Block, Program } from './model.js';
 import { emptyProgram } from './project.js';
+import { walkProgram } from './tree.js';
 
 /** How an animation program shows its frames. */
 export interface AnimationOptions {
@@ -53,4 +54,21 @@ export function frameNames(prefix: string, count: number): string[] {
       .trim()
       .slice(0, 13) || 'Frame';
   return Array.from({ length: count }, (_, i) => `${base}${String(i + 1).padStart(2, '0')}`);
+}
+
+/**
+ * Brick files a program shows or plays (pictures as "name.ric", sounds as "name.rso"),
+ * from its Display and Sound blocks, including inside My Blocks.
+ */
+export function filesUsedBy(program: Program): string[] {
+  const names = new Set<string>();
+  walkProgram(program, (b) => {
+    if (b.kind === 'display' && b.action === 'image') {
+      names.add(`${(b.image ?? 'Smile 01').replace(/\.ric$/i, '')}.ric`);
+    }
+    if (b.kind === 'sound' && b.action === 'file' && b.file) {
+      names.add(`${b.file.replace(/\.rso$/i, '')}.rso`);
+    }
+  });
+  return [...names];
 }

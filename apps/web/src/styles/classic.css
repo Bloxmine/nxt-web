@@ -3499,3 +3499,44 @@ fieldset.controls.wired {
   color: #c62828;
   font-weight: bold;
 }
+
+/* Palette: favourites. */
+.palette-btn .fav {
+  position: absolute;
+  top: 1px;
+  right: 3px;
+  font-size: 10px;
+  color: #d69a00;
+}
+
+.palette-sep {
+  width: 40px;
+  height: 1px;
+  margin: 2px auto;
+  background: var(--chrome-dark);
+}
+
+/* Little Help: tips and example links. */
+.help-tips {
+  margin: 4px 0;
+  padding-left: 16px;
+  list-style: disc;
+}
+
+.help-tips li {
+  margin: 2px 0;
+}
+
+.help-examples {
+  margin: 4px 0 0;
+}
+
+.link-btn {
+  padding: 0;
+  border: 0;
+  background: none;
+  color: var(--selection);
+  text-decoration: underline;
+  cursor: pointer;
+  font: inherit;
+}
