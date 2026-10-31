@@ -191,10 +191,16 @@ export function BrickProvider({ children }: { children: ReactNode }) {
     [run],
   );
 
-  // Keep the brick awake while connected.
+  // Keep the brick awake while connected, and keep the battery reading fresh.
   useEffect(() => {
     if (state !== 'connected' || !client) return;
-    const id = setInterval(() => void client.keepAlive().catch(() => {}), KEEP_ALIVE_MS);
+    const id = setInterval(() => {
+      void client.keepAlive().catch(() => {});
+      void client
+        .getBatteryLevel()
+        .then((mv) => setSummary((s) => (s ? { ...s, batteryMillivolts: mv } : s)))
+        .catch(() => {});
+    }, KEEP_ALIVE_MS);
     return () => clearInterval(id);
   }, [state, client]);
 

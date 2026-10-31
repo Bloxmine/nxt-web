@@ -1,4 +1,4 @@
-import { formatBattery } from '../lib/format';
+import { formatBattery, LOW_BATTERY_MV } from '../lib/format';
 import { iconUrl } from '../lib/icons';
 import { useBrick } from '../brick/BrickContext';
 
@@ -60,7 +60,18 @@ export function Toolbar({ groups, onBrickClick }: Props) {
               {brick.summary && (
                 <>
                   <img src={iconUrl(batteryIcon(brick.summary.batteryMillivolts))} alt="" />
-                  {formatBattery(brick.summary.batteryMillivolts)}
+                  <span
+                    className={
+                      brick.summary.batteryMillivolts < LOW_BATTERY_MV ? 'battery-low' : undefined
+                    }
+                    title={
+                      brick.summary.batteryMillivolts < LOW_BATTERY_MV
+                        ? 'The battery is low: motors get weaker and sensors less reliable'
+                        : undefined
+                    }
+                  >
+                    {formatBattery(brick.summary.batteryMillivolts)}
+                  </span>
                 </>
               )}
             </>
@@ -78,6 +89,6 @@ export function Toolbar({ groups, onBrickClick }: Props) {
 
 function batteryIcon(mv: number): string {
   if (mv >= 8000) return 'battery_full';
-  if (mv >= 7000) return 'battery_half';
+  if (mv >= LOW_BATTERY_MV) return 'battery_half';
   return 'battery_low';
 }

@@ -30,7 +30,10 @@ import { CalculatorDialog, CheckerDialog, CommandPalette, type Command } from '.
 import { LibraryDialog, SnippetsDialog } from './tools/LibraryDialogs';
 import { RobotSetupDialog } from './tools/RobotSetupDialog';
 import { newLibraryId, saveSnippet, saveToLibrary, type LibraryEntry } from './lib/library';
+import { formatBattery, LOW_BATTERY_MV } from './lib/format';
 import { listMedia } from './lib/media';
+import { readShared } from './lib/share';
+import { contentBounds, snapshotSvg, svgToPng } from './lib/snapshot';
 import { TUTORIALS } from './tutorials/content';
 import { ModernCanvas } from './modern/ModernCanvas';
 import { TutorialPanel, TutorialPicker } from './tutorials/TutorialPanel';
@@ -63,6 +66,7 @@ import { loadValue, saveValue } from './lib/storage';
 import { CHALLENGES } from '@nxt/sim';
 import { SimulatorProvider, useSimulator, type SimulatorControls } from './sim/SimulatorContext';
 import { ChallengesDialog } from './sim/ChallengesDialog';
+import { ShareDialog } from './components/ShareDialog';
 import { ShortcutsDialog } from './components/ShortcutsDialog';
 import { canCalibrate } from './tools/calibration';
 import { GifAnimator } from './tools/GifAnimator';
@@ -104,6 +108,7 @@ type Modal =
   | 'challenges'
   | 'recorder'
   | 'gif'
+  | 'share'
   | 'shortcuts'
   | 'picture'
   | 'library'
@@ -176,8 +181,21 @@ function Studio() {
     void loadValue<string>(AUTOSAVE_ID_KEY).then((id) => {
       if (id && !example) libraryId.current = id;
     });
-    void loadValue<unknown>(AUTOSAVE_KEY).then((saved) => {
-      if (example) {
+    void loadValue<unknown>(AUTOSAVE_KEY).then(async (saved) => {
+      // A share link (#p=…) opens the shared program; the last session stays in the library.
+      let shared: Program | null = null;
+      try {
+        shared = await readShared(window.location.hash);
+      } catch {
+        setAnnouncement('The share link is damaged, so the last program was opened instead.');
+      }
+      if (shared) {
+        if (isProgram(saved))
+          void saveVersion(normalizeProgram(saved), 'Before opening a shared link');
+        libraryId.current = newLibraryId();
+        dispatch({ type: 'load', program: shared });
+        history.replaceState(null, '', window.location.pathname + window.location.search);
+      } else if (example) {
         dispatch({ type: 'load', program: example.create() });
         setInitialMat(example.mat ?? 'empty');
       } else if (isProgram(saved)) dispatch({ type: 'load', program: normalizeProgram(saved) });
@@ -344,6 +362,41 @@ function Studio() {
       // Run it once the new program has rendered (the simulator builds from the program).
       if (simulate) setTimeout(() => actionsRef.current.simulate(), 50);
     },
+    /** File → Export as picture: the program's beams as a PNG (2×) or SVG. */
+    exportPicture: async (kind: 'png' | 'svg') => {
+      const content = document.querySelector<HTMLElement>('.canvas-content');
+      if (!content) {
+        message(
+          'Export as picture',
+          'information',
+          <p style={{ marginTop: 0 }}>
+            Switch to the classic blocks (View menu) to export a picture.
+          </p>,
+        );
+        return;
+      }
+      // No selection outline in the picture.
+      dispatch({ type: 'select', id: null });
+      await new Promise((r) => requestAnimationFrame(() => requestAnimationFrame(r)));
+      try {
+        const bounds = contentBounds(
+          content,
+          '[data-block-id], .canvas-comment, [data-lane-node]',
+          state.zoom,
+        );
+        const canvas = content.closest('.canvas');
+        const background = canvas ? getComputedStyle(canvas).backgroundColor : '#ffffff';
+        const svg = await snapshotSvg(content, bounds, background, '.lane-add');
+        const base = state.program.name.replace(/[^\w -]+/g, '') || 'program';
+        if (kind === 'svg') saveFile(`${base}.svg`, svg, 'image/svg+xml');
+        else {
+          const png = await svgToPng(svg, bounds.width, bounds.height, 2);
+          saveFile(`${base}.png`, new Uint8Array(await png.arrayBuffer()), 'image/png');
+        }
+      } catch (e) {
+        message('Export as picture', 'exclamation', <p style={{ marginTop: 0 }}>{String(e)}</p>);
+      }
+    },
     /** Opens a program made by a tool (such as the GIF animator) as a new program. */
     openMade: (program: Program) => {
       if (!confirmDiscard()) return;
@@ -493,38 +546,65 @@ function Studio() {
             <progress max={bytes.length} value={sent} style={{ width: '100%' }} />
           </>,
         );
-      progress(0);
-      void listMedia()
-        .then((files) =>
-          brick.downloadProgram(fileName, bytes, run, progress, {
-            needed: [...needed],
-            available: new Map(files.map((f) => [f.name.toLowerCase(), f.bytes])),
-          }),
-        )
-        .then((result) => {
-          if (!result.ok) return setModal(null);
+      const send = () => {
+        progress(0);
+        void listMedia()
+          .then((files) =>
+            brick.downloadProgram(fileName, bytes, run, progress, {
+              needed: [...needed],
+              available: new Map(files.map((f) => [f.name.toLowerCase(), f.bytes])),
+            }),
+          )
+          .then((result) => {
+            if (!result.ok) return setModal(null);
+            message(
+              run ? 'Download and run' : 'Download',
+              result.missing.length > 0 ? 'error' : 'tick',
+              <>
+                <p style={{ marginTop: 0 }}>
+                  <strong>{fileName}</strong> ({bytes.length} bytes) is on the brick
+                  {run ? ' and running.' : '. Find it under My Files › Software files.'}
+                </p>
+                {result.sent.length > 0 && (
+                  <p>
+                    Also sent {result.sent.length === 1 ? 'the file' : 'the files'} it uses:{' '}
+                    {result.sent.join(', ')}.
+                  </p>
+                )}
+                {result.missing.length > 0 && (
+                  <p>
+                    <strong>Not on the brick:</strong> {result.missing.join(', ')}. Blocks that show
+                    or play {result.missing.length === 1 ? 'it' : 'them'} will do nothing. Make or
+                    upload {result.missing.length === 1 ? 'it' : 'them'} first (Tools → Picture
+                    editor, Sound recorder, or Files on the brick).
+                  </p>
+                )}
+              </>,
+            );
+          });
+      };
+      // A weak battery makes motors and sensors unreliable: say so before sending.
+      void (brick.client?.getBatteryLevel() ?? Promise.resolve(Infinity))
+        .catch(() => Infinity)
+        .then((mv) => {
+          if (mv >= LOW_BATTERY_MV) return send();
           message(
-            run ? 'Download and run' : 'Download',
-            result.missing.length > 0 ? 'error' : 'tick',
+            'The battery is low',
+            'battery_low',
             <>
               <p style={{ marginTop: 0 }}>
-                <strong>{fileName}</strong> ({bytes.length} bytes) is on the brick
-                {run ? ' and running.' : '. Find it under My Files › Software files.'}
+                The brick&apos;s battery is at <strong>{formatBattery(mv)}</strong>. Motors will be
+                weaker than usual and sensors less reliable, so the program may not behave as
+                expected. Put in fresh batteries or charge the pack when you can.
               </p>
-              {result.sent.length > 0 && (
-                <p>
-                  Also sent {result.sent.length === 1 ? 'the file' : 'the files'} it uses:{' '}
-                  {result.sent.join(', ')}.
-                </p>
-              )}
-              {result.missing.length > 0 && (
-                <p>
-                  <strong>Not on the brick:</strong> {result.missing.join(', ')}. Blocks that show
-                  or play {result.missing.length === 1 ? 'it' : 'them'} will do nothing. Make or
-                  upload {result.missing.length === 1 ? 'it' : 'them'} first (Tools → Picture
-                  editor, Sound recorder, or Files on the brick).
-                </p>
-              )}
+              <p style={{ display: 'flex', gap: 6 }}>
+                <button type="button" className="btn primary" onClick={send}>
+                  Download anyway
+                </button>
+                <button type="button" className="btn" onClick={() => setModal(null)}>
+                  Cancel
+                </button>
+              </p>
             </>,
           );
         });
@@ -745,6 +825,18 @@ function Studio() {
           label: 'Save back to NXT-G (.rbt)…',
           icon: 'brick',
           onClick: actions.saveBackToNxtg,
+        },
+        { separator: true },
+        { label: 'Share link…', icon: 'transmit', onClick: () => setModal('share') },
+        {
+          label: 'Export as picture (PNG)…',
+          icon: 'picture',
+          onClick: () => void actions.exportPicture('png'),
+        },
+        {
+          label: 'Export as picture (SVG)…',
+          icon: 'picture',
+          onClick: () => void actions.exportPicture('svg'),
         },
         { separator: true },
         { label: 'Program library…', icon: 'folder', onClick: () => setModal('library') },
@@ -1114,14 +1206,6 @@ function Studio() {
           {announcement}
         </div>
         <div className="app-window">
-          <div className="title-bar">
-            <img src={iconUrl('brick')} alt="" />
-            NXT Web Studio
-            <span className="doc">
-              — {state.program.name}
-              {state.dirty ? '*' : ''}
-            </span>
-          </div>
           <MenuBar menus={menus} />
           <Toolbar
             onBrickClick={() => setModal('nxt')}
@@ -1303,6 +1387,9 @@ function Studio() {
         {modal === 'shortcuts' && <ShortcutsDialog onClose={() => setModal(null)} />}
         {modal === 'recorder' && <SoundRecorder onClose={() => setModal(null)} />}
         {modal === 'picture' && <PictureEditor onClose={() => setModal(null)} />}
+        {modal === 'share' && (
+          <ShareDialog program={state.program} onClose={() => setModal(null)} />
+        )}
         {modal === 'gif' && (
           <GifAnimator onClose={() => setModal(null)} onMakeProgram={actions.openMade} />
         )}

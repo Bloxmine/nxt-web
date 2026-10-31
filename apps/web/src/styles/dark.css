@@ -432,3 +432,6 @@
 [data-theme='dark'] .list-box tr.checked-row:not(.selected-row) {
   background: #2c3a50;
 }
+[data-theme='dark'] .battery-low {
+  color: #ff6b6b;
+}
