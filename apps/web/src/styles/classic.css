@@ -3456,3 +3456,41 @@ fieldset.controls.wired {
   font-size: 10px;
   text-align: center;
 }
+
+/* Files tab: ticking files and the delete queue. */
+.list-box .check-cell {
+  width: 20px;
+  padding-right: 0;
+}
+
+.list-box tr.checked-row:not(.selected-row) {
+  background: #e3ecfa;
+}
+
+.delete-queue ul {
+  max-height: 120px;
+  margin: 0 0 6px;
+  padding: 0;
+  overflow: auto;
+  list-style: none;
+}
+
+.delete-queue li {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding: 1px 0;
+}
+
+.delete-queue li img {
+  width: 14px;
+  height: 14px;
+}
+
+.delete-queue li.waiting {
+  color: var(--text-muted);
+}
+
+.delete-queue li.deleting {
+  font-weight: bold;
+}

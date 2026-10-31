@@ -429,3 +429,6 @@
 [data-theme='dark'] .picture-canvas {
   background: linear-gradient(#3a3d42, #2b2d31);
 }
+[data-theme='dark'] .list-box tr.checked-row:not(.selected-row) {
+  background: #2c3a50;
+}
