@@ -29,7 +29,8 @@ tutorials, an example gallery, a dark theme, a Blockly-style "modern blocks" vie
 touch support for tablets.
 
 **Brick tools:** files, a live sensor monitor, remote control, data logging, a live copy of
-the brick's screen, a sound recorder (microphone → .rso) and a picture editor (.ric).
+the brick's screen, a sound recorder (microphone → .rso), a picture editor (.ric) and an
+animated-GIF converter that also builds the program to play it.
 
 **Download:** programs compile to `.rxe` files for the stock firmware and upload over USB
 (or Bluetooth, experimental). Without a brick you can save the `.rxe` file.

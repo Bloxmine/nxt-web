@@ -3349,3 +3349,84 @@ fieldset.controls.wired {
     margin: auto 3px;
   }
 }
+
+/* Animation from GIF */
+.gif-empty {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  padding: 24px;
+  text-align: center;
+}
+
+.gif-animator {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  gap: 10px;
+}
+
+.gif-preview canvas {
+  display: block;
+  image-rendering: pixelated;
+}
+
+.gif-settings {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.gif-settings .robot-field {
+  margin: 0;
+}
+
+.gif-strip {
+  grid-column: 1 / -1;
+  display: flex;
+  gap: 4px;
+  max-height: 170px;
+  overflow: auto;
+  flex-wrap: wrap;
+  padding: 4px;
+  border: 1px solid var(--border);
+  border-radius: 3px;
+  background: var(--canvas);
+}
+
+.gif-strip button {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 1px;
+  padding: 2px;
+  border: 1px solid transparent;
+  border-radius: 3px;
+  background: none;
+  font-size: 10px;
+  color: var(--text-muted);
+  cursor: pointer;
+}
+
+.gif-strip button:hover {
+  border-color: var(--hover-border);
+}
+
+.gif-strip button.skipped canvas {
+  opacity: 0.25;
+}
+
+.gif-strip canvas {
+  display: block;
+  image-rendering: pixelated;
+}
+
+@media (max-width: 760px) {
+  .gif-animator {
+    grid-template-columns: 1fr;
+  }
+  .gif-preview canvas {
+    max-width: 100%;
+    height: auto;
+  }
+}

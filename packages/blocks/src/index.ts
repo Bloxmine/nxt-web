@@ -9,4 +9,5 @@ export * from './project.js';
 export * from './examples.js';
 export * from './edit.js';
 export * from './lint.js';
+export * from './animation.js';
 export { newId } from './ids.js';

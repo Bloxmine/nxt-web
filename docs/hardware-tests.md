@@ -108,6 +108,10 @@ confirmed" in [spec/rxe.md](spec/rxe.md). Connect over USB, then:
    (↻ re-reads the list). With X 0, Y 0, Download and run: the brick shows it the same
    way up and in the same place as the simulator does.
 
+10. **Animation from GIF** (Tools → Animation from GIF): open an animated GIF, Send to
+    brick, then Make a program and Download and run: the brick plays the frames in a
+    loop at about the preview's speed. Note any flicker between frames.
+
 ## Recording a capture
 
 Real replies make the best protocol tests. Connect over USB, then **Tools → Record USB

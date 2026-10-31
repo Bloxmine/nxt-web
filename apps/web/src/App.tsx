@@ -64,6 +64,7 @@ import { SimulatorProvider, useSimulator, type SimulatorControls } from './sim/S
 import { ChallengesDialog } from './sim/ChallengesDialog';
 import { ShortcutsDialog } from './components/ShortcutsDialog';
 import { canCalibrate } from './tools/calibration';
+import { GifAnimator } from './tools/GifAnimator';
 import { PictureEditor } from './tools/PictureEditor';
 import { SoundRecorder } from './tools/SoundRecorder';
 import { SimulatorWindow } from './sim/SimulatorWindow';
@@ -101,6 +102,7 @@ type Modal =
   | 'robot'
   | 'challenges'
   | 'recorder'
+  | 'gif'
   | 'shortcuts'
   | 'picture'
   | 'library'
@@ -340,6 +342,16 @@ function Studio() {
       setModal(null);
       // Run it once the new program has rendered (the simulator builds from the program).
       if (simulate) setTimeout(() => actionsRef.current.simulate(), 50);
+    },
+    /** Opens a program made by a tool (such as the GIF animator) as a new program. */
+    openMade: (program: Program) => {
+      if (!confirmDiscard()) return;
+      void saveVersion(state.program, 'Before opening a new program');
+      fileHandle.current = null;
+      rbtOrigin.current = null;
+      libraryId.current = newLibraryId();
+      dispatch({ type: 'load', program });
+      setModal(null);
     },
     renameProgram: () => {
       const name = window.prompt('Program name:', state.program.name);
@@ -917,6 +929,7 @@ function Studio() {
         { section: 'Sounds and pictures' },
         { label: 'Sound recorder…', icon: 'microphone', onClick: () => setModal('recorder') },
         { label: 'Picture editor…', icon: 'picture_edit', onClick: () => setModal('picture') },
+        { label: 'Animation from GIF…', icon: 'images', onClick: () => setModal('gif') },
         { separator: true },
         { section: 'Program' },
         { label: 'Check program…', icon: 'tick', onClick: () => setModal('checker') },
@@ -1258,6 +1271,9 @@ function Studio() {
         {modal === 'shortcuts' && <ShortcutsDialog onClose={() => setModal(null)} />}
         {modal === 'recorder' && <SoundRecorder onClose={() => setModal(null)} />}
         {modal === 'picture' && <PictureEditor onClose={() => setModal(null)} />}
+        {modal === 'gif' && (
+          <GifAnimator onClose={() => setModal(null)} onMakeProgram={actions.openMade} />
+        )}
         {modal === 'challenges' && (
           <ChallengesDialog onPlay={playChallenge} onClose={() => setModal(null)} />
         )}
