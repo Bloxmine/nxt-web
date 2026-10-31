@@ -2,6 +2,8 @@ import { SensorMode, SensorType, type InputPort, type OutputPort } from '@nxt/pr
 import { useState } from 'react';
 import { useBrick } from '../brick/BrickContext';
 import { friendlyError } from '../brick/errors';
+import { isLinux } from '../lib/udev';
+import { UdevHelp } from './UdevHelp';
 import { usePolling } from '../brick/usePolling';
 import { formatBattery, formatBytes } from '../lib/format';
 import { iconUrl } from '../lib/icons';
@@ -49,6 +51,7 @@ export function NxtWindow({
           </button>
         </div>
       )}
+      {brick.error?.startsWith('Permission denied') && isLinux() && <UdevHelp compact />}
       <div className="dialog-tabs" role="tablist">
         {(
           [
@@ -134,8 +137,14 @@ function Communications() {
             ? 'Connecting…'
             : connected
               ? `Connected via ${brick.kind}.`
-              : 'Plug the brick in with a USB cable and switch it on. On Linux, install the udev rule first (see docs/udev).'}
+              : 'Plug the brick in with a USB cable and switch it on.'}
         </p>
+        {!connected && isLinux() && (
+          <details className="udev-details">
+            <summary>First time on Linux? Install the USB permission rule</summary>
+            <UdevHelp compact />
+          </details>
+        )}
       </fieldset>
       <fieldset className="groupbox">
         <legend>Brick</legend>

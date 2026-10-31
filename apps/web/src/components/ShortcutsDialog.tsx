@@ -9,6 +9,7 @@ const GROUPS: [string, [string, string][]][] = [
       ['Ctrl+Z / Ctrl+Y', 'Undo / redo'],
       ['Ctrl+K', 'Command palette: find any command, block or example'],
       ['Ctrl+F', 'Find in the program'],
+      ['F1', 'Open the user guide'],
     ],
   ],
   [

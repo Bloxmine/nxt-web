@@ -73,6 +73,10 @@ import { ShareDialog } from './components/ShareDialog';
 import { ShortcutsDialog } from './components/ShortcutsDialog';
 import { canCalibrate } from './tools/calibration';
 import { GifAnimator } from './tools/GifAnimator';
+import { GuideDialog } from './guide/GuideDialog';
+import { UdevDialog } from './components/UdevHelp';
+import { downloadUdevRule, UDEV_FILE_NAME } from './lib/udev';
+import { GUIDE, type GuideAction } from './guide/content';
 import { PictureEditor } from './tools/PictureEditor';
 import { SoundRecorder } from './tools/SoundRecorder';
 import { SimulatorWindow } from './sim/SimulatorWindow';
@@ -121,6 +125,9 @@ function saveBytes(fileName: string, bytes: Uint8Array): void {
 
 type Modal =
   | 'nxt'
+  | 'udev'
+  | 'guide'
+  | { guide: string }
   | 'gallery'
   | 'palette'
   | 'checker'
@@ -805,6 +812,9 @@ function Studio() {
     } else if (e.key === 'F5' && !typing) {
       e.preventDefault();
       a.simulate();
+    } else if (e.key === 'F1') {
+      e.preventDefault();
+      setModal('guide');
     } else if (typing || inDialog) {
       return;
     } else if (mod && e.key.toLowerCase() === 'z') {
@@ -1215,9 +1225,13 @@ function Studio() {
     {
       label: 'Help',
       items: [
-        { label: 'Tutorials…', icon: 'help', onClick: () => setModal('tutorials') },
+        { label: 'User guide…', icon: 'help', shortcut: 'F1', onClick: () => setModal('guide') },
+        { label: 'Tutorials…', icon: 'flag_green', onClick: () => setModal('tutorials') },
         { label: 'Example gallery…', icon: 'star', onClick: () => setModal('gallery') },
         { label: 'Keyboard shortcuts…', icon: 'keyboard', onClick: () => setModal('shortcuts') },
+        { separator: true },
+        { label: 'Linux USB setup…', icon: 'connect', onClick: () => setModal('udev') },
+        { label: `Download ${UDEV_FILE_NAME}`, icon: 'page_white_put', onClick: downloadUdevRule },
         { separator: true },
         { label: 'About NXT Web Studio', icon: 'information', onClick: () => setModal('about') },
       ],
@@ -1259,6 +1273,14 @@ function Studio() {
       icon: 'cup_gold',
       run: () => playChallenge(c.id),
     })),
+    ...GUIDE.flatMap((c) =>
+      c.sections.map((sec) => ({
+        label: `Guide: ${sec.title}`,
+        section: 'User guide',
+        icon: 'help',
+        run: () => setModal({ guide: sec.id }),
+      })),
+    ),
     ...TUTORIALS.map((t) => ({
       label: `Tutorial: ${t.title}`,
       section: 'Tutorials',
@@ -1266,6 +1288,28 @@ function Studio() {
       run: () => setTutorial({ tutorial: t, step: 0 }),
     })),
   ];
+
+  /** A link in the user guide that opens a tool or runs a command. */
+  function runGuideAction(action: GuideAction) {
+    switch (action) {
+      case 'simulate':
+        setModal(null);
+        return actions.simulate();
+      case 'connect':
+        return void brick.connectUsb();
+      case 'udev':
+        return downloadUdevRule();
+      case 'udevSetup':
+        return setModal('udev');
+      case 'files':
+      case 'screen':
+      case 'remote':
+      case 'health':
+        return setModal({ nxt: action });
+      default:
+        return setModal(action);
+    }
+  }
 
   function playChallenge(id: string) {
     simActions.current?.setChallenge(id);
@@ -1449,6 +1493,16 @@ function Studio() {
           </MessageDialog>
         )}
         {modal === 'datalog' && <DataLogDialog onClose={() => setModal(null)} />}
+        {(modal === 'guide' ||
+          (typeof modal === 'object' && modal !== null && 'guide' in modal)) && (
+          <GuideDialog
+            section={
+              typeof modal === 'object' && modal && 'guide' in modal ? modal.guide : undefined
+            }
+            onClose={() => setModal(null)}
+            onAction={runGuideAction}
+          />
+        )}
         {modal === 'tutorials' && (
           <TutorialPicker
             onStart={(t, step) => {
@@ -1482,6 +1536,7 @@ function Studio() {
         )}
         {modal === 'robot' && <RobotSetupDialog onClose={() => setModal(null)} />}
         {modal === 'shortcuts' && <ShortcutsDialog onClose={() => setModal(null)} />}
+        {modal === 'udev' && <UdevDialog onClose={() => setModal(null)} />}
         {modal === 'recorder' && <SoundRecorder onClose={() => setModal(null)} />}
         {modal === 'picture' && <PictureEditor onClose={() => setModal(null)} />}
         {modal === 'share' && (

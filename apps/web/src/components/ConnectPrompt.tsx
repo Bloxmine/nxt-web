@@ -1,6 +1,7 @@
 import { useBrick } from '../brick/BrickContext';
 import { checkBrowserSupport } from '../lib/browserSupport';
 import { iconUrl } from '../lib/icons';
+import { downloadUdevRule, isLinux } from '../lib/udev';
 
 const support = checkBrowserSupport(navigator);
 
@@ -29,6 +30,15 @@ export function ConnectPrompt({ what }: { what: string }) {
           <img src={iconUrl('bluetooth')} alt="" /> Bluetooth
         </button>
       </div>
+      {isLinux() && (
+        <p className="udev-hint">
+          On Linux, the first time:{' '}
+          <button type="button" className="guide-link" onClick={downloadUdevRule}>
+            download the USB permission rule
+          </button>{' '}
+          (Help → Linux USB setup shows how to install it).
+        </p>
+      )}
     </div>
   );
 }

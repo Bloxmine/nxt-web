@@ -2,6 +2,10 @@
 
 On Linux the browser needs permission to open the brick's USB device.
 
+The app hands out this rule too: **Help → Download 70-nxt.rules** (or Help → Linux USB
+setup, which also shows the commands). The file is bundled from this folder at build time,
+so keep this copy as the only one.
+
 1. Copy the rule into place and reload udev:
 
    ```sh

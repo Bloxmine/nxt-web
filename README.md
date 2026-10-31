@@ -26,7 +26,7 @@ brick on the mat that talks to the first over simulated Bluetooth.
 **Editor helpers:** several programs open in tabs, a command palette (Ctrl+K), a program
 checker with tips, Tidy up, favourite blocks, a distance and turn calculator, snippets, a
 program library that keeps your work in the browser, share links, export as PNG/SVG, guided
-tutorials, block help with examples, an example gallery, a dark theme, a Blockly-style
+tutorials, a built-in user guide (F1), block help with examples, an example gallery, a dark theme, a Blockly-style
 "modern blocks" view, and touch support for tablets.
 
 **Brick tools:** files (with multi-delete and a cleanup of unused pictures and sounds), a
@@ -45,7 +45,8 @@ files from the NXT 2.0 software. See [docs/rbt-compat.md](docs/rbt-compat.md).
 ## Requirements
 
 - Chrome, Edge, Brave or Opera (current version) on Linux or macOS. Firefox and Safari lack WebUSB.
-- On Linux, a udev rule so the browser can open the brick (see [docs/udev/](docs/udev/)).
+- On Linux, a udev rule so the browser can open the brick: download it from Help → Linux USB
+  setup in the app, or see [docs/udev/](docs/udev/).
 
 ## Development
 

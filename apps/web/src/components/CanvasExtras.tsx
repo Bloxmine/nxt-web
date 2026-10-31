@@ -206,9 +206,9 @@ export function WorkMap({
     const css = getComputedStyle(el);
     const v = (name: string, fallback: string) => css.getPropertyValue(name).trim() || fallback;
     const origin = el.getBoundingClientRect();
-    ctx.fillStyle = v('--chrome-dark', '#c9c6b5');
+    ctx.fillStyle = v('--chrome-dark', '#c1c4c8');
     ctx.fillRect(0, 0, ctx.canvas.width, ctx.canvas.height);
-    ctx.fillStyle = v('--canvas', '#efede4');
+    ctx.fillStyle = v('--canvas', '#e9ecf0');
     ctx.fillRect(ox, oy, el.scrollWidth * s, el.scrollHeight * s);
     const colors: Record<string, string> = {
       action: v('--action-bottom', '#39a12f'),
