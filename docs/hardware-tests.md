@@ -85,8 +85,8 @@ confirmed" in [spec/rxe.md](spec/rxe.md). Connect over USB, then:
 1. **Files** (Tools → Files on the brick): the list matches the brick's My Files. Upload
    a WAV file: it becomes an .rso; Preview plays it in the browser, and the brick plays it
    from My Files › Sound files. Upload a PNG: it becomes an .ric; check it on the brick's
-   screen (e.g. with a Display block). If the picture is mirrored or upside down, tell us
-   (the sprite bit order in docs/spec/media.md is unconfirmed). Download, Delete and Run
+   screen (e.g. with a Display block). (Sprite bit order and placement are confirmed;
+   see docs/spec/media.md.) Download, Delete and Run
    (on an .rxe) work.
 2. **Monitor**: choose Ultrasonic on port 4; the distance changes as you move a hand.
 3. **Remote control**: with motors on B and C, click the panel and drive with the arrow

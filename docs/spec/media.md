@@ -43,6 +43,10 @@ field), `u16 opcode`, then little-endian u16 arguments:
 Arguments with bit 0x1000 set refer to drawing parameters (`RICArg`); these are not
 supported by the renderer.
 
-**To be confirmed on a brick** (the macros do not say): sprite bit order (we use most
-significant bit = leftmost pixel, first row = top) and that CopyBits' destination is
-the bottom-left corner, with y counted upwards like the rest of the screen API.
+**Confirmed on a brick** (NXT 2.0, standard firmware; the macros do not say): sprite rows
+run from the top, the most significant bit is the leftmost pixel, and CopyBits'
+destination is the bottom-left corner, with y counted upwards like the rest of the screen
+API. Checked by drawing an asymmetric sprite with DrawPicture and reading the screen back
+(docs/spec/display-iomap.md). DrawPicture's status byte is `ERR_FILE` (−3) even when the
+picture was drawn: the firmware's interpreter loop ends that way when it runs out of
+instructions (`cCmdWrapDrawPicture` in the firmware's c_cmd_drawing.inc).
