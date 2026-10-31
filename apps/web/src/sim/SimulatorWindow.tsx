@@ -11,14 +11,20 @@ import {
 } from '@nxt/sim';
 import { useEffect, useRef, useState, type PointerEvent as ReactPointerEvent } from 'react';
 import { useEditor } from '../editor/EditorContext';
+import { encodeGif, FittedPalette, type GifFrame } from '../lib/gifEncoder';
 import { iconUrl } from '../lib/icons';
 import { listLibrary, type LibraryEntry } from '../lib/library';
 import { blankMat, newMatId } from '../lib/mats';
+import { saveFile } from '../tools/convert';
 import { drawLcd, drawMat, matTransform } from './draw';
 import { MatEditor } from './MatEditor';
 import { formatValue, useSimulator, type SecondBrick } from './SimulatorContext';
 
 const LCD_SCALE = 2;
+/** Recording: a frame every RECORD_MS, the mat at RECORD_SCALE, for at most RECORD_LIMIT_MS. */
+const RECORD_MS = 125;
+const RECORD_SCALE = 0.75;
+const RECORD_LIMIT_MS = 30_000;
 const SPEEDS = [0.25, 0.5, 1, 2, 4, 10];
 const SENSOR_NAMES: Record<SensorKind, string> = {
   touch: 'Touch',
@@ -57,6 +63,11 @@ export function SimulatorWindow() {
   const [brick, setBrick] = useState<1 | 2>(1);
   const [editing, setEditing] = useState<Scenario | null>(null);
   const [library, setLibrary] = useState<LibraryEntry[]>([]);
+  /** Milliseconds recorded so far, or null when not recording. */
+  const [recording, setRecording] = useState<number | null>(null);
+  const shots = useRef<GifFrame[]>([]);
+  /** Colours of the first recorded frame (the mat, the robot, the screen). */
+  const palette = useRef<FittedPalette | null>(null);
   const sim = s.sim;
   const sim2 = s.sim2;
   /** The brick whose screen, buttons and read-outs are shown. */
@@ -111,6 +122,59 @@ export function SimulatorWindow() {
     sim?.setSoundLevel(sound);
     sim2?.setSoundLevel(sound);
   }, [sim, sim2, sound]);
+
+  // While recording, grab the mat and the screen side by side every RECORD_MS.
+  useEffect(() => {
+    if (recording === null) return;
+    const id = setInterval(() => {
+      const mat = matRef.current;
+      const lcd = lcdRef.current;
+      if (!mat || !lcd) return;
+      const w = Math.round(mat.width * RECORD_SCALE);
+      const h = Math.round(mat.height * RECORD_SCALE);
+      const frame = document.createElement('canvas');
+      frame.width = w + lcd.width + 12;
+      frame.height = Math.max(h, lcd.height);
+      const ctx = frame.getContext('2d', { willReadFrequently: true })!;
+      ctx.fillStyle = '#ece9d8';
+      ctx.fillRect(0, 0, frame.width, frame.height);
+      ctx.drawImage(mat, 0, 0, w, h);
+      ctx.drawImage(lcd, w + 6, Math.round((frame.height - lcd.height) / 2));
+      const { data } = ctx.getImageData(0, 0, frame.width, frame.height);
+      const count = frame.width * frame.height;
+      palette.current ??= new FittedPalette(data, count);
+      shots.current.push({ indexes: palette.current.map(data, count), delayMs: RECORD_MS });
+      recordSize.current = { width: frame.width, height: frame.height };
+      const elapsed = shots.current.length * RECORD_MS;
+      if (elapsed >= RECORD_LIMIT_MS) finishRecording();
+      else setRecording(elapsed);
+    }, RECORD_MS);
+    return () => clearInterval(id);
+    // finishRecording only reads refs.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [recording !== null]);
+
+  const recordSize = useRef({ width: 0, height: 0 });
+  function finishRecording() {
+    setRecording(null);
+    const frames = shots.current;
+    const colors = palette.current?.colors ?? [];
+    shots.current = [];
+    palette.current = null;
+    if (frames.length === 0) return;
+    const { width, height } = recordSize.current;
+    saveFile(
+      `${state.program.name || 'simulation'}.gif`,
+      encodeGif(width, height, colors, frames),
+      'image/gif',
+    );
+  }
+  const toggleRecording = () => {
+    if (recording === null) {
+      shots.current = [];
+      setRecording(0);
+    } else finishRecording();
+  };
 
   // Keep the window on screen when the browser window gets smaller.
   useEffect(() => {
@@ -389,6 +453,20 @@ export function SimulatorWindow() {
           }}
         >
           <img src={iconUrl('sound')} alt="" style={{ opacity: s.audio.isMuted ? 0.35 : 1 }} />
+        </button>
+        <button
+          type="button"
+          className={`tool-btn ${recording !== null ? 'recording' : ''}`}
+          title={
+            recording !== null
+              ? 'Stop recording and save the GIF'
+              : 'Record the mat and the screen as an animated GIF (up to 30 s)'
+          }
+          aria-pressed={recording !== null}
+          onClick={toggleRecording}
+        >
+          <img src={iconUrl(recording !== null ? 'control_stop' : 'images')} alt="" />
+          {recording !== null && `${(recording / 1000).toFixed(0)} s`}
         </button>
       </div>
 

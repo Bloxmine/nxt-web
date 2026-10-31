@@ -4,9 +4,13 @@ import { friendlyError } from '../brick/errors';
 import { usePolling } from '../brick/usePolling';
 import { ConnectPrompt } from '../components/ConnectPrompt';
 import { iconUrl } from '../lib/icons';
+import { lcdGif, type LcdShot } from '../lib/gifEncoder';
 import { drawLcd } from '../sim/draw';
+import { saveFile } from './convert';
 
 const SCALE = 4;
+/** About a minute at the usual update rate. */
+const MAX_SHOTS = 600;
 
 /** NXT window → Screen: what the real brick's screen shows, refreshed continuously. */
 export function BrickScreen() {
@@ -17,13 +21,22 @@ export function BrickScreen() {
   const [live, setLive] = useState(true);
   const [rate, setRate] = useState<number | null>(null);
   const [error, setError] = useState<string | null>(null);
+  /** Screens seen while recording (null when not recording). */
+  const recording = useRef<LcdShot[] | null>(null);
+  const [recorded, setRecorded] = useState<number | null>(null);
 
   usePolling(
     async () => {
       if (!client) return;
       const started = performance.now();
       try {
-        setPixels(await client.readScreen());
+        const screen = await client.readScreen();
+        setPixels(screen);
+        const shots = recording.current;
+        if (shots && shots.length < MAX_SHOTS) {
+          shots.push({ pixels: screen, at: performance.now() });
+          setRecorded(shots.length);
+        }
         setRate(1000 / Math.max(1, performance.now() - started));
         setError(null);
       } catch (e) {
@@ -38,6 +51,21 @@ export function BrickScreen() {
     const ctx = canvas.current?.getContext('2d');
     if (ctx && pixels) drawLcd(ctx, { pixels }, SCALE);
   }, [pixels]);
+
+  const toggleRecording = () => {
+    const shots = recording.current;
+    if (!shots) {
+      recording.current = [];
+      setRecorded(0);
+      setLive(true);
+      return;
+    }
+    recording.current = null;
+    setRecorded(null);
+    if (shots.length === 0) return;
+    const gif = lcdGif(shots, 3, performance.now());
+    saveFile(`${brick.summary?.name ?? 'NXT'} screen.gif`, gif, 'image/gif');
+  };
 
   const save = () => {
     const url = canvas.current?.toDataURL('image/png');
@@ -68,6 +96,15 @@ export function BrickScreen() {
           </button>
           <button type="button" className="btn" disabled={!pixels} onClick={save}>
             <img src={iconUrl('picture')} alt="" /> Save picture
+          </button>
+          <button
+            type="button"
+            className={`btn ${recorded !== null ? 'recording' : ''}`}
+            onClick={toggleRecording}
+            title="Record what the screen shows as an animated GIF"
+          >
+            <img src={iconUrl(recorded !== null ? 'control_stop' : 'images')} alt="" />
+            {recorded !== null ? `Stop and save GIF (${recorded})` : 'Record GIF'}
           </button>
           <span className="sim-muted">
             {live && rate !== null ? `About ${rate.toFixed(1)} updates a second` : 'Paused'}
