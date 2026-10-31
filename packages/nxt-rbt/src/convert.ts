@@ -555,7 +555,10 @@ export function convertRbt(rbt: RbtProgram): ImportResult {
           line: Math.min(8, Math.max(1, 8 - Math.floor(y / 8))),
           clear,
         } as Extract<Block, { kind: 'display' }>;
-        if (fn === 0) block.image = image;
+        if (fn === 0) {
+          block.image = image;
+          block.y = y;
+        }
         if (drawing) {
           block.shape = fn === 2 ? 'point' : fn === 4 ? 'circle' : 'line';
           block.y = y;

@@ -1,4 +1,4 @@
-import { EXAMPLES, labelOf, findBlock } from '@nxt/blocks';
+import { conditionOf, EXAMPLES, findBlock, labelOf, walkProgram } from '@nxt/blocks';
 import type { SensorKind } from '@nxt/compiler';
 import {
   CHALLENGES,
@@ -227,14 +227,14 @@ export function SimulatorWindow() {
   const shownProgram =
     brick === 2 && s.second?.kind === 'program' ? s.second.program : state.program;
   // Every new program has a "Number 1" variable; only list it when it is used.
-  const blocksJson = JSON.stringify([
-    shownProgram.body,
-    shownProgram.parallel,
-    shownProgram.myBlocks,
-  ]);
-  const userVars = shownProgram.variables.filter(
-    (v) => v.name !== 'Number 1' || blocksJson.includes(JSON.stringify(v.name)),
-  );
+  const used = new Set<string>();
+  walkProgram(shownProgram, (b) => {
+    if (b.kind === 'variable') used.add(b.name);
+    else if (b.kind === 'display' && b.action === 'variable') used.add(b.variable);
+    const c = conditionOf(b);
+    if (c?.source === 'variable') used.add(c.name);
+  });
+  const userVars = shownProgram.variables.filter((v) => v.name !== 'Number 1' || used.has(v.name));
 
   return (
     <div

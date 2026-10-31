@@ -500,7 +500,7 @@ export class RxeVm {
       case SYSCALL.DrawPicture: {
         clear(4);
         const [x, y] = loc(1);
-        return lcd.picture(x, 8 - Math.floor(y / 8));
+        return this.sim.drawPicture(this.text(f(2)), x, y);
       }
       case SYSCALL.SoundPlayTone:
         return this.sim.emitEvent({

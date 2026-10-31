@@ -103,8 +103,10 @@ confirmed" in [spec/rxe.md](spec/rxe.md). Connect over USB, then:
    PNG. (Layout from docs/spec/display-iomap.md.)
 8. **Sound recorder** (Tools → Sound recorder): record "hello", trim it, Send to brick;
    the brick plays it from My Files › Sound files, and a Sound block can use it.
-9. **Picture editor** (Tools → Picture editor): draw text and a box, Send to brick; a
-   Display block with that picture shows it the same way up as in the editor.
+9. **Picture editor** (Tools → Picture editor): draw text and a box, Send to brick. Add a
+   Display block, Action Image: the File list shows the picture under "On the brick"
+   (↻ re-reads the list). With X 0, Y 0, Download and run: the brick shows it the same
+   way up and in the same place as the simulator does.
 
 ## Recording a capture
 

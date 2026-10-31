@@ -26,6 +26,7 @@ import {
 } from 'react';
 import { useEditor } from '../editor/EditorContext';
 import { deleteMat as removeMat, listMats, saveMat as storeMat } from '../lib/mats';
+import { listMedia, MEDIA_CHANGED, picturesOf } from '../lib/media';
 import { loadRobot, ROBOT_CHANGED, robotGeometry } from '../lib/robot';
 import { SimAudio } from './audio';
 import { recordScore } from './scores';
@@ -167,6 +168,25 @@ export function SimulatorProvider({
     };
   }, []);
 
+  // Pictures made or uploaded in this browser show for real on the simulated screen. One
+  // map, updated in place, so simulations already built see new pictures too.
+  const [pictures] = useState(() => new Map<string, Uint8Array>());
+  useEffect(() => {
+    let live = true;
+    const load = () =>
+      void listMedia().then((files) => {
+        if (!live) return;
+        pictures.clear();
+        for (const [name, bytes] of picturesOf(files)) pictures.set(name, bytes);
+      });
+    load();
+    window.addEventListener(MEDIA_CHANGED, load);
+    return () => {
+      live = false;
+      window.removeEventListener(MEDIA_CHANGED, load);
+    };
+  }, [pictures]);
+
   const scenario = useMemo(
     () => customMats.find((m) => m.id === scenarioId) ?? scenarioById(scenarioId),
     [customMats, scenarioId],
@@ -222,14 +242,18 @@ export function SimulatorProvider({
     let brick = 1;
     try {
       const ir = lowerProgram(program);
-      const next = new Simulation(ir, scenario, { robot });
+      const next = new Simulation(ir, scenario, { robot, pictures });
       for (const b of breakpoints) next.breakpoints.add(b);
       next.on((event) => audio.handle(event, speedRef.current));
       let next2: Simulation | null = null;
       if (second) {
         brick = 2;
         const ir2 = lowerProgram(second.kind === 'same' ? program : second.program);
-        next2 = new Simulation(ir2, scenario, { robot, start: secondStart(scenario) });
+        next2 = new Simulation(ir2, scenario, {
+          robot,
+          pictures,
+          start: secondStart(scenario),
+        });
         next2.on((event) => audio.handle(event, speedRef.current));
         pair.current = new BrickPair(next, next2);
       }
@@ -248,7 +272,7 @@ export function SimulatorProvider({
       setProblems(brick === 2 ? messages.map((m) => `Brick 2: ${m}`) : messages);
       return null;
     }
-  }, [program, scenario, robot, second, breakpoints, audio, newJudge]);
+  }, [program, scenario, robot, second, pictures, breakpoints, audio, newJudge]);
 
   // The animation loop: advances simulated time in step with the clock while running.
   const live = status === 'running' || (status2 === 'running' && status !== 'paused');

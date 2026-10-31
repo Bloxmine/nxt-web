@@ -82,6 +82,8 @@ export interface SimOptions {
   robot?: RobotGeometry;
   /** Where the robot starts (the mat's start by default). */
   start?: Pose;
+  /** Picture files (.ric) the program may show, by lower-case file name. */
+  pictures?: ReadonlyMap<string, Uint8Array>;
 }
 
 /**
@@ -104,6 +106,8 @@ export class Simulation {
   readonly mailboxes: Value[][] = Array.from({ length: 10 }, () => []);
   /** Files written by the program, by name. */
   readonly files = new Map<string, OpenFile>();
+  /** Picture files (.ric) by lower-case name; others show a placeholder. */
+  readonly pictures: ReadonlyMap<string, Uint8Array>;
   /** Block ids to pause at. */
   readonly breakpoints = new Set<string>();
 
@@ -127,6 +131,7 @@ export class Simulation {
     options: SimOptions = {},
   ) {
     this.world = new World(scenario, options.robot, options.start);
+    this.pictures = options.pictures ?? new Map();
     this.random = mulberry32(options.seed ?? Date.now());
     this.subroutines = new Map(program.subroutines.map((s) => [s.name, s.body]));
     this.reset();
@@ -303,6 +308,17 @@ export class Simulation {
     this.time += dt;
   }
 
+  /** Shows a picture file, or a placeholder when the simulator doesn't have it. */
+  drawPicture(file: string, x: number, y: number): void {
+    const bytes = this.pictures.get(file.toLowerCase());
+    try {
+      if (bytes) return this.lcd.ric(bytes, x, y);
+    } catch {
+      // A damaged file: fall back to the placeholder.
+    }
+    this.lcd.picture(x, y);
+  }
+
   /** Sends an event to listeners (for {@link RxeVm}). */
   emitEvent(event: SimEvent): void {
     this.emit(event);
@@ -415,7 +431,7 @@ export class Simulation {
         this.lcd.text(this.num(s.x), this.num(s.line), formatNumber(this.num(s.value)));
         return 'next';
       case 'drawImage':
-        this.lcd.picture(this.num(s.x), this.num(s.line));
+        this.drawPicture(s.file, this.num(s.x), this.num(s.y));
         return 'next';
       case 'drawPoint':
         this.lcd.point(this.num(s.x), this.num(s.y));

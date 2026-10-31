@@ -458,7 +458,7 @@ class Compiler {
         );
         const loc = params.fields[1]!;
         c.emit(OP.MOV, [this.field(loc, 0), this.expr(ctx, s.x, 'number')]);
-        c.emit(OP.MOV, [this.field(loc, 1), this.lineToY(ctx, s.line)]);
+        c.emit(OP.MOV, [this.field(loc, 1), this.expr(ctx, s.y, 'number')]);
         c.emit(OP.MOV, [this.field(params, 2), this.str(s.file)]);
         c.emit(OP.MOV, [this.field(params, 4), this.num(0)]);
         c.emit(OP.SYSCALL, [SYSCALL.DrawPicture, params.id]);

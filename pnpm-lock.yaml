@@ -292,6 +292,9 @@ importers:
       '@nxt/compiler':
         specifier: workspace:*
         version: link:../nxt-compiler
+      '@nxt/media':
+        specifier: workspace:*
+        version: link:../nxt-media
       '@nxt/rxe':
         specifier: workspace:*
         version: link:../nxt-rxe

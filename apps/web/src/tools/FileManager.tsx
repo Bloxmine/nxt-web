@@ -3,6 +3,7 @@ import { useBrick } from '../brick/BrickContext';
 import { friendlyError } from '../brick/errors';
 import { formatBytes } from '../lib/format';
 import { iconUrl } from '../lib/icons';
+import { rememberMedia } from '../lib/media';
 import { audioToRso, brickFileName, imageToRic, pickFile, saveFile } from './convert';
 import { FilePreview } from './FilePreview';
 
@@ -49,6 +50,10 @@ export function FileManager() {
   const [files, setFiles] = useState<{ name: string; size: number }[] | null>(null);
   const [selected, setSelected] = useState<string | null>(null);
   const [preview, setPreview] = useState<{ name: string; bytes: Uint8Array } | null>(null);
+  // Pictures and sounds that pass through here become choices in Display and Sound blocks.
+  useEffect(() => {
+    if (preview) void rememberMedia(preview.name, preview.bytes);
+  }, [preview]);
   const [status, setStatus] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [reload, setReload] = useState(0);

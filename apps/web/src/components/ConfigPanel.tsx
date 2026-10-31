@@ -16,6 +16,7 @@ import {
 import { useEditor } from '../editor/EditorContext';
 import { iconUrl } from '../lib/icons';
 import { DataFields } from './DataFields';
+import { FileChoice } from './FileChoice';
 import { DirectionButtons, Field, NumberInput, Radios, Select, Slider } from './fields';
 import { WiredContext } from './wired';
 
@@ -298,12 +299,11 @@ function BlockFields({ block, update, program, onEditVariables }: FieldsProps) {
           )}
           {block.action === 'file' && (
             <Field label="File">
-              <input
-                className="text-input"
-                aria-label="Sound file name"
-                value={block.file}
-                maxLength={15}
-                onChange={(e) => update({ file: e.target.value })}
+              <FileChoice
+                label="Sound file"
+                extension="rso"
+                value={block.file.replace(/\.rso$/i, '')}
+                onChange={(file) => update({ file })}
               />
             </Field>
           )}
@@ -368,7 +368,10 @@ function BlockFields({ block, update, program, onEditVariables }: FieldsProps) {
                 ['drawing', 'Drawing'],
                 ['reset', 'Clear screen'],
               ]}
-              onChange={(action) => update({ action })}
+              onChange={(action) =>
+                // Pictures are placed by pixel, like in NXT-G; start at the bottom-left.
+                update(action === 'image' && block.y === undefined ? { action, y: 0 } : { action })
+              }
             />
           </Field>
           {block.action === 'drawing' && (
@@ -438,12 +441,11 @@ function BlockFields({ block, update, program, onEditVariables }: FieldsProps) {
           )}
           {block.action === 'image' && (
             <Field label="File" icon="monitor_window">
-              <input
-                className="text-input"
-                aria-label="Image file name"
-                value={block.image ?? 'Smile 01'}
-                maxLength={15}
-                onChange={(e) => update({ image: e.target.value })}
+              <FileChoice
+                label="Picture file"
+                extension="ric"
+                value={(block.image ?? 'Smile 01').replace(/\.ric$/i, '')}
+                onChange={(image) => update({ image })}
               />
             </Field>
           )}
@@ -478,13 +480,28 @@ function BlockFields({ block, update, program, onEditVariables }: FieldsProps) {
                   max={99}
                   onChange={(x) => update({ x })}
                 />
-                Line
-                <Select
-                  label="Line"
-                  value={block.line}
-                  options={[1, 2, 3, 4, 5, 6, 7, 8].map((n) => [n, String(n)] as const)}
-                  onChange={(line) => update({ line })}
-                />
+                {block.action === 'image' ? (
+                  <>
+                    Y
+                    <NumberInput
+                      label="Y position (from the bottom)"
+                      value={block.y ?? (8 - block.line) * 8}
+                      min={0}
+                      max={63}
+                      onChange={(y) => update({ y })}
+                    />
+                  </>
+                ) : (
+                  <>
+                    Line
+                    <Select
+                      label="Line"
+                      value={block.line}
+                      options={[1, 2, 3, 4, 5, 6, 7, 8].map((n) => [n, String(n)] as const)}
+                      onChange={(line) => update({ line })}
+                    />
+                  </>
+                )}
               </Field>
               <Field label="Display">
                 <label className="check">

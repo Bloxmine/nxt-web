@@ -3,6 +3,7 @@ import { useBrick } from '../brick/BrickContext';
 import { friendlyError } from '../brick/errors';
 import { Dialog } from '../components/Dialog';
 import { iconUrl } from '../lib/icons';
+import { rememberMedia } from '../lib/media';
 import { brickFileName, imageToRic, pickFile, saveFile } from './convert';
 import * as pic from './picture';
 
@@ -189,7 +190,9 @@ export function PictureEditor({ onClose }: { onClose(): void }) {
   const upload = async () => {
     if (!brick.client) return;
     try {
-      await brick.client.uploadFile(fileName, bytes());
+      const data = bytes();
+      await brick.client.uploadFile(fileName, data);
+      void rememberMedia(fileName, data);
       setMessage({
         error: false,
         text: `${fileName} is on the brick. Pick it in a Display block.`,
@@ -247,7 +250,15 @@ export function PictureEditor({ onClose }: { onClose(): void }) {
           >
             Open…
           </button>
-          <button type="button" className="btn" onClick={() => saveFile(fileName, bytes())}>
+          <button
+            type="button"
+            className="btn"
+            onClick={() => {
+              const data = bytes();
+              saveFile(fileName, data);
+              void rememberMedia(fileName, data);
+            }}
+          >
             Save .ric…
           </button>
           <button

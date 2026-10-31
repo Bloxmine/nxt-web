@@ -1,3 +1,4 @@
+import { decodeRic, renderRic } from '@nxt/media';
 import { glyph } from './font.js';
 
 /** Screen width in pixels. */
@@ -113,13 +114,19 @@ export class Lcd {
     this.version++;
   }
 
+  /** Draws a picture file (.ric) with its bottom-left corner at (x, y). */
+  ric(bytes: Uint8Array, x: number, y: number): void {
+    renderRic(decodeRic(bytes), { set: (px, py, on) => this.set(px, py, on) }, x, y);
+    this.version++;
+  }
+
   /**
-   * Stand-in for a picture file (.ric files are not available to the simulator): a
-   * 24×24 frame with a smiling face, its top-left corner at x and the given line.
+   * A picture whose file the simulator doesn't have: a 24×24 placeholder with its
+   * bottom-left corner at (x, y).
    */
-  picture(x: number, line: number): void {
+  picture(x: number, y: number): void {
     const left = Math.round(x);
-    const top = LCD_HEIGHT - 1 - (Math.round(line) - 1) * 8;
+    const top = Math.round(y) + 23;
     for (let i = 0; i < 24; i++) {
       this.set(left + i, top);
       this.set(left + i, top - 23);

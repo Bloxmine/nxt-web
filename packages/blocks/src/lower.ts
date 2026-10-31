@@ -456,7 +456,7 @@ export function lowerProgram(program: Program): IrProgram {
         }
         if (block.action === 'image') {
           const file = (block.image ?? 'Smile 01').replace(/\.ric$/i, '') + '.ric';
-          return [...out, ...clear, { kind: 'drawImage', x, line, file, source }];
+          return [...out, ...clear, { kind: 'drawImage', x, y, file, source }];
         }
         const draw: Stmt =
           block.action === 'text'

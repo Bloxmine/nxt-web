@@ -4,6 +4,7 @@ import { useBrick } from '../brick/BrickContext';
 import { friendlyError } from '../brick/errors';
 import { Dialog } from '../components/Dialog';
 import { iconUrl } from '../lib/icons';
+import { rememberMedia } from '../lib/media';
 import { brickFileName, decodeAudio, pickFile, saveFile } from './convert';
 
 /** Longest recording, in seconds: an 8 kHz sound takes 8 KB of the brick's memory a second. */
@@ -179,6 +180,7 @@ export function SoundRecorder({ onClose }: { onClose(): void }) {
     setMessage(null);
     try {
       await brick.client.uploadFile(fileName, bytes);
+      void rememberMedia(fileName, bytes);
       setMessage({ error: false, text: `${fileName} is on the brick. Pick it in a Sound block.` });
     } catch (e) {
       setMessage({ error: true, text: friendlyError(e) ?? String(e) });
@@ -215,7 +217,11 @@ export function SoundRecorder({ onClose }: { onClose(): void }) {
             type="button"
             className="btn"
             disabled={!bytes || state !== 'idle'}
-            onClick={() => bytes && saveFile(fileName, bytes)}
+            onClick={() => {
+              if (!bytes) return;
+              saveFile(fileName, bytes);
+              void rememberMedia(fileName, bytes);
+            }}
           >
             Save .rso…
           </button>

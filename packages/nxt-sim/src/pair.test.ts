@@ -1,6 +1,7 @@
 import { EXAMPLES, lowerProgram } from '@nxt/blocks';
 import type { IrProgram, Stmt } from '@nxt/compiler';
 import { describe, expect, it } from 'vitest';
+import { encodeRic } from '@nxt/media';
 import { CHALLENGES, ChallengeJudge, challengeById, inZone } from './challenges.js';
 import { BrickPair, secondStart } from './pair.js';
 import { scenarioById } from './scenarios.js';
@@ -72,6 +73,39 @@ describe('robot setup', () => {
     expect(matColorAt(mat, 5, 5)).toBe('#ff0000');
     expect(matColorAt(mat, 15, 5)).toBe('#0000ff');
     expect(matColorAt(mat, 25, 5)).toBe(mat.background);
+  });
+});
+
+describe('pictures', () => {
+  it('shows a known .ric for real, bottom-left corner at (x, y), and a placeholder otherwise', () => {
+    // A 3×2 picture: top row X.X, bottom row .X.
+    const ric = encodeRic(3, 2, [1, 0, 1, 0, 1, 0]);
+    const show = (file: string) => {
+      const sim = new Simulation(
+        ir([{ kind: 'drawImage', x: n(10), y: n(5), file }]),
+        scenarioById('empty'),
+        { pictures: new Map([['mine.ric', ric]]) },
+      );
+      sim.start();
+      sim.advance(10);
+      return sim;
+    };
+    const sim = show('Mine.ric');
+    expect([sim.lcd.get(10, 6), sim.lcd.get(11, 6), sim.lcd.get(12, 6)]).toEqual([
+      true,
+      false,
+      true,
+    ]);
+    expect([sim.lcd.get(10, 5), sim.lcd.get(11, 5), sim.lcd.get(12, 5)]).toEqual([
+      false,
+      true,
+      false,
+    ]);
+    expect(sim.lcd.pixels.reduce((a, p) => a + p, 0)).toBe(3);
+    // Unknown file: the 24×24 placeholder frame, starting at (10, 5).
+    const other = show('Other.ric');
+    expect(other.lcd.get(10, 5)).toBe(true);
+    expect(other.lcd.get(33, 28)).toBe(true);
   });
 });
 

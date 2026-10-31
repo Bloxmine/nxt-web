@@ -107,7 +107,8 @@ export type Stmt = StmtBase &
         /** Write: bytes to reserve when creating the file. */
         size?: Expr;
       }
-    | { kind: 'drawImage'; x: Expr; line: Expr; file: string }
+    /** A picture file (.ric) with its bottom-left corner at (x, y); y = 0 is the bottom row. */
+    | { kind: 'drawImage'; x: Expr; y: Expr; file: string }
     /** Shapes; coordinates in pixels, y = 0 at the bottom. */
     | { kind: 'drawPoint'; x: Expr; y: Expr }
     | { kind: 'drawLine'; x: Expr; y: Expr; endX: Expr; endY: Expr }
