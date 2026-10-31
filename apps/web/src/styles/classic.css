@@ -3430,3 +3430,29 @@ fieldset.controls.wired {
     height: auto;
   }
 }
+
+/* Picture preview in the Display block's settings. */
+.config-preview {
+  grid-row: span 4;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+  margin: 0;
+}
+
+.config-preview canvas {
+  display: block;
+  width: 150px;
+  height: 96px;
+  border: 2px solid #4a4d48;
+  border-radius: 3px;
+  image-rendering: pixelated;
+}
+
+.config-preview figcaption {
+  max-width: 180px;
+  color: var(--text-muted);
+  font-size: 10px;
+  text-align: center;
+}

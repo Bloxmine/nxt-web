@@ -18,6 +18,14 @@ import {
 } from 'react';
 import { friendlyError } from './errors';
 
+/** What a download did: also which pictures/sounds it sent, and which it couldn't find. */
+export interface DownloadResult {
+  ok: boolean;
+  sent: string[];
+  /** Used by the program but neither on the brick nor made in this browser. */
+  missing: string[];
+}
+
 export interface BrickContextValue {
   state: TransportState;
   /** Link type of the current connection, e.g. "USB". */
@@ -36,13 +44,18 @@ export interface BrickContextValue {
   startRecording(): void;
   /** Stops recording and returns what was captured (null if nothing was recording). */
   stopRecording(note: string): Capture | null;
-  /** Uploads a compiled program and optionally starts it. Resolves to false on failure. */
+  /**
+   * Uploads a compiled program and optionally starts it. First sends the pictures and
+   * sounds it uses (`needed`, file names) that are not on the brick yet, or differ in
+   * size, from `available`.
+   */
   downloadProgram(
     fileName: string,
     bytes: Uint8Array,
     start: boolean,
     onProgress?: (sent: number, total: number) => void,
-  ): Promise<boolean>;
+    media?: { needed: string[]; available: ReadonlyMap<string, Uint8Array> },
+  ): Promise<DownloadResult>;
   clearError(): void;
 }
 
@@ -147,17 +160,33 @@ export function BrickProvider({ children }: { children: ReactNode }) {
       bytes: Uint8Array,
       start: boolean,
       onProgress?: (sent: number, total: number) => void,
+      media?: { needed: string[]; available: ReadonlyMap<string, Uint8Array> },
     ) => {
-      let ok = false;
+      const result: DownloadResult = { ok: false, sent: [], missing: [] };
       await run(async () => {
         const c = clientRef.current;
         if (!c) throw new Error('No brick connected');
         await c.stopProgram();
+        if (media && media.needed.length > 0) {
+          const onBrick = new Map(
+            (await c.listFiles('*.*')).map((f) => [f.name.toLowerCase(), f.size]),
+          );
+          for (const name of media.needed) {
+            const local = media.available.get(name.toLowerCase());
+            const size = onBrick.get(name.toLowerCase());
+            if (local && size !== local.length) {
+              await c.uploadFile(name, local);
+              result.sent.push(name);
+            } else if (!local && size === undefined) {
+              result.missing.push(name);
+            }
+          }
+        }
         await c.uploadFile(fileName, bytes, onProgress);
         if (start) await c.startProgram(fileName);
-        ok = true;
+        result.ok = true;
       });
-      return ok;
+      return result;
     },
     [run],
   );

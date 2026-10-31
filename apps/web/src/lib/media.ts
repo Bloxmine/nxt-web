@@ -22,13 +22,22 @@ export async function listMedia(): Promise<MediaFile[]> {
   return (await loadValue<MediaFile[]>(KEY)) ?? [];
 }
 
+/** Saves run one after the other: each reads the list and writes it back. */
+let queue: Promise<void> = Promise.resolve();
+
 /** Remembers a .ric or .rso file (replacing one with the same name); other files are ignored. */
-export async function rememberMedia(name: string, bytes: Uint8Array): Promise<void> {
-  if (!/\.(ric|rso)$/i.test(name)) return;
-  const files = (await listMedia()).filter((f) => f.name.toLowerCase() !== name.toLowerCase());
-  files.unshift({ name, bytes: Uint8Array.from(bytes), savedAt: new Date().toISOString() });
-  await saveValue(KEY, files.slice(0, MAX_FILES));
-  window.dispatchEvent(new Event(MEDIA_CHANGED));
+export function rememberMedia(name: string, bytes: Uint8Array): Promise<void> {
+  if (!/\.(ric|rso)$/i.test(name)) return Promise.resolve();
+  const copy = Uint8Array.from(bytes);
+  queue = queue
+    .then(async () => {
+      const files = (await listMedia()).filter((f) => f.name.toLowerCase() !== name.toLowerCase());
+      files.unshift({ name, bytes: copy, savedAt: new Date().toISOString() });
+      await saveValue(KEY, files.slice(0, MAX_FILES));
+      window.dispatchEvent(new Event(MEDIA_CHANGED));
+    })
+    .catch(() => {});
+  return queue;
 }
 
 /** Picture files by lower-case name, for the simulator. */

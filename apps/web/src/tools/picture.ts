@@ -138,6 +138,21 @@ export function resize(b: Bitmap, width: number, height: number): Bitmap {
   return out;
 }
 
+/**
+ * The picture on a blank 100 × 64 screen with its bottom-left corner at (x, y), y counted
+ * from the bottom like the brick does.
+ */
+export function place(b: Bitmap, x: number, y: number): Bitmap {
+  const screen = blank();
+  const top = 64 - y - b.height;
+  for (let r = 0; r < b.height; r++) {
+    for (let c = 0; c < b.width; c++) {
+      if (b.pixels[r * b.width + c]) set(screen, x + c, top + r, true);
+    }
+  }
+  return screen;
+}
+
 /** Reads a .ric picture file. */
 export function fromRic(bytes: Uint8Array): Bitmap {
   const ops = decodeRic(bytes);

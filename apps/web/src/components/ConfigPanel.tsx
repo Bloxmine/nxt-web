@@ -17,6 +17,7 @@ import { useEditor } from '../editor/EditorContext';
 import { iconUrl } from '../lib/icons';
 import { DataFields } from './DataFields';
 import { FileChoice } from './FileChoice';
+import { PicturePreview } from './PicturePreview';
 import { DirectionButtons, Field, NumberInput, Radios, Select, Slider } from './fields';
 import { WiredContext } from './wired';
 
@@ -514,6 +515,13 @@ function BlockFields({ block, update, program, onEditVariables }: FieldsProps) {
                 </label>
               </Field>
             </>
+          )}
+          {block.action === 'image' && (
+            <PicturePreview
+              name={block.image ?? 'Smile 01'}
+              x={block.x}
+              y={block.y ?? (8 - block.line) * 8}
+            />
           )}
         </>
       );

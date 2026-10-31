@@ -13,7 +13,7 @@ import {
   type Block,
   type Program,
 } from '@nxt/blocks';
-import { CompileError, compileProgram } from '@nxt/compiler';
+import { CompileError, compileProgram, visitStatements } from '@nxt/compiler';
 import {
   useCallback,
   useEffect,
@@ -30,6 +30,7 @@ import { CalculatorDialog, CheckerDialog, CommandPalette, type Command } from '.
 import { LibraryDialog, SnippetsDialog } from './tools/LibraryDialogs';
 import { RobotSetupDialog } from './tools/RobotSetupDialog';
 import { newLibraryId, saveSnippet, saveToLibrary, type LibraryEntry } from './lib/library';
+import { listMedia } from './lib/media';
 import { TUTORIALS } from './tutorials/content';
 import { ModernCanvas } from './modern/ModernCanvas';
 import { TutorialPanel, TutorialPicker } from './tutorials/TutorialPanel';
@@ -421,8 +422,16 @@ function Studio() {
         return;
       }
       let bytes: Uint8Array;
+      const needed = new Set<string>();
       try {
-        bytes = compileProgram(lowerProgram(state.program));
+        const ir = lowerProgram(state.program);
+        bytes = compileProgram(ir);
+        // Pictures and sounds the program shows or plays, to send along when missing.
+        for (const body of [ir.main, ...ir.parallel, ...ir.subroutines.map((s) => s.body)]) {
+          visitStatements(body, (s) => {
+            if (s.kind === 'drawImage' || s.kind === 'soundFile') needed.add(s.file);
+          });
+        }
       } catch (error) {
         message(
           'Cannot download',
@@ -485,17 +494,40 @@ function Studio() {
           </>,
         );
       progress(0);
-      void brick.downloadProgram(fileName, bytes, run, progress).then((ok) => {
-        if (!ok) return setModal(null);
-        message(
-          run ? 'Download and run' : 'Download',
-          'tick',
-          <p style={{ marginTop: 0 }}>
-            <strong>{fileName}</strong> ({bytes.length} bytes) is on the brick
-            {run ? ' and running.' : '. Find it under My Files › Software files.'}
-          </p>,
-        );
-      });
+      void listMedia()
+        .then((files) =>
+          brick.downloadProgram(fileName, bytes, run, progress, {
+            needed: [...needed],
+            available: new Map(files.map((f) => [f.name.toLowerCase(), f.bytes])),
+          }),
+        )
+        .then((result) => {
+          if (!result.ok) return setModal(null);
+          message(
+            run ? 'Download and run' : 'Download',
+            result.missing.length > 0 ? 'error' : 'tick',
+            <>
+              <p style={{ marginTop: 0 }}>
+                <strong>{fileName}</strong> ({bytes.length} bytes) is on the brick
+                {run ? ' and running.' : '. Find it under My Files › Software files.'}
+              </p>
+              {result.sent.length > 0 && (
+                <p>
+                  Also sent {result.sent.length === 1 ? 'the file' : 'the files'} it uses:{' '}
+                  {result.sent.join(', ')}.
+                </p>
+              )}
+              {result.missing.length > 0 && (
+                <p>
+                  <strong>Not on the brick:</strong> {result.missing.join(', ')}. Blocks that show
+                  or play {result.missing.length === 1 ? 'it' : 'them'} will do nothing. Make or
+                  upload {result.missing.length === 1 ? 'it' : 'them'} first (Tools → Picture
+                  editor, Sound recorder, or Files on the brick).
+                </p>
+              )}
+            </>,
+          );
+        });
     },
     stop: () => void brick.stopEverything(),
     openFromLibrary: (entry: LibraryEntry) => {

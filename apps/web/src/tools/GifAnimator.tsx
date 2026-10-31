@@ -69,18 +69,6 @@ function pixelsOf(frame: ImageBitmap, width: number, height: number): Uint8Clamp
   return ctx.getImageData(0, 0, width, height).data;
 }
 
-/** A frame placed on a blank 100 × 64 screen. */
-function onScreen(frame: pic.Bitmap, x: number, y: number): pic.Bitmap {
-  const screen = pic.blank();
-  const top = 64 - y - frame.height;
-  for (let r = 0; r < frame.height; r++) {
-    for (let c = 0; c < frame.width; c++) {
-      if (frame.pixels[r * frame.width + c]) pic.set(screen, x + c, top + r, true);
-    }
-  }
-  return screen;
-}
-
 /** Shows a picture on a small LCD-coloured canvas. */
 function Thumb({ bitmap, scale }: { bitmap: pic.Bitmap; scale: number }) {
   const ref = useRef<HTMLCanvasElement>(null);
@@ -208,7 +196,7 @@ export function GifAnimator({
   const current = kept[shown % Math.max(1, kept.length)];
   useEffect(() => {
     const ctx = lcd.current?.getContext('2d');
-    if (ctx && current) drawLcd(ctx, onScreen(current, x, y), 3);
+    if (ctx && current) drawLcd(ctx, pic.place(current, x, y), 3);
   }, [current, x, y]);
 
   const remember = () => Promise.all(files.map((f) => rememberMedia(f.name, f.bytes)));
