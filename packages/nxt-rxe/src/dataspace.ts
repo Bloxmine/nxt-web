@@ -173,11 +173,17 @@ export function layoutDataspace(ds: Dataspace): DataspaceLayout {
     cursor = align(cursor + arr.values.length * arr.elementSize, 4);
     return { ...arr, offset: at };
   });
-  // Memory manager list: non-root DVs by ascending offset (empty arrays last).
-  const order = placed
-    .map((p, i) => ({ dv: i + 1, offset: p.offset }))
-    .sort((x, y) => x.offset - y.offset || x.dv - y.dv)
-    .map((x) => x.dv);
+  // Memory manager list, by ascending offset: the root DV (the DVA itself, which sits
+  // right after the static data) first, then the arrays, empty ones last. The firmware
+  // compacts memory by walking this list from the end of the static data, so the root
+  // must be in it, at the head (the specification's example has head = tail = 0).
+  const order = [
+    0,
+    ...placed
+      .map((p, i) => ({ dv: i + 1, offset: p.offset }))
+      .sort((x, y) => x.offset - y.offset || x.dv - y.dv)
+      .map((x) => x.dv),
+  ];
   const next = new Map<number, number>();
   order.forEach((dv, i) => next.set(dv, order[i + 1] ?? 0xffff));
 
@@ -185,7 +191,7 @@ export function layoutDataspace(ds: Dataspace): DataspaceLayout {
   put16(10);
   put16(dvCount);
   put16(0xffff);
-  put16(0xffff);
+  put16(next.get(0) ?? 0xffff);
   placed.forEach((p, i) => {
     put16(p.offset);
     put16(p.elementSize);
@@ -208,7 +214,7 @@ export function layoutDataspace(ds: Dataspace): DataspaceLayout {
     dynamicDefaults: Uint8Array.from(dynamic),
     initialSize: dvOffset + dynamic.length,
     dopeVectorOffset: dvOffset,
-    memMgrHead: order[0] ?? 0,
+    memMgrHead: 0,
     memMgrTail: order[order.length - 1] ?? 0,
   };
 }

@@ -70,10 +70,15 @@ Mutexes store `FF FF FF FF`.
 array (DVA) first, then each array's elements, each array on a 4-byte boundary.
 
 Dope vector (5 × u16): offset in RAM (0xFFFF for empty), element size, element count,
-back pointer (unused), link index. DV 0 is the root (it describes the DVA itself:
-offset = DV offset, element size 10, count = number of DVs, link 0xFFFF). Non-root DVs form
-a linked list in order of ascending offset; the last link is 0xFFFF; header fields give the
-head and tail.
+back pointer (unused in files), link index. DV 0 is the root: it describes the DVA itself
+(offset = DV offset, element size 10, count = number of DVs). All DVs, the root included,
+form the memory manager's linked list in order of ascending offset, so the root comes first:
+the header's head is 0, the root links to the array with the lowest offset, and the last
+link is 0xFFFF (the tail). The specification's example (no arrays) has head = tail = 0.
+**Confirmed on a brick:** with the root left out of the list (head = first array), the
+firmware's compaction, which walks the list from the end of the static data, overwrote
+the DVA, and DrawPicture failed with "illegal file name" (firmware source: `cCmdDSCompact`
+in c_cmd.c).
 
 ## Clump records
 

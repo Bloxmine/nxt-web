@@ -73,8 +73,9 @@ describe('.rxe writer', () => {
     // Root DV plus one per array; static data ends on a 4-byte boundary.
     expect(file.dataspace.staticSize % 4).toBe(0);
     expect(file.dataspace.dopeVectorOffset).toBe(file.dataspace.staticSize);
-    // Memory manager list: head and tail are the arrays with the lowest/highest offsets.
-    expect(file.dataspace.memMgrHead).toBeGreaterThan(0);
+    // Memory manager list: the root DV (lowest offset) is the head and links on to the
+    // arrays; the tail is the array with the highest offset (empty ones last).
+    expect(file.dataspace.memMgrHead).toBe(0);
     expect(file.dataspace.memMgrTail).toBeGreaterThan(0);
   });
 
