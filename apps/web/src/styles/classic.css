@@ -3545,3 +3545,82 @@ fieldset.controls.wired {
   color: #c62828;
   font-weight: bold;
 }
+
+/* Open programs. */
+.doc-tabs {
+  display: flex;
+  align-items: flex-end;
+  gap: 2px;
+  height: 26px;
+  padding: 0 4px;
+  overflow-x: auto;
+  background: linear-gradient(#d6d4c8, #c4c1b2);
+  border-bottom: 1px solid #8f8c7c;
+  scrollbar-width: thin;
+}
+
+.doc-tab {
+  display: flex;
+  flex-shrink: 0;
+  align-items: center;
+  gap: 5px;
+  height: 22px;
+  max-width: 200px;
+  padding: 0 4px 0 8px;
+  border: 1px solid #8f8c7c;
+  border-bottom: none;
+  border-radius: 4px 4px 0 0;
+  background: linear-gradient(#e6e4dc, #cfccc0);
+  color: var(--text-muted);
+  cursor: default;
+}
+
+.doc-tab.active {
+  height: 24px;
+  margin-bottom: -1px;
+  background: linear-gradient(#ffffff, #efede4);
+  color: var(--text);
+  font-weight: bold;
+}
+
+.doc-tab span {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.doc-tab img {
+  width: 14px;
+  height: 14px;
+}
+
+.doc-tab .close {
+  padding: 0 3px;
+  border: none;
+  border-radius: 3px;
+  background: none;
+  color: #844;
+  font-weight: bold;
+  cursor: default;
+}
+
+.doc-tab .close:hover {
+  background: rgba(0, 0, 0, 0.1);
+}
+
+.doc-tab-new {
+  flex-shrink: 0;
+  width: 22px;
+  height: 20px;
+  margin-bottom: 1px;
+  border: 1px solid transparent;
+  border-radius: 4px;
+  background: none;
+  font-weight: bold;
+  color: var(--text-muted);
+}
+
+.doc-tab-new:hover {
+  border-color: var(--hover-border);
+  background: linear-gradient(var(--hover-top), var(--hover-bottom));
+}

@@ -42,6 +42,7 @@ import type { Tutorial } from './tutorials/content';
 import { Canvas } from './components/Canvas';
 import { ConfigPanel } from './components/ConfigPanel';
 import { Controller } from './components/Controller';
+import { DocumentTabs } from './components/DocumentTabs';
 import { HelpPanel } from './components/HelpPanel';
 import { MenuBar, type Menu } from './components/MenuBar';
 import { NxtWindow, type NxtTab } from './components/NxtWindow';
@@ -60,6 +61,7 @@ import { EditorContext, useIssues } from './editor/EditorContext';
 import { describeBlock, describeProgram, editCommands } from './editor/commands';
 import { installTouchSupport } from './editor/touch';
 import { editorReducer, initialState, selectedIds } from './editor/store';
+import { useDocuments } from './editor/useDocuments';
 import { checkBrowserSupport } from './lib/browserSupport';
 import { openProjectFile, saveProjectFile, type SavedFile } from './lib/files';
 import { iconUrl } from './lib/icons';
@@ -78,6 +80,24 @@ import { SimulatorWindow } from './sim/SimulatorWindow';
 const support = checkBrowserSupport(navigator);
 const AUTOSAVE_KEY = 'autosave';
 const AUTOSAVE_ID_KEY = 'autosave-library-id';
+/** All open programs (tabs): [{ program, libraryId, active }]. */
+const AUTOSAVE_TABS_KEY = 'autosave-tabs';
+
+function isTabList(
+  value: unknown,
+): value is { program: Program; libraryId: string; active: boolean }[] {
+  return (
+    Array.isArray(value) &&
+    value.length > 0 &&
+    value.every(
+      (t) =>
+        typeof t === 'object' &&
+        t !== null &&
+        isProgram((t as { program?: unknown }).program) &&
+        typeof (t as { libraryId?: unknown }).libraryId === 'string',
+    )
+  );
+}
 /** Brick file name for a program: 15.3 characters, letters, digits, spaces, - and _. */
 function rxeFileName(name: string): string {
   const base =
@@ -157,6 +177,17 @@ function Studio() {
   const rbtOrigin = useRef<RbtOrigin | null>(null);
   // Library entry the current program is saved under (File → Library).
   const libraryId = useRef(newLibraryId());
+  const documents = useDocuments({
+    state,
+    dispatch,
+    fileHandleRef: fileHandle,
+    rbtOriginRef: rbtOrigin,
+    libraryIdRef: libraryId,
+  });
+  const documentsRef = useRef(documents);
+  useEffect(() => {
+    documentsRef.current = documents;
+  });
   // Simulator controls, filled in by <SimulatorHooks> inside the provider.
   const simActions = useRef<SimulatorControls | null>(null);
   const [initialMat, setInitialMat] = useState('empty');
@@ -174,34 +205,45 @@ function Studio() {
   }, [selectionKey]);
   const connected = brick.state === 'connected';
 
-  // Restore the last session, then autosave every change.
+  // Restore the open programs of the last session, then autosave every change. A share
+  // link (#p=…) or ?example=<key> opens in an extra tab.
   useEffect(() => {
-    // ?example=<key> opens an example directly (handy for links and docs).
     const exampleKey = new URLSearchParams(window.location.search).get('example');
     const example = EXAMPLES.find((e) => e.key === exampleKey);
-    void loadValue<string>(AUTOSAVE_ID_KEY).then((id) => {
-      if (id && !example) libraryId.current = id;
-    });
-    void loadValue<unknown>(AUTOSAVE_KEY).then(async (saved) => {
-      // A share link (#p=…) opens the shared program; the last session stays in the library.
+    void Promise.all([
+      loadValue<unknown>(AUTOSAVE_TABS_KEY),
+      loadValue<unknown>(AUTOSAVE_KEY),
+      loadValue<string>(AUTOSAVE_ID_KEY),
+    ]).then(async ([tabs, saved, savedId]) => {
       let shared: Program | null = null;
       try {
         shared = await readShared(window.location.hash);
       } catch {
-        setAnnouncement('The share link is damaged, so the last program was opened instead.');
+        setAnnouncement('The share link is damaged, so it could not be opened.');
       }
-      if (shared) {
-        if (isProgram(saved))
-          void saveVersion(normalizeProgram(saved), 'Before opening a shared link');
-        libraryId.current = newLibraryId();
-        dispatch({ type: 'load', program: shared });
-        history.replaceState(null, '', window.location.pathname + window.location.search);
-      } else if (example) {
-        dispatch({ type: 'load', program: example.create() });
-        setInitialMat(example.mat ?? 'empty');
-      } else if (isProgram(saved)) dispatch({ type: 'load', program: normalizeProgram(saved) });
+      const open = isTabList(tabs)
+        ? tabs.map((t) => ({ ...t, program: normalizeProgram(t.program) }))
+        : isProgram(saved)
+          ? [
+              {
+                program: normalizeProgram(saved),
+                libraryId: savedId ?? newLibraryId(),
+                active: true,
+              },
+            ]
+          : [];
+      const extra = shared ?? example?.create() ?? null;
+      if (extra) {
+        for (const t of open) t.active = false;
+        open.push({ program: extra, libraryId: newLibraryId(), active: true });
+      }
+      if (shared) history.replaceState(null, '', window.location.pathname + window.location.search);
+      if (example && !shared) setInitialMat(example.mat ?? 'empty');
+      if (open.length > 0) documents.restoreTabs(open, initialState);
       setReady(true);
     });
+    // Once, at start-up.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   useEffect(() => {
@@ -209,6 +251,7 @@ function Studio() {
     const id = setTimeout(() => {
       void saveValue(AUTOSAVE_KEY, state.program);
       void saveValue(AUTOSAVE_ID_KEY, libraryId.current);
+      void saveValue(AUTOSAVE_TABS_KEY, documentsRef.current.all());
       // Programs you have changed are kept in the library (File → Library).
       if (state.dirty) void saveToLibrary(libraryId.current, state.program);
     }, 400);
@@ -248,9 +291,6 @@ function Studio() {
     document.title = `${state.program.name}${state.dirty ? '*' : ''} - NXT Web Studio`;
   }, [state.program.name, state.dirty]);
 
-  const confirmDiscard = () =>
-    !state.dirty || window.confirm('Discard unsaved changes to this program?');
-
   const message = (title: string, icon: string, body: ReactNode) => setModal({ title, icon, body });
 
   const showOpened = (result: {
@@ -259,10 +299,12 @@ function Studio() {
     imported: boolean;
     files?: PackedFile[];
     origin?: RbtOrigin;
+    handle?: SavedFile;
   }) => {
-    dispatch({ type: 'load', program: result.program });
-    rbtOrigin.current = result.origin ?? null;
-    libraryId.current = newLibraryId();
+    documents.openProgram(result.program, {
+      fileHandle: result.handle ?? null,
+      rbtOrigin: result.origin ?? null,
+    });
     if (!result.imported) return;
     message(
       'Program imported',
@@ -322,20 +364,11 @@ function Studio() {
   };
 
   const actions = {
-    newProgram: () => {
-      if (!confirmDiscard()) return;
-      fileHandle.current = null;
-      rbtOrigin.current = null;
-      libraryId.current = newLibraryId();
-      dispatch({ type: 'load', program: emptyProgram() });
-    },
+    newProgram: () => documents.openProgram(emptyProgram(`Untitled-${documents.count + 1}`)),
     open: async () => {
-      if (!confirmDiscard()) return;
-      void saveVersion(state.program, 'Before opening another program');
       try {
         const result = await openProjectFile();
         if (!result) return;
-        fileHandle.current = result.handle;
         showOpened(result);
       } catch (e) {
         message('Could not open', 'exclamation', e instanceof Error ? e.message : String(e));
@@ -352,12 +385,8 @@ function Studio() {
     },
     loadExample: (key: string, simulate = false) => {
       const example = EXAMPLES.find((e) => e.key === key);
-      if (!example || !confirmDiscard()) return;
-      void saveVersion(state.program, 'Before opening an example');
-      fileHandle.current = null;
-      rbtOrigin.current = null;
-      libraryId.current = newLibraryId();
-      dispatch({ type: 'load', program: example.create() });
+      if (!example) return;
+      documents.openProgram(example.create());
       if (example.mat) simActions.current?.setScenario(example.mat);
       setModal(null);
       // Run it once the new program has rendered (the simulator builds from the program).
@@ -464,12 +493,7 @@ function Studio() {
     },
     /** Opens a program made by a tool (such as the GIF animator) as a new program. */
     openMade: (program: Program) => {
-      if (!confirmDiscard()) return;
-      void saveVersion(state.program, 'Before opening a new program');
-      fileHandle.current = null;
-      rbtOrigin.current = null;
-      libraryId.current = newLibraryId();
-      dispatch({ type: 'load', program });
+      documents.openProgram(program);
       setModal(null);
     },
     renameProgram: () => {
@@ -676,12 +700,7 @@ function Studio() {
     },
     stop: () => void brick.stopEverything(),
     openFromLibrary: (entry: LibraryEntry) => {
-      if (entry.id !== libraryId.current && !confirmDiscard()) return;
-      void saveVersion(state.program, 'Before opening another program');
-      fileHandle.current = null;
-      rbtOrigin.current = null;
-      libraryId.current = entry.id;
-      dispatch({ type: 'load', program: normalizeProgram(entry.program) });
+      documents.openProgram(normalizeProgram(entry.program), { libraryId: entry.id });
       setModal(null);
     },
     saveSnippet: () => {
@@ -1381,6 +1400,13 @@ function Studio() {
           <div className="workspace">
             {state.view.editor === 'classic' && <Palette />}
             <div className="editor-column">
+              <DocumentTabs
+                tabs={documents.tabs}
+                onSwitch={documents.switchTo}
+                onClose={documents.close}
+                onNew={actions.newProgram}
+                onRename={actions.renameProgram}
+              />
               {state.view.editor === 'modern' ? (
                 <ModernCanvas overlay={controller} />
               ) : (

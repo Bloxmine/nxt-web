@@ -155,37 +155,40 @@ export function Canvas({
 
   return (
     <div className="canvas-frame">
-      <div className="tabs" role="tablist">
-        {state.tabs.map((tab) => (
-          <div
-            key={tab}
-            role="tab"
-            aria-selected={tab === root}
-            tabIndex={0}
-            className={`tab ${tab === root ? 'active' : ''}`}
-            onClick={() => dispatch({ type: 'openTab', tab })}
-            onKeyDown={(e) => e.key === 'Enter' && dispatch({ type: 'openTab', tab })}
-            onDoubleClick={() => tab === 'main' && onRenameProgram()}
-            title={tab === 'main' ? 'Double-click to rename' : 'My Block'}
-          >
-            <img src={iconUrl(tab === 'main' ? 'brick' : 'bricks')} alt="" />
-            <span>{tabName(tab)}</span>
-            {tab !== 'main' && (
-              <button
-                type="button"
-                className="close"
-                aria-label={`Close ${tabName(tab)}`}
-                onClick={(e) => {
-                  e.stopPropagation();
-                  dispatch({ type: 'closeTab', tab });
-                }}
-              >
-                ×
-              </button>
-            )}
-          </div>
-        ))}
-      </div>
+      {/* The program's own tab is in the program tabs above; this row is for My Blocks. */}
+      {state.tabs.length > 1 && (
+        <div className="tabs" role="tablist">
+          {state.tabs.map((tab) => (
+            <div
+              key={tab}
+              role="tab"
+              aria-selected={tab === root}
+              tabIndex={0}
+              className={`tab ${tab === root ? 'active' : ''}`}
+              onClick={() => dispatch({ type: 'openTab', tab })}
+              onKeyDown={(e) => e.key === 'Enter' && dispatch({ type: 'openTab', tab })}
+              onDoubleClick={() => tab === 'main' && onRenameProgram()}
+              title={tab === 'main' ? 'Double-click to rename' : 'My Block'}
+            >
+              <img src={iconUrl(tab === 'main' ? 'brick' : 'bricks')} alt="" />
+              <span>{tabName(tab)}</span>
+              {tab !== 'main' && (
+                <button
+                  type="button"
+                  className="close"
+                  aria-label={`Close ${tabName(tab)}`}
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    dispatch({ type: 'closeTab', tab });
+                  }}
+                >
+                  ×
+                </button>
+              )}
+            </div>
+          ))}
+        </div>
+      )}
       <div
         ref={scroller}
         className="canvas"

@@ -81,6 +81,8 @@ export type EditorAction =
       coalesce?: string;
     }
   | { type: 'load'; program: Program }
+  /** Switch to another open program's state (its own undo history and selection). */
+  | { type: 'restore'; state: EditorState }
   | { type: 'undo' }
   | { type: 'redo' }
   | { type: 'select'; id: string | null; toggle?: boolean }
@@ -156,6 +158,8 @@ export function editorReducer(state: EditorState, action: EditorAction): EditorS
         dirty: true,
       };
     }
+    case 'restore':
+      return { ...action.state, view: state.view };
     case 'load':
       return { ...initialState(action.program), view: state.view, zoom: state.zoom };
     case 'view': {

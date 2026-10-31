@@ -435,3 +435,17 @@
 [data-theme='dark'] .battery-low {
   color: #ff6b6b;
 }
+[data-theme='dark'] .doc-tabs {
+  background: linear-gradient(#34373c, #2a2c30);
+  border-bottom-color: #18191b;
+}
+[data-theme='dark'] .doc-tab {
+  border-color: #18191b;
+  background: linear-gradient(#2e3034, #26282c);
+}
+[data-theme='dark'] .doc-tab.active {
+  background: linear-gradient(#3a3d42, #2f3236);
+}
+[data-theme='dark'] .doc-tab .close {
+  color: #e08a8a;
+}
