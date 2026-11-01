@@ -12,6 +12,7 @@ import {
 import { useEffect, useRef, useState, type PointerEvent as ReactPointerEvent } from 'react';
 import { useEditor } from '../editor/EditorContext';
 import { encodeGif, FittedPalette, type GifFrame } from '../lib/gifEncoder';
+import { useFloatingWindow } from '../lib/floating';
 import { iconUrl } from '../lib/icons';
 import { listLibrary, type LibraryEntry } from '../lib/library';
 import { blankMat, newMatId } from '../lib/mats';
@@ -51,6 +52,7 @@ export function SimulatorWindow() {
   const { state } = useEditor();
   const matRef = useRef<HTMLCanvasElement>(null);
   const lcdRef = useRef<HTMLCanvasElement>(null);
+  const floating = useFloatingWindow();
   const [pos, setPos] = useState(() => ({
     x: Math.max(8, window.innerWidth - 720),
     // Just below the toolbar, so the whole window fits on most screens.
@@ -305,7 +307,14 @@ export function SimulatorWindow() {
       className="sim-window"
       role="dialog"
       aria-label="Simulator"
-      style={{ left: pos.x, top: pos.y, maxHeight: `calc(100vh - ${pos.y + 8}px)` }}
+      style={{
+        left: pos.x,
+        top: pos.y,
+        maxHeight: `calc(100vh - ${pos.y + 8}px)`,
+        zIndex: floating.zIndex,
+      }}
+      onPointerDownCapture={floating.raise}
+      onFocusCapture={floating.raise}
       onKeyDown={(e) => {
         const target = e.target as HTMLElement;
         if (e.key === 'Escape' && !target.closest('input, select, textarea, .dialog')) {

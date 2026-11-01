@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState, type ReactNode } from 'react';
+import { useFloatingWindow } from '../lib/floating';
 import { iconUrl } from '../lib/icons';
 
 interface Props {
@@ -29,6 +30,7 @@ export function Dialog({
   modeless,
 }: Props) {
   const box = useRef<HTMLDivElement>(null);
+  const floating = useFloatingWindow(!!modeless);
   // A modeless window can be moved by its title bar, so it doesn't hide what's beneath.
   const [offset, setOffset] = useState({ x: 0, y: 0 });
   const drag = (e: React.PointerEvent) => {
@@ -97,12 +99,15 @@ export function Dialog({
   return (
     <div
       className={`dialog-backdrop ${modeless ? 'modeless' : ''}`}
+      style={modeless ? { zIndex: floating.zIndex } : undefined}
       onMouseDown={(e) => !modeless && e.target === e.currentTarget && onClose()}
     >
       <div
         ref={box}
         tabIndex={-1}
         onKeyDown={trapTab}
+        onPointerDownCapture={modeless ? floating.raise : undefined}
+        onFocusCapture={modeless ? floating.raise : undefined}
         className="dialog"
         role="dialog"
         aria-modal={!modeless}
