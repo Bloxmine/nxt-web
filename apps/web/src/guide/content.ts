@@ -467,8 +467,68 @@ Without a brick, Download offers to save the \`.rxe\` file instead.`,
 - **Files**: what's on the brick (see below).
 - **Monitor**: live readings of all sensors and motors; set a sensor type per port and try the motors.
 - **Screen**: a live copy of the brick's screen, with **Record GIF**.
-- **Remote control**: drive the robot with the arrow keys or WASD, the on-screen pad or the joystick area. Also works on the simulated robot.
 - **Health check**: battery, firmware, free memory, and quick tests of each motor and sensor port.`,
+      },
+      {
+        id: 'remote-control',
+        title: 'Remote control and your own controls',
+        body: `Tools → **Remote control** drives the robot by hand: the brick over USB or Bluetooth, or the simulated robot. How it drives is set up in **controls**. Keep several, for example one per robot, and switch between them at the top. They are saved in this browser; **Export** writes a file to keep or share, and **Import** reads one back.
+
+- **Drive**: drive with your keys, the on-screen pad or the joystick area. Each motor shows its power and position, and says **at limit** when its limit holds it back. Your keys are listed and light up while held.
+- **Steering**: how the robot turns. **Two wheels or tracks** runs the left and right side at different speeds. **Car with a steering motor** turns the front wheels with one motor, within its range, while the others drive. **No steering** leaves only your own keys.
+- **Motors**: a name for each motor, reversed direction, top power, brake or coast when let go, and limits: how far it may turn each way from its centre.
+- **Keys**: what each key, key combination or gamepad control does.
+- **Sequences**: chains of commands that one key starts.
+
+Keys only drive while the Drive tab is open and you aren't typing in a box. Switching to another window stops everything.
+
+[[Open the remote control|remote]]`,
+      },
+      {
+        id: 'remote-car',
+        title: 'A car with a steering motor',
+        body: `Robots like a race car steer with a motor that turns the front wheels. If that motor keeps turning, the wheels hit their end and the gears grind or slip. Give it a range:
+
+1. Under **Steering**, choose **Car with a steering motor**, then the steering motor and the drive motors.
+2. Connect the brick and choose it under **Drive**.
+3. Click **Find the ends**. The steering turns slowly to one end, then the other; the centre goes in the middle and the range a little short of both ends.
+4. Or set it by hand: straighten the wheels, click **Set centre** under Motors, and type the range.
+
+Near the end of its range the steering slows down and stops just before it. With **Turn the steering back to the centre**, the wheels straighten when you let go of the steering keys. A gamepad stick pushed part of the way steers part of the way.
+
+Note: The centre is remembered while the page is open. After switching the brick off, straighten the wheels and click **Set centre** again (or Find the ends).
+
+Tip: The same limits work for any motor: an arm that may only lift so far, or a claw. Set them under **Motors**.`,
+      },
+      {
+        id: 'remote-keys',
+        title: 'Keys, combinations and gamepads',
+        body: `Under **Keys**, click a key button, press a key or several together, and let go. A key can:
+
+- drive forward, backward, left or right (the way the Steering tab says);
+- run one track forward or backward (tank controls);
+- run a motor while held, or switch it on and off with each press;
+- turn a motor to a position, for example to open or close a claw;
+- run a sequence, once or again and again while held;
+- set the speed, make it faster or slower, or boost it while held;
+- sound a horn, or stop everything.
+
+A combination wins over its keys alone: with **W** to drive forward and **Shift + W** for something else, holding Shift and W only does the second.
+
+Keys are named by where they are on the keyboard, so W A S D are the same keys on any layout. The browser keeps some combinations for itself, such as {B}Ctrl{B} + {B}W{B}; the Keys tab warns about them.
+
+Gamepads work too: press a button once so the browser notices the gamepad, then record its buttons and sticks like keys.
+
+Tip: The **Tank controls** preset puts the left track on W/S and the right track on ↑/↓. Hold both forward keys to drive straight.`,
+      },
+      {
+        id: 'remote-sequences',
+        title: 'Sequences',
+        body: `A sequence is a list of steps that one key starts: run motors for some seconds or degrees, turn a motor to a position, stop motors, wait, or play a tone. For example: close the claw, lift the arm and beep.
+
+While a sequence runs it controls the motors it uses; when it ends they go back to your keys. Limits apply to sequences too. **Try it** runs a sequence without a key, and **Stop all** (or your stop key) ends it.
+
+Note: In the simulator only the wheels move the robot. Other motors, such as an arm or a claw, only show their positions in the Remote control window.`,
       },
       {
         id: 'brickfiles',
@@ -681,6 +741,14 @@ The Health check and Communications tabs show the free memory. If a download fai
         body: `- Check the ports: is the motor really on B and C, the sensor really on port 4? NXT window → Monitor shows what is plugged in.
 - The program may end straight away: anything it shows disappears unless you end with a Wait.
 - Batteries: a weak battery can be too weak to turn the motors under load.`,
+      },
+      {
+        id: 'remote-wrong',
+        title: 'The remote control drives the wrong way or steers too far',
+        body: `- A motor turns the wrong way: tick **Reversed** for it under Motors.
+- Left and right are swapped: swap the motors under Steering.
+- The steering stops short or goes too far: straighten the wheels, click **Set centre**, and check the range (or use **Find the ends**). See [[A car with a steering motor|#remote-car]].
+- Nothing moves: is the right target chosen under Drive (the brick or the simulated robot)? In the simulator, a running program has to stop first.`,
       },
       {
         id: 'blank-picture',

@@ -47,6 +47,7 @@ import { HelpPanel } from './components/HelpPanel';
 import { MenuBar, type Menu } from './components/MenuBar';
 import { NxtWindow, type NxtTab } from './components/NxtWindow';
 import { CalibrateDialog } from './tools/CalibrateDialog';
+import { RemoteDialog } from './control/RemoteDialog';
 import { DataLogDialog } from './tools/DataLogDialog';
 import { saveFile } from './tools/convert';
 import { exportNotes, exportRbt, RbtExportError, type PackedFile, type RbtOrigin } from '@nxt/rbt';
@@ -145,6 +146,7 @@ type Modal =
   | { nxt: NxtTab }
   | 'datalog'
   | 'calibrate'
+  | 'remote'
   | 'variables'
   | 'about'
   | 'search'
@@ -1137,7 +1139,7 @@ function Studio() {
         { section: 'Brick' },
         { label: 'NXT Window', icon: 'monitor_window', onClick: () => setModal('nxt') },
         { label: 'Files on the brick…', icon: 'folder', onClick: () => setModal({ nxt: 'files' }) },
-        { label: 'Remote control…', icon: 'joystick', onClick: () => setModal({ nxt: 'remote' }) },
+        { label: 'Remote control…', icon: 'joystick', onClick: () => setModal('remote') },
         { label: 'Health check…', icon: 'heart', onClick: () => setModal({ nxt: 'health' }) },
         { label: 'Brick screen…', icon: 'monitor', onClick: () => setModal({ nxt: 'screen' }) },
         { label: 'Data logging…', icon: 'chart_line', onClick: () => setModal('datalog') },
@@ -1309,7 +1311,6 @@ function Studio() {
         return setModal('udev');
       case 'files':
       case 'screen':
-      case 'remote':
       case 'health':
         return setModal({ nxt: action });
       default:
@@ -1499,6 +1500,7 @@ function Studio() {
           </MessageDialog>
         )}
         {modal === 'datalog' && <DataLogDialog onClose={() => setModal(null)} />}
+        {modal === 'remote' && <RemoteDialog onClose={() => setModal(null)} />}
         {(modal === 'guide' ||
           (typeof modal === 'object' && modal !== null && 'guide' in modal)) && (
           <GuideDialog

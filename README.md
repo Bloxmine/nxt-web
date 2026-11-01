@@ -55,9 +55,15 @@ tutorials, a built-in user guide (F1), block help with examples, an example gall
 "modern blocks" view, and touch support for tablets.
 
 **Brick tools:** files (with multi-delete and a cleanup of unused pictures and sounds), a
-live sensor monitor, remote control, data logging, a live copy of the brick's screen (record
+live sensor monitor, data logging, a live copy of the brick's screen (record
 it as a GIF), a low-battery warning, a sound recorder (microphone → .rso), a picture editor (.ric) and an
 animated-GIF converter that also builds the program to play it.
+
+**Remote control with your own controls:** drive the brick or the simulated robot with
+keys, key combinations or a gamepad. Choose how it steers (two wheels, tank tracks, or a
+car with a steering motor that never turns past its ends), set limits, names and top
+power per motor, bind keys to motors or to sequences of commands, and save the setups
+as profiles you can export and share.
 
 **Download:** programs compile to `.rxe` files for the stock firmware and upload over USB
 (or Bluetooth, experimental). Without a brick you can save the `.rxe` file.

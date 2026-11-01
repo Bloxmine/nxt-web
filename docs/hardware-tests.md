@@ -89,8 +89,21 @@ confirmed" in [spec/rxe.md](spec/rxe.md). Connect over USB, then:
    see docs/spec/media.md.) Download, Delete and Run
    (on an .rxe) work.
 2. **Monitor**: choose Ultrasonic on port 4; the distance changes as you move a hand.
-3. **Remote control**: with motors on B and C, click the panel and drive with the arrow
-   keys; release stops the robot. Try the joystick area.
+3. **Remote control** (Tools → Remote control, Drive: the brick):
+   - _Two-wheel robot_ controls, motors on B and C: the arrow keys drive; letting go
+     stops; Shift boosts; 1/2/3 change the speed; H sounds the horn; the joystick works.
+   - Unplug nothing, switch to another window while driving: the motors stop.
+   - _Car with a steering motor_ (for example the race car, steering on A): Steering →
+     Find the ends. The steering turns slowly to each end and stops there without
+     grinding for long, then centres. Note the range it found and whether the centre
+     really is straight. Then steer with ← and →: the wheels stop just before each end
+     (watch the "at limit" flag), even when holding the key, and straighten on release.
+     Note any overshoot in degrees (the Position readout) over USB and over Bluetooth.
+   - Motors tab: tick Reversed on a drive motor: forward now turns it the other way.
+   - Keys: record Shift + Q to run motor A at 30% and Q alone at −30%: each does its own.
+   - A gamepad (if you have one): record a stick for steering; half-way steers half-way.
+   - Sequences: Run B+C at 50% for 360 degrees, then a tone. Try it: the wheels turn
+     about one rotation (check the degrees in the readout), then it beeps.
 4. **Health check**: lift the robot, run it; each connected motor shows "turned …°", an
    empty port shows a problem. The battery chart grows every 5 s.
 5. **Data logging** (Tools → Data logging): light sensor on port 3, record for 10 s while

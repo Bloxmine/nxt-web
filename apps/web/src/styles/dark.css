@@ -534,3 +534,58 @@
   border-color: #50545a;
   color: var(--text);
 }
+
+/* Remote control */
+[data-theme='dark'] .rc-gauge,
+[data-theme='dark'] .rc-kind {
+  border-color: #1d1e21;
+  background: linear-gradient(#3c3f45, #2e3135);
+}
+[data-theme='dark'] .rc-kind.active {
+  border-color: #c98a3c;
+  background: linear-gradient(#4d453a, #3a3229);
+  box-shadow: 0 0 0 1px #c98a3c inset;
+}
+[data-theme='dark'] .rc-gauge-numbers,
+[data-theme='dark'] .rc-pos {
+  color: #9cc7ff;
+}
+[data-theme='dark'] .rc-power,
+[data-theme='dark'] .rc-limitbar {
+  border-color: #1d1e21;
+  background: #24262a;
+}
+[data-theme='dark'] .rc-limitbar {
+  background: linear-gradient(90deg, #5a4127, #2a2c30 12%, #2a2c30 88%, #5a4127);
+}
+[data-theme='dark'] .rc-limitbar-pos {
+  background: linear-gradient(#e8ebef, #aeb4bc);
+}
+[data-theme='dark'] .rc-heading,
+[data-theme='dark'] .rc-label {
+  color: #b9c6d8;
+}
+[data-theme='dark'] .rc-cheats li.active {
+  background: linear-gradient(#5a4a33, #4d3f2a);
+}
+[data-theme='dark'] .rc-panel kbd,
+[data-theme='dark'] .rc-chord kbd {
+  border-color: #1d1e21;
+  background: linear-gradient(#55595f, #383b40);
+  color: var(--text);
+}
+[data-theme='dark'] .rc-chord,
+[data-theme='dark'] .rc-seq-list ul {
+  border-color: #55595f;
+  background: #24262a;
+}
+[data-theme='dark'] .rc-chord.recording {
+  background: #3a3229;
+}
+[data-theme='dark'] .rc-bindings li,
+[data-theme='dark'] .rc-steps li {
+  border-color: #3a3d42;
+}
+[data-theme='dark'] .rc-warn {
+  color: #e8b45a;
+}

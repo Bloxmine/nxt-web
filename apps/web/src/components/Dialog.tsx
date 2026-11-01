@@ -1,4 +1,4 @@
-import { useEffect, useRef, type ReactNode } from 'react';
+import { useEffect, useRef, useState, type ReactNode } from 'react';
 import { iconUrl } from '../lib/icons';
 
 interface Props {
@@ -29,6 +29,31 @@ export function Dialog({
   modeless,
 }: Props) {
   const box = useRef<HTMLDivElement>(null);
+  // A modeless window can be moved by its title bar, so it doesn't hide what's beneath.
+  const [offset, setOffset] = useState({ x: 0, y: 0 });
+  const drag = (e: React.PointerEvent) => {
+    if (!modeless || (e.target as HTMLElement).closest('button')) return;
+    const el = box.current;
+    if (!el) return;
+    const start = { x: e.clientX - offset.x, y: e.clientY - offset.y };
+    const rect = el.getBoundingClientRect();
+    const base = { left: rect.left - offset.x, top: rect.top - offset.y };
+    const move = (ev: PointerEvent) => {
+      const x = ev.clientX - start.x;
+      const y = ev.clientY - start.y;
+      // Keep the title bar on screen.
+      setOffset({
+        x: Math.min(window.innerWidth - 80 - base.left, Math.max(80 - base.left - rect.width, x)),
+        y: Math.min(window.innerHeight - 30 - base.top, Math.max(-base.top, y)),
+      });
+    };
+    const up = () => {
+      window.removeEventListener('pointermove', move);
+      window.removeEventListener('pointerup', up);
+    };
+    window.addEventListener('pointermove', move);
+    window.addEventListener('pointerup', up);
+  };
 
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
@@ -82,9 +107,12 @@ export function Dialog({
         role="dialog"
         aria-modal={!modeless}
         aria-label={title}
-        style={width ? { width: `min(${width}px, calc(100vw - 32px))` } : undefined}
+        style={{
+          ...(width ? { width: `min(${width}px, calc(100vw - 32px))` } : {}),
+          ...(offset.x || offset.y ? { transform: `translate(${offset.x}px, ${offset.y}px)` } : {}),
+        }}
       >
-        <div className="title-bar">
+        <div className={`title-bar ${modeless ? 'draggable' : ''}`} onPointerDown={drag}>
           <span style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
             <img src={iconUrl(icon)} alt="" />
             {title}

@@ -12,9 +12,8 @@ import { Dialog } from './Dialog';
 import { BrickScreen } from '../tools/BrickScreen';
 import { FileManager } from '../tools/FileManager';
 import { HealthPanel } from '../tools/HealthPanel';
-import { RemotePanel } from '../tools/RemotePanel';
 
-export type NxtTab = 'communications' | 'files' | 'monitor' | 'screen' | 'remote' | 'health';
+export type NxtTab = 'communications' | 'files' | 'monitor' | 'screen' | 'health';
 type Tab = NxtTab;
 
 /** Connection, brick info, files on the brick and a live sensor/motor monitor. */
@@ -59,7 +58,6 @@ export function NxtWindow({
             ['files', 'Files'],
             ['monitor', 'Monitor'],
             ['screen', 'Screen'],
-            ['remote', 'Remote control'],
             ['health', 'Health check'],
           ] as const
         ).map(([key, label]) => (
@@ -80,7 +78,6 @@ export function NxtWindow({
         {tab === 'files' && <FileManager />}
         {tab === 'monitor' && (connected ? <Monitor /> : <NotConnected />)}
         {tab === 'screen' && <BrickScreen />}
-        {tab === 'remote' && <RemotePanel />}
         {tab === 'health' && <HealthPanel />}
       </div>
     </Dialog>
