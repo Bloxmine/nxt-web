@@ -27,22 +27,34 @@ and ColorRace.
 
 The same script also downloads the site's NXT 1.0 projects into
 `fixtures/external/nxtprograms1/` (84 `.rbt` files, made with NXT-G 1.x; also
-git-ignored). **Status: 44 import without notes and run; all import without errors.**
-NXT-G 1.x blocks not supported yet, with the programs that use them:
+git-ignored). **Status: all 84 import and run in the simulator and compiled; 76 without
+notes.** The other 8 have a Calibration block (no editor equivalent: it changes a
+sensor's scale on the brick, and the calibration file format is not in docs/spec) or a
+loop the original never runs.
 
-| Block           | Programs | Settings (by name)                                                     |
-| --------------- | -------- | ---------------------------------------------------------------------- |
-| Rotation Sensor | 22       | Connection, Threshold, Distance Type, Polarity, Direction, Reset       |
-| Range           | 8        | A, B, Value, Polarity                                                  |
-| Calibration     | 6        | Connection, SensorType, Maximum, Restore Default (no editor block yet) |
-| Abort           | 4        | Abort (stops the program)                                              |
-| File Access     | 3        | Mode, Type, Filename, File Size, Text In, Number In                    |
-| Message Read    | 2        | Mailbox, MessageType, Timeout (200ms)                                  |
-| Message Write   | 2        | Message Connection, Mailbox, MessageType, Timeout                      |
+NXT-G 1.x blocks are read by setting name from each block's type map (`DataSpace`):
 
-All their settings can be read by name; what each value means still has to be checked
-against the programs, as was done for Math and Compare. Switches whose value came from
-one of these blocks fall back to their default case (the importer says so).
+| Block                | Settings                                                                                                | Meaning (how it was checked)                                                                                                                                                                                                                      |
+| -------------------- | ------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Numeric Operations   | A, B, Operation (0 + 1 − 2 × 3 ÷)                                                                       | Whole numbers. Whack-a-Brick: x = position × 34 − 24, score + 1, delay − 15                                                                                                                                                                       |
+| Numeric Comparison   | A, B, Operation (0 < 1 > 2 =)                                                                           | Whack-a-Brick: position = button                                                                                                                                                                                                                  |
+| Random Number        | A minimum, B maximum                                                                                    | Whack-a-Brick 1–3 (three positions), Robo_Mower 1–4                                                                                                                                                                                               |
+| Rotation Sensor      | Connection (1 A, 2 B, 3 C), Threshold, Polarity, Direction, Distance Type, Reset                        | Polarity true = `>` (Kicker, Ballerina wait for a turn after a reset); Direction false = backward (imported as a negative amount, comparison turned round); Reset true = Reset Rotation block. Distance Type 1 = rotations is assumed (no sample) |
+| Range (and FP Range) | A low, B high, Value, Polarity                                                                          | Polarity false = inside (Claw_Strike, Forklift, Radar wait for a distance inside), true = outside (Segway stops when its tilt leaves −1000…1000)                                                                                                  |
+| Abort                | Abort                                                                                                   | The Stop block                                                                                                                                                                                                                                    |
+| File Access          | Mode (0 read 1 write 2 close 3 delete), Type (0 text 1 number), Filename, File Size, Text In, Number In | LockBox, LockBoxReset, Rhythm_Echo                                                                                                                                                                                                                |
+| Message Read / Write | Mailbox, MessageType (0 text 1 number 2 logic), Message Connection                                      | Matches the wired plugs; Dial_Remote_BT sends on connection 1 to mailboxes 1–2                                                                                                                                                                    |
+
+Plug meanings found on the way: a Rotation Sensor's **Degrees** output is how far the motor
+turned (always positive) and **Direction** says which way (Joystick_Drive and the Dial
+remotes test Degrees against a range and pick forward/backward with Direction); the Sound
+block's **Duration** input is in milliseconds (Rhythm_Echo plays back clap lengths recorded
+from a timer). The editor's blocks now have these plugs too.
+
+**Wire nets.** A data wire with several ends is one net. The importer used to link its ends
+to the first one only, which lost every target when the first end was an input rather than
+the source (NXT 2.0 Segway: the tilt never reached the motors or the Range). 25 wires in
+the NXT 2.0 set and 31 in the NXT 1.0 set were affected.
 
 ## File structure
 
@@ -155,26 +167,26 @@ behaviour). Loop and wait times are stored in milliseconds (u32 at 0xCC of the t
 
 ## Block settings and confidence
 
-| Block          | Source               | Fields                                                                              | Confidence                                          |
-| -------------- | -------------------- | ----------------------------------------------------------------------------------- | --------------------------------------------------- |
-| Move           | settings tag         | ports, direction, steering, power, duration, next                                   | High                                                |
-| Motor          | settings tag         | port, direction, power, regulation, duration, wait, next                            | High                                                |
-| Sound          | settings tag         | tone/file, frequency, duration, volume, wait, repeat, stop                          | High                                                |
-| Ultrasonic     | settings tag         | port, compare (1 = "<"), value, units (0 = cm)                                      | High (units checked against a variable named "cm")  |
-| Color Lamp     | settings tag         | port, on/off, color (0 red, 1 green, 2 blue)                                        | High                                                |
-| Variable       | `VarName` tag + plug | name, read/write (direction of Value plug), type (plug type)                        | High; written constants default to 0                |
-| Display        | `DFDS`               | text (u32 length + text at 0xC0), image name                                        | Medium; X/Y position not decoded                    |
-| Touch          | `DFDS`               | port (u32 at 0xC0), action                                                          | Port high; action medium                            |
-| NXT Buttons    | `DFDS`               | button (u16 at 0xC0: 1 right, 2 left, 3 enter), action (u16 at 0xC4)                | Medium                                              |
-| Rotation       | `DFDS`               | port (u32 at 0xC0), degrees (u32 at 0xC4)                                           | Medium                                              |
-| Timer          | `DFDS`               | timer number                                                                        | Low; trigger value not decoded                      |
-| Math           | `DFDS`               | B (float after two range triples), operation (u16 after B; 0 add 1 sub 2 mul 3 div) | Medium                                              |
-| Compare        | `DFDS`               | B, operation (u16 before three u32 3s; 0 < 1 > 2 =)                                 | Medium                                              |
-| Logic          | `DFDS`               | operation (u16 before three u32 4s; 0 and 1 or 2 xor 3 not)                         | Medium                                              |
-| Range          | `DFDS`               | low, high, test value (floats)                                                      | Medium; inside/outside not decoded (inside assumed) |
-| Text           | `DFDS`               | A, B, C (u32 length + text each)                                                    | High                                                |
-| Number to Text | —                    | (no settings)                                                                       | High                                                |
-| Random         | `DFDS`, by name      | A = minimum, B = maximum                                                            | High (checked against the game's three positions)   |
+| Block          | Source               | Fields                                                                              | Confidence                                         |
+| -------------- | -------------------- | ----------------------------------------------------------------------------------- | -------------------------------------------------- |
+| Move           | settings tag         | ports, direction, steering, power, duration, next                                   | High                                               |
+| Motor          | settings tag         | port, direction, power, regulation, duration, wait, next                            | High                                               |
+| Sound          | settings tag         | tone/file, frequency, duration, volume, wait, repeat, stop                          | High                                               |
+| Ultrasonic     | settings tag         | port, compare (1 = "<"), value, units (0 = cm)                                      | High (units checked against a variable named "cm") |
+| Color Lamp     | settings tag         | port, on/off, color (0 red, 1 green, 2 blue)                                        | High                                               |
+| Variable       | `VarName` tag + plug | name, read/write (direction of Value plug), type (plug type)                        | High; written constants default to 0               |
+| Display        | `DFDS`               | text (u32 length + text at 0xC0), image name                                        | Medium; X/Y position not decoded                   |
+| Touch          | `DFDS`               | port (u32 at 0xC0), action                                                          | Port high; action medium                           |
+| NXT Buttons    | `DFDS`               | button (u16 at 0xC0: 1 right, 2 left, 3 enter), action (u16 at 0xC4)                | Medium                                             |
+| Rotation       | `DFDS`               | port (u32 at 0xC0), degrees (u32 at 0xC4)                                           | Medium                                             |
+| Timer          | `DFDS`               | timer number                                                                        | Low; trigger value not decoded                     |
+| Math           | `DFDS`               | B (float after two range triples), operation (u16 after B; 0 add 1 sub 2 mul 3 div) | Medium                                             |
+| Compare        | `DFDS`               | B, operation (u16 before three u32 3s; 0 < 1 > 2 =)                                 | Medium                                             |
+| Logic          | `DFDS`               | operation (u16 before three u32 4s; 0 and 1 or 2 xor 3 not)                         | Medium                                             |
+| Range          | `DFDS`, by name      | low, high, test value; Polarity false = inside, true = outside                      | High (see NXT 1.0 programs)                        |
+| Text           | `DFDS`               | A, B, C (u32 length + text each)                                                    | High                                               |
+| Number to Text | —                    | (no settings)                                                                       | High                                               |
+| Random         | `DFDS`, by name      | A = minimum, B = maximum                                                            | High (checked against the game's three positions)  |
 
 **NXT-G 1.x data blocks.** NXT 1.0 programs use the older whole-number blocks
 `Numeric Operations`, `Numeric Comparison` and `Number To Text` (the NXT 2.0 ones are
@@ -257,7 +269,7 @@ For a program opened from an `.rbt`, changed settings are written back into that
 both the settings tag and the defaults of each changed block are rewritten, the embedded
 VI and the outer resource file are rebuilt (`rsrcWrite.ts`; rebuilding any corpus file
 without changes gives the identical bytes). Supported: Move, Motor, Sound (not the file
-name), Display, wait and loop time and count, Math, Compare, Range (not inside/outside),
+name), Display, wait and loop time and count, Math, Compare, Range,
 Random, Logic, Text, number Constant, Color Lamp, and the touch, ultrasonic, timer,
 rotation and button settings of waits, loops, switches and sensor blocks.
 
@@ -287,7 +299,7 @@ this repository).
 
 ## Next steps
 
-1. Decode the remaining `DFDS` fields (Display X/Y, Range inside/outside, Timer trigger,
+1. Decode the remaining `DFDS` fields (Display X/Y, Timer trigger,
    Variable constant values) with more sample programs.
 2. Fetch the zipped projects (`.rbtx` Pack-and-Go) to grow the corpus.
 3. Light and Sound sensor blocks and NXT 2.0 Color Sensor blocks do not appear in this

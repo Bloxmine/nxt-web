@@ -89,7 +89,7 @@ Settings:
 - **Volume**: 0–100 %.
 - **Wait**: **Wait for completion** waits until the sound ends. **Repeat** (sound files only) plays the file again and again until a Sound block with Stop, or the end of the program; a repeating sound never waits.
 
-Data hub: **Tone** (number in, Hz) and **Volume** (number in).
+Data hub: **Tone** (number in, Hz), **Volume** (number in) and **Duration (ms)** (number in: how long a tone lasts, in milliseconds, as in NXT-G; 1000 is one second).
 
 Tip: Untick Wait to keep driving while a sound plays, for example a horn while the robot moves.`,
       },
@@ -219,9 +219,13 @@ Tip: Show the colour number on the screen while you hold the sensor over each co
         title: 'Rotation sensor',
         body: `Every NXT motor has a built-in rotation sensor that counts how far it has turned, in degrees (360 per rotation). This block reads that count.
 
-Settings: **Port** (motor A, B or C) and **Until**: \`<\` or \`>\` and an amount in **Degrees** or **Rotations**.
+Settings: **Port** (motor A, B or C) and **Until**: \`<\` or \`>\` and an amount in **Degrees** or **Rotations**. The count goes up forward and down backward, so to test a turn backward use a negative amount: "\`<\` −360" means "more than one rotation backward".
 
-Data hub: **Trigger** (number in), **Yes / No** (logic out) and **Value** (number out: whole degrees; backwards counts down).
+Data hub, as in the original NXT-G:
+
+- **Trigger** (number in) and **Yes / No** (logic out).
+- **Degrees** (number out): how far the motor has turned, always positive.
+- **Direction** (logic out): yes when the count is forward (0 or more), no when backward.
 
 Tip: Use **Reset Rotation** before measuring a new distance, so the count starts at 0.`,
       },
@@ -497,9 +501,9 @@ Settings:
 
 Each Write adds a line to the end of the file. Each Read reads the next line; at the end of the file you get empty text or 0. **Close** finishes with a file, so the next Read starts at the top again. **Delete** removes the file from the brick.
 
-Data hub: **Filename** (text in), **Text** and **Number** (in when writing, out when reading), **File size** (number in: bytes to reserve when the file is made) and **Error** (logic out).
+Data hub: **Filename** (text in), **Text** and **Number** (in when writing, out when reading), **File size** (number in: bytes to reserve when the file is made) and **Error** (logic out): yes when Read couldn't open the file, for example because it doesn't exist yet. Then the value read is empty text or 0.
 
-Note: The Error plug is always no for now; a missing file reads as empty text or 0.
+Tip: Read a file and test **Error** with a Switch to do something different the first time a program runs, such as asking for a new code.
 
 Tip: See the files on the brick, and download them to your computer, in the NXT window's Files tab.`,
       },

@@ -393,7 +393,9 @@ export function lowerProgram(program: Program): IrProgram {
       case 'sound': {
         const frequency = input(block, 'frequency', num(block.frequency));
         const volume = input(block, 'volume', num(block.volume));
-        const out = outputs(block, { frequency, volume });
+        // The Duration plug is in milliseconds, as in NXT-G (the setting is in seconds).
+        const durationMs = input(block, 'duration', num(Math.round(block.seconds * 1000)));
+        const out = outputs(block, { frequency, volume, duration: durationMs });
         if (block.action === 'stop') return [...out, { kind: 'stopSound', source }];
         if (block.action === 'file') {
           const file = block.file.endsWith('.rso') ? block.file : `${block.file}.rso`;
@@ -414,7 +416,7 @@ export function lowerProgram(program: Program): IrProgram {
           {
             kind: 'tone',
             frequency,
-            durationMs: num(Math.round(block.seconds * 1000)),
+            durationMs,
             volume,
             wait: block.wait,
             source,
@@ -526,13 +528,24 @@ export function lowerProgram(program: Program): IrProgram {
         if (block.action === 'read') {
           const target = newTemp();
           hidden.set(target, block.type === 'text' ? 'text' : 'number');
+          // Error: yes when the file could not be opened (for example, it doesn't exist).
+          const error = usedOutputs.has(`${block.id}:error`) ? newTemp() : undefined;
+          if (error) hidden.set(error, 'boolean');
           return [
-            { kind: 'file', action: 'read', file, valueType: block.type, target, source },
+            {
+              kind: 'file',
+              action: 'read',
+              file,
+              valueType: block.type,
+              target,
+              ...(error ? { error } : {}),
+              source,
+            },
             ...outputs(block, {
               filename: file,
               text: block.type === 'text' ? v(target) : text(''),
               number: block.type === 'number' ? v(target) : num(0),
-              error: bool(false),
+              error: error ? v(error) : bool(false),
             }),
           ];
         }
@@ -710,7 +723,18 @@ export function lowerProgram(program: Program): IrProgram {
           ...outputs(block, {
             trigger,
             yes: conditionExpr(c, block, trigger),
-            value: reading(c),
+            // A rotation sensor gives how far (always positive) and which way (yes =
+            // forward), like NXT-G's Degrees and Direction plugs.
+            value:
+              c.source === 'rotation'
+                ? {
+                    kind: 'choose',
+                    condition: bin('<', reading(c), num(0)),
+                    then: bin('-', num(0), reading(c)),
+                    else: reading(c),
+                  }
+                : reading(c),
+            direction: bin('>=', reading(c), num(0)),
           }),
         ];
       }

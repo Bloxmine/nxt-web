@@ -739,6 +739,9 @@ class Compiler {
         const open = this.params(ctx, 'fopenr', T.cluster(T.uword, T.ubyte, T.string, T.ulong));
         const have = c.label();
         const fail = c.label();
+        const error = s.error ? this.vars.get(s.error) : undefined;
+        if (s.error && !error) throw new CompileError(`Unknown variable "${s.error}"`, s.source);
+        if (error) c.emit(OP.MOV, [error.id, this.byte(0)]);
         c.emit(OP.MOV, [handle, this.field(resolved, 1)]);
         const openNow = c.label();
         c.brtst(CMP.NEQ, openNow, status);
@@ -768,6 +771,8 @@ class Compiler {
         c.emitVariable(OP.STRCAT, [text, text, this.field(read, 2)]);
         c.jmp(top);
         c.mark(fail);
+        // The file could not be opened.
+        if (error) c.emit(OP.MOV, [error.id, this.byte(1)]);
         c.mark(end);
         if (s.target) {
           const target = this.vars.get(s.target);

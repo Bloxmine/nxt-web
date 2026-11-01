@@ -353,12 +353,20 @@ function editCondition(c: Condition, before: Condition, e: Edit, problems: strin
       return;
     }
     case 'rotation': {
+      // A negative amount is a count backward (see rotationSettings in convert.ts):
+      // the original stores it as Direction backward with a positive Threshold.
       const b = before as typeof c;
+      const forward = c.value >= 0;
+      const wasForward = b.value >= 0;
       if (c.port !== b.port) s['Connection'] = MOTOR_NUMBER[c.port];
       if (c.value !== b.value || c.unit !== b.unit) {
-        s['Threshold'] = Math.round(c.unit === 'rotations' ? c.value * 360 : c.value);
+        const degrees = c.unit === 'rotations' ? c.value * 360 : c.value;
+        s['Threshold'] = Math.round(Math.abs(degrees));
       }
-      if (c.compare !== b.compare) s['Polarity'] = SENSOR_COMPARE_GT.has(c.compare);
+      if (c.unit !== b.unit) s['Distance Type'] = c.unit === 'rotations' ? 1 : 0;
+      if (forward !== wasForward) s['Direction'] = forward;
+      if (c.compare !== b.compare || forward !== wasForward)
+        s['Polarity'] = forward ? SENSOR_COMPARE_GT.has(c.compare) : c.compare === '<';
       return;
     }
     case 'button': {
@@ -477,8 +485,8 @@ export function exportRbt(program: Program, origin: RbtOrigin): Uint8Array {
         if (b.low !== prev.low) e.settings['A'] = b.low;
         if (b.high !== prev.high) e.settings['B'] = b.high;
         if (b.value !== prev.value) e.settings['Value'] = b.value;
-        if (b.inside !== prev.inside)
-          problems.push('Range: inside/outside cannot be written back yet.');
+        // Polarity false = inside, true = outside (see convert.ts).
+        if (b.inside !== prev.inside) e.settings['Polarity'] = !b.inside;
         return;
       }
       case 'random': {

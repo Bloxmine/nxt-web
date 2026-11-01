@@ -1,6 +1,6 @@
 import { existsSync, readdirSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
-import { lowerProgram, validateProgram, type Block } from '@nxt/blocks';
+import { lowerProgram, validateProgram, walkProgram, type Block } from '@nxt/blocks';
 import { describe, expect, it } from 'vitest';
 import { ByteReader } from './bytes.js';
 import { importRbt } from './index.js';
@@ -59,6 +59,15 @@ const files = existsSync(dir)
   : [];
 const load = (name: string) => importRbt(new Uint8Array(readFileSync(join(dir, name))), name);
 const has = (name: string) => files.includes(name);
+const everyBlock = (program: ReturnType<typeof load>['program']) => {
+  const out: Block[] = [];
+  walkProgram(program, (b) => out.push(b));
+  return out;
+};
+const findKind = (program: ReturnType<typeof load>['program'], kind: Block['kind']) =>
+  everyBlock(program).find((b) => b.kind === kind);
+const findId = (program: ReturnType<typeof load>['program'], id: string) =>
+  everyBlock(program).find((b) => b.id === id);
 
 describe.skipIf(files.length === 0)('importing real .rbt programs (local only)', () => {
   it.each(files)('%s imports, validates and lowers', (name) => {
@@ -82,6 +91,22 @@ describe.skipIf(files.length === 0)('importing real .rbt programs (local only)',
         direction: 'backward',
         duration: { unit: 'seconds', value: 0.5 },
       });
+    },
+  );
+
+  it.skipIf(!has('Segway.rbt'))(
+    'Segway: a wire listed from an input end still reaches every input',
+    () => {
+      const { program } = load('Segway.rbt');
+      const range = program.body.length ? findKind(program, 'range') : undefined;
+      expect(range).toMatchObject({ inside: false });
+      const into = (kind: Block['kind'], plug: string) =>
+        program.wires.filter((w) => {
+          const b = findId(program, w.to.block);
+          return b?.kind === kind && w.to.plug === plug;
+        }).length;
+      expect(into('range', 'value')).toBe(1);
+      expect(into('motor', 'power')).toBeGreaterThanOrEqual(2);
     },
   );
 
@@ -258,6 +283,146 @@ describe.skipIf(files1.length === 0)('NXT 1.0 programs (local only)', () => {
     expect(validateProgram(program).filter((i) => i.severity === 'error')).toEqual([]);
     expect(() => lowerProgram(program)).not.toThrow();
   });
+
+  const all = (program: ReturnType<typeof load1>['program']) => {
+    const out: Block[] = [];
+    const walk = (list: Block[]) =>
+      list.forEach((b) => {
+        out.push(b);
+        if (b.kind === 'loop') walk(b.body);
+        if (b.kind === 'switch') {
+          walk(b.whenTrue);
+          walk(b.whenFalse);
+          b.cases?.forEach((c) => walk(c.blocks));
+        }
+      });
+    walk(program.body);
+    program.parallel.forEach(walk);
+    return out;
+  };
+  const wiredFrom = (program: ReturnType<typeof load1>['program'], b: Block) =>
+    program.wires.filter((w) => w.from.block === b.id).map((w) => w.from.plug);
+  const wiredTo = (program: ReturnType<typeof load1>['program'], b: Block) =>
+    program.wires.filter((w) => w.to.block === b.id).map((w) => w.to.plug);
+
+  it.skipIf(!files1.includes('Kicker.rbt'))('Kicker: reset B, then wait for 120° forward', () => {
+    const { program, warnings } = load1('Kicker.rbt');
+    expect(warnings).toEqual([]);
+    const blocks = all(program);
+    expect(blocks).toContainEqual(expect.objectContaining({ kind: 'resetRotation', port: 'B' }));
+    expect(blocks).toContainEqual(
+      expect.objectContaining({
+        kind: 'wait',
+        control: {
+          type: 'sensor',
+          condition: { source: 'rotation', port: 'B', compare: '>', value: 120, unit: 'degrees' },
+        },
+      }),
+    );
+  });
+
+  it.skipIf(!files1.includes('Ball_Hunt.rbt'))(
+    'Ball_Hunt: a count backward becomes a negative amount',
+    () => {
+      const blocks = all(load1('Ball_Hunt.rbt').program);
+      expect(blocks).toContainEqual(
+        expect.objectContaining({
+          kind: 'loop',
+          control: {
+            type: 'sensor',
+            condition: {
+              source: 'rotation',
+              port: 'C',
+              compare: '<',
+              value: -1000,
+              unit: 'degrees',
+            },
+          },
+        }),
+      );
+      expect(blocks.filter((b) => b.kind === 'stop')).toHaveLength(2); // Abort blocks
+    },
+  );
+
+  it.skipIf(!files1.includes('Joystick_Drive.rbt'))(
+    'Joystick_Drive: rotation Degrees and Direction feed a Range and a Switch',
+    () => {
+      const { program } = load1('Joystick_Drive.rbt');
+      const blocks = all(program);
+      const sensor = blocks.find((b) => b.kind === 'sensor')!;
+      expect(wiredFrom(program, sensor)).toEqual(expect.arrayContaining(['value', 'direction']));
+      const ranges = blocks.filter((b) => b.kind === 'range');
+      expect(ranges.map((r) => r.kind === 'range' && [r.low, r.high, r.inside])).toEqual(
+        expect.arrayContaining([
+          [101, 160, true],
+          [-100, 100, true],
+        ]),
+      );
+    },
+  );
+
+  it.skipIf(!files1.includes('LockBox.rbt'))(
+    'LockBox: reads the code file and uses its Error output',
+    () => {
+      const { program } = load1('LockBox.rbt');
+      const files = all(program).filter((b) => b.kind === 'file');
+      expect(new Set(files.map((b) => b.kind === 'file' && b.action))).toEqual(
+        new Set(['read', 'write', 'close', 'delete']),
+      );
+      const read = files.find((b) => b.kind === 'file' && b.action === 'read')!;
+      expect(read).toMatchObject({ file: 'LockBoxCode', type: 'number' });
+      expect(wiredFrom(program, read)).toEqual(expect.arrayContaining(['number', 'error']));
+    },
+  );
+
+  it.skipIf(!files1.includes('Dial_Remote_BT.rbt') || !files1.includes('Dial_BT_Robot.rbt'))(
+    'Dial remote: numbers sent on connection 1 to mailboxes 1 and 2, and read there',
+    () => {
+      const send = all(load1('Dial_Remote_BT.rbt').program).filter((b) => b.kind === 'sendMessage');
+      expect(
+        send.map((b) => b.kind === 'sendMessage' && [b.connection, b.mailbox, b.type]),
+      ).toEqual(
+        expect.arrayContaining([
+          [1, 1, 'number'],
+          [1, 2, 'number'],
+        ]),
+      );
+      const robot = load1('Dial_BT_Robot.rbt').program;
+      const read = all(robot).filter((b) => b.kind === 'receiveMessage');
+      expect(read.map((b) => b.kind === 'receiveMessage' && b.mailbox).sort()).toEqual([1, 2]);
+      for (const r of read)
+        expect(wiredFrom(robot, r)).toEqual(expect.arrayContaining(['received', 'value']));
+    },
+  );
+
+  it.skipIf(!files1.includes('Rhythm_Echo.rbt') || !files1.includes('Robo_Mower.rbt'))(
+    'wired Sound durations and a random number into a Switch',
+    () => {
+      const echo = load1('Rhythm_Echo.rbt').program;
+      expect(
+        all(echo).filter((b) => b.kind === 'sound' && wiredTo(echo, b).includes('duration')),
+      ).toHaveLength(2);
+      const mower = load1('Robo_Mower.rbt').program;
+      const random = all(mower).find((b) => b.kind === 'random')!;
+      expect(random).toMatchObject({ min: 1, max: 4 });
+      expect(wiredFrom(mower, random)).toEqual(['value']);
+    },
+  );
+
+  it.skipIf(!files1.includes('Segway.rbt'))(
+    'Segway: the tilt reaches both motors and the "fallen over" range (outside)',
+    () => {
+      const { program } = load1('Segway.rbt');
+      const blocks = all(program);
+      const range = blocks.find((b) => b.kind === 'range')!;
+      expect(range).toMatchObject({ low: -1000, high: 1000, inside: false });
+      expect(wiredTo(program, range)).toContain('value');
+      const motors = blocks.filter(
+        (b) => b.kind === 'motor' && wiredTo(program, b).includes('power'),
+      );
+      expect(motors.length).toBeGreaterThanOrEqual(2);
+    },
+  );
 
   it.skipIf(!files1.includes('Whack-a-Brick.rbt'))(
     'Whack-a-Brick: whole-number Math, Compare, Number To Text and Random',

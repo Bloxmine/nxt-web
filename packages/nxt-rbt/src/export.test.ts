@@ -1,6 +1,6 @@
 import { existsSync, readdirSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
-import { walkProgram, type Block, type Program } from '@nxt/blocks';
+import { walkProgram, type Block, type Condition, type Program } from '@nxt/blocks';
 import { describe, expect, it } from 'vitest';
 import {
   DataSpace,
@@ -23,10 +23,14 @@ describe('steering table', () => {
 });
 
 const dir = join(import.meta.dirname, '../../../fixtures/external/nxtprograms');
-const files = existsSync(dir) ? readdirSync(dir).filter((f) => f.endsWith('.rbt')) : [];
+const dir1 = join(import.meta.dirname, '../../../fixtures/external/nxtprograms1');
+const list = (d: string) => (existsSync(d) ? readdirSync(d).filter((f) => f.endsWith('.rbt')) : []);
+// NXT 2.0 programs by name, NXT 1.0 programs as "nxt1/<name>".
+const files = [...list(dir), ...list(dir1).map((f) => `nxt1/${f}`)];
 const load = (name: string) => {
-  const bytes = new Uint8Array(readFileSync(join(dir, name)));
-  const result = importRbt(bytes, name);
+  const path = name.startsWith('nxt1/') ? join(dir1, name.slice(5)) : join(dir, name);
+  const bytes = new Uint8Array(readFileSync(path));
+  const result = importRbt(bytes, name.replace(/^nxt1\//, ''));
   return { bytes, result, origin: originOf(result, bytes, name) };
 };
 const blocks = (p: Program) => {
@@ -35,6 +39,15 @@ const blocks = (p: Program) => {
   return list;
 };
 const clone = <T>(v: T): T => JSON.parse(JSON.stringify(v)) as T;
+
+/** A rotation condition counted the other way, with another amount and comparison. */
+function turnRound(c: Extract<Condition, { source: 'rotation' }>): typeof c {
+  return {
+    ...c,
+    value: c.value >= 0 ? -(Math.abs(c.value) + 90) : Math.abs(c.value) + 90,
+    compare: c.compare === '>' ? '<' : '>',
+  };
+}
 
 /** A changed copy of a block's settings, or null if the exporter does not handle it. */
 function mutate(b: Block): Block | null {
@@ -62,11 +75,20 @@ function mutate(b: Block): Block | null {
     case 'display':
       return b.action === 'text' ? { ...b, text: 'Hi there', x: 12, line: 3 } : null;
     case 'wait':
-      return b.control.type === 'time' ? { ...b, control: { type: 'time', seconds: 2.5 } } : null;
+      if (b.control.type === 'time') return { ...b, control: { type: 'time', seconds: 2.5 } };
+      return b.control.type === 'sensor' && b.control.condition.source === 'rotation'
+        ? { ...b, control: { type: 'sensor', condition: turnRound(b.control.condition) } }
+        : null;
     case 'loop':
       if (b.control.type === 'count') return { ...b, control: { type: 'count', count: 7 } };
       if (b.control.type === 'time') return { ...b, control: { type: 'time', seconds: 1.2 } };
-      return null;
+      return b.control.type === 'sensor' && b.control.condition.source === 'rotation'
+        ? { ...b, control: { type: 'sensor', condition: turnRound(b.control.condition) } }
+        : null;
+    case 'sensor':
+      return b.condition.source === 'rotation' ? { ...b, condition: turnRound(b.condition) } : null;
+    case 'range':
+      return { ...b, inside: !b.inside, low: 3, high: 77 };
     case 'math':
       return { ...b, b: 7, op: '*' };
     case 'compare':
@@ -100,6 +122,10 @@ function expected(b: Block): Record<string, unknown> {
     case 'wait':
     case 'loop':
       return pick(['control']);
+    case 'sensor':
+      return pick(['condition']);
+    case 'range':
+      return pick(['inside', 'low', 'high']);
     case 'math':
     case 'compare':
       return pick(['b', 'op']);
@@ -181,7 +207,7 @@ describe.skipIf(files.length === 0)('writing .rbt files back (local only)', () =
   });
 
   it('rewriting a container without changes is the identity', () => {
-    for (const name of files.slice(0, 5)) {
+    for (const name of list(dir).slice(0, 5)) {
       const bytes = new Uint8Array(readFileSync(join(dir, name)));
       expect(Buffer.compare(Buffer.from(rewriteRsrc(bytes, new Map())), Buffer.from(bytes))).toBe(
         0,

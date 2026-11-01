@@ -47,7 +47,12 @@ export function plugsOf(block: Block): Plug[] {
         plug('duration', 'Duration', 'number', true),
       ];
     case 'sound':
-      return [plug('frequency', 'Tone', 'number', true), plug('volume', 'Volume', 'number', true)];
+      return [
+        plug('frequency', 'Tone', 'number', true),
+        plug('volume', 'Volume', 'number', true),
+        // Milliseconds, as in NXT-G.
+        plug('duration', 'Duration (ms)', 'number', true),
+      ];
     case 'display':
       return [
         plug('text', 'Text', 'text', true),
@@ -122,6 +127,15 @@ export function plugsOf(block: Block): Plug[] {
       }
       if (c.source === 'color' && c.mode === 'range') {
         return [plug('yes', 'Yes / No', 'logic', false), plug('value', 'Color', 'number', false)];
+      }
+      if (c.source === 'rotation') {
+        // As in NXT-G: Degrees is how far the motor turned, Direction which way.
+        return [
+          plug('trigger', 'Trigger', 'number', true),
+          plug('yes', 'Yes / No', 'logic', false),
+          plug('value', 'Degrees', 'number', false),
+          plug('direction', 'Direction', 'logic', false),
+        ];
       }
       return [
         plug('trigger', 'Trigger', 'number', true),

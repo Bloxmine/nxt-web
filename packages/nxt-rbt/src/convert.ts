@@ -57,6 +57,7 @@ const SENSOR_TEMPLATES = new Set([
   'Sound Sensor',
   'FP Sound Sensor',
   'FP Rotation Sensor',
+  'Rotation Sensor',
   'Timer',
   'NXT Buttons',
   'Color Sensor',
@@ -113,20 +114,63 @@ class Defaults {
 /** The (-inf, +inf, 0) single-precision range triple stored before numeric values. */
 const SGL_RANGE = [0xff, 0x80, 0, 0, 0x7f, 0x80, 0, 0, 0, 0, 0, 0];
 
-/**
- * Reads a block's numeric settings by their front-panel names (see DataSpace), or null
- * when the block's data can't be read that way.
- */
-function namedSettings(inst: RbtInstance): ((label: string) => number) | null {
+/** A block's settings read by their front-panel names (see DataSpace). */
+interface NamedSettings {
+  has(label: string): boolean;
+  /** A number or yes/no (as 1/0); 0 when missing. */
+  num(label: string): number;
+  /** Text; "" when missing. */
+  text(label: string): string;
+}
+
+/** Reads a block's settings by name, or null when its data can't be read that way. */
+function namedSettings(inst: RbtInstance): NamedSettings | null {
   try {
     const space = new DataSpace(inst.dstm, inst.dfds);
-    return (label) => {
-      const v = space.has(label) ? space.get(label) : undefined;
-      return typeof v === 'number' ? v : typeof v === 'boolean' ? Number(v) : 0;
+    const get = (label: string) => (space.has(label) ? space.get(label) : undefined);
+    return {
+      has: (label) => space.has(label),
+      num: (label) => {
+        const v = get(label);
+        return typeof v === 'number' ? v : typeof v === 'boolean' ? Number(v) : 0;
+      },
+      text: (label) => {
+        const v = get(label);
+        return typeof v === 'string' ? v : '';
+      },
     };
   } catch {
     return null;
   }
+}
+
+/**
+ * A Rotation Sensor block (NXT-G 1.x, or FP in 2.0) read by name: its condition, and
+ * whether it is set to reset the count instead. Polarity true is ">" (checked against
+ * Kicker and Ballerina, which wait for a turn after a reset). A count "backward" is a
+ * negative amount here, with the comparison turned round. Null when not readable.
+ */
+function rotationSettings(
+  inst: RbtInstance,
+): { condition: Extract<Condition, { source: 'rotation' }>; reset: boolean } | null {
+  const g = namedSettings(inst);
+  if (!g?.has('Threshold') || !g.has('Connection')) return null;
+  const p = g.num('Connection');
+  const port: MotorPort = p === 2 ? 'B' : p === 3 ? 'C' : 'A';
+  const rotations = g.num('Distance Type') === 1;
+  const amount = rotations ? g.num('Threshold') / 360 : g.num('Threshold');
+  const forward = !g.has('Direction') || g.num('Direction') !== 0;
+  const greater = g.num('Polarity') !== 0;
+  return {
+    condition: {
+      source: 'rotation',
+      port,
+      compare: greater === forward ? '>' : '<',
+      value: forward ? amount : -amount,
+      unit: rotations ? 'rotations' : 'degrees',
+    },
+    reset: g.num('Reset') !== 0,
+  };
 }
 
 const DURATION_UNITS = ['unlimited', 'degrees', 'rotations', 'seconds'] as const;
@@ -149,7 +193,8 @@ function sensorPort(v: number): SensorPort {
 const PLUG_NAMES: Record<string, Record<string, string>> = {
   move: { Power: 'power', Steering: 'steering', Direction: 'direction', Goal: 'duration' },
   motor: { Power: 'power', Direction: 'direction', Goal: 'duration' },
-  sound: { Tone: 'frequency', Volume: 'volume' },
+  sound: { Tone: 'frequency', Volume: 'volume', Duration: 'duration' },
+  random: { A: 'min', B: 'max', Number: 'value' },
   display: { Text: 'text', X: 'x', Y: 'y', 'End X': 'endX', 'End Y': 'endY', Radius: 'radius' },
   variable: { Value: 'value' },
   sensor: {
@@ -157,6 +202,7 @@ const PLUG_NAMES: Record<string, Record<string, string>> = {
     'Raw Value': 'value',
     Distance: 'value',
     'Degrees out': 'value',
+    'Direction out': 'direction',
     'Timer Value': 'value',
     Intensity: 'value',
     Color: 'value',
@@ -231,8 +277,11 @@ export function convertRbt(rbt: RbtProgram): ImportResult {
   };
   for (const w of rbt.wires) {
     if (w.beam) continue;
+    // All ends of a wire are one net. (Linking them only to the first end loses
+    // targets when that end is an input rather than the source, as in Segway.)
     const keys = w.ends.map((e) => key(e.terminal, e.inside));
-    for (let i = 1; i < keys.length; i++) link(keys[0]!, keys[i]!);
+    for (let i = 0; i < keys.length; i++)
+      for (let j = i + 1; j < keys.length; j++) link(keys[i]!, keys[j]!);
   }
   for (const t of rbt.terminals.values()) {
     if (t.role === 'tunnel') link(key(t.ptr, false), key(t.ptr, true));
@@ -362,7 +411,10 @@ export function convertRbt(rbt: RbtProgram): ImportResult {
           unit: num(c?.['Units'], 0) === 1 ? 'in' : 'cm',
         };
       }
+      case 'Rotation Sensor':
       case 'FP Rotation Sensor': {
+        const named = rotationSettings(inst);
+        if (named) return named.condition;
         const p = d.u32(0xc0, 1);
         const port: MotorPort = p === 2 ? 'B' : p === 3 ? 'C' : 'A';
         return { source: 'rotation', port, compare: '>', value: d.u32(0xc4, 360), unit: 'degrees' };
@@ -620,12 +672,68 @@ export function convertRbt(rbt: RbtProgram): ImportResult {
         const ops = math ? (['+', '-', '*', '/'] as const) : (['<', '>', '='] as const);
         return {
           ...createBlock(math ? 'math' : 'compare'),
-          a: get?.('A') ?? 0,
-          b: get?.('B') ?? 0,
-          op: ops[get?.('Operation') ?? 0] ?? ops[0],
+          a: get?.num('A') ?? 0,
+          b: get?.num('B') ?? 0,
+          op: ops[get?.num('Operation') ?? 0] ?? ops[0],
           hub: true,
         } as Block;
       }
+      case 'Rotation Sensor':
+      case 'FP Rotation Sensor': {
+        const named = rotationSettings(inst);
+        // "Reset" mode: the block sets the count back to 0.
+        if (named?.reset)
+          return { ...createBlock('resetRotation'), port: named.condition.port } as Block;
+        const condition = named?.condition ?? conditionFromSensor(n);
+        return condition ? ({ ...createBlock('sensor'), condition, hub: true } as Block) : null;
+      }
+      case 'Abort': {
+        // NXT-G 1.x's Stop block.
+        const named = namedSettings(inst);
+        return !named || named.num('Abort') !== 0 ? createBlock('stop') : null;
+      }
+      case 'File Access': {
+        // NXT-G 1.x: Mode 0 read, 1 write, 2 close, 3 delete; Type 0 text, 1 number.
+        const g = namedSettings(inst);
+        if (!g) return null;
+        const actions = ['read', 'write', 'close', 'delete'] as const;
+        const size = g.num('File Size');
+        return {
+          ...createBlock('file'),
+          action: actions[g.num('Mode')] ?? 'read',
+          file: g.text('Filename') || 'MyFile',
+          type: g.num('Type') === 1 ? 'number' : 'text',
+          text: g.text('Text In'),
+          number: g.num('Number In'),
+          ...(size > 0 ? { size } : {}),
+          hub: true,
+        } as Block;
+      }
+      case 'Message Read':
+      case 'Message Write': {
+        // NXT-G 1.x: MessageType 0 text, 1 number, 2 logic (it matches the wired plugs).
+        const g = namedSettings(inst);
+        if (!g) return null;
+        const type = (['text', 'number', 'logic'] as const)[g.num('MessageType')] ?? 'number';
+        const mailbox = Math.max(1, Math.min(10, g.num('Mailbox') || 1));
+        if (t === 'Message Read')
+          return { ...createBlock('receiveMessage'), mailbox, type, hub: true } as Block;
+        return {
+          ...createBlock('sendMessage'),
+          connection: Math.max(0, Math.min(3, g.num('Message Connection'))) as 0 | 1 | 2 | 3,
+          mailbox,
+          type,
+          number: g.num('Number In'),
+          logic: g.num('Boolean In') !== 0,
+          text: g.text('String In'),
+          hub: true,
+        } as Block;
+      }
+      case 'Calibration':
+        warn(
+          'Calibration blocks (which change a sensor’s scale on the brick) are not available here and were left out; sensors read their own scale.',
+        );
+        return null;
       case 'FP Numeric Comparison': {
         const b = startsWith(d, 0xd8, [0, 0, 0xff, 0xff]) ? 0 : d.f32(0xd8);
         const anchor = d.find([0, 0, 0, 3, 0, 0, 0, 3, 0, 0, 0, 3], 0xd8);
@@ -633,7 +741,22 @@ export function convertRbt(rbt: RbtProgram): ImportResult {
         const ops = ['<', '>', '='] as const;
         return { ...createBlock('compare'), op: ops[op] ?? '<', b, hub: true } as Block;
       }
+      case 'Range':
       case 'FP Range': {
+        // By name: A low, B high, Value; Polarity false = inside, true = outside
+        // (Claw_Strike and Forklift wait for a distance inside the range, Segway stops
+        // when its tilt leaves −1000…1000).
+        const named = namedSettings(inst);
+        if (named?.has('A') && named.has('Polarity'))
+          return {
+            ...createBlock('range'),
+            low: named.num('A'),
+            high: named.num('B'),
+            value: named.num('Value'),
+            inside: named.num('Polarity') === 0,
+            hub: true,
+          } as Block;
+        if (t === 'Range') return null;
         const present = !startsWith(d, 0xc0, SGL_RANGE.slice(0, 4));
         return {
           ...createBlock('range'),
@@ -785,8 +908,8 @@ export function convertRbt(rbt: RbtProgram): ImportResult {
           const get = namedSettings(inst);
           return {
             ...createBlock('random'),
-            min: get?.('A') ?? 0,
-            max: get?.('B') ?? 0,
+            min: get?.num('A') ?? 0,
+            max: get?.num('B') ?? 0,
             hub: true,
           } as Block;
         }

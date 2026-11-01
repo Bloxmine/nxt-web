@@ -104,6 +104,8 @@ export type Stmt = StmtBase &
         valueType: 'text' | 'number';
         value?: Expr;
         target?: string;
+        /** Read: logic variable set to true when the file could not be opened. */
+        error?: string;
         /** Write: bytes to reserve when creating the file. */
         size?: Expr;
       }

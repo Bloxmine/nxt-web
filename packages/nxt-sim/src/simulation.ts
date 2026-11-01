@@ -556,6 +556,7 @@ export class Simulation {
         if (s.target) {
           this.vars.set(s.target, s.valueType === 'number' ? Number(line) || 0 : line);
         }
+        if (s.error) this.vars.set(s.error, !file);
         return;
       }
       case 'close': {

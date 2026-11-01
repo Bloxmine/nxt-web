@@ -76,6 +76,9 @@ confirmed" in [spec/rxe.md](spec/rxe.md). Connect over USB, then:
    updates.
 7. **Files.** A program with File Access write (number 42), close, read: Display shows 42.
    NXT window → Memory lists the .txt file.
+   Then a File Access read of a file that doesn't exist, its **Error** wired to a Switch
+   that shows "missing" or "found": it shows "missing"; after writing the file, "found".
+   (Open NXT 1.0's LockBox from nxtprograms.com for a real program that does this.)
 8. **Two beams.** Drive and sing: the robot drives while the tune plays.
 9. **Bluetooth messages (two bricks).** 5ButtonRemote/5ButtonSteer from nxtprograms.com:
    messages arrive in mailboxes 1 and 2.
