@@ -139,6 +139,28 @@ function Communications() {
               ? `Connected via ${brick.kind}.`
               : 'Plug the brick in with a USB cable and switch it on.'}
         </p>
+        {!connected && hasSerial && (
+          <details className="udev-details">
+            <summary>Brick not in the Bluetooth list?</summary>
+            <p>
+              Pair the brick in your computer&apos;s Bluetooth settings first (passkey{' '}
+              <code>1234</code>). The list only shows paired devices that offer a serial port.
+            </p>
+            <p>
+              If your browser still doesn&apos;t list it, bind the brick to a serial port yourself
+              (on Linux: <code>sudo rfcomm bind 0 &lt;brick address&gt;</code>) and pick that port:{' '}
+              <button
+                type="button"
+                className="guide-link"
+                disabled={brick.state === 'connecting'}
+                onClick={() => void brick.connectBluetooth(true)}
+              >
+                show all serial ports
+              </button>
+              .
+            </p>
+          </details>
+        )}
         {!connected && isLinux() && (
           <details className="udev-details">
             <summary>First time on Linux? Install the USB permission rule</summary>

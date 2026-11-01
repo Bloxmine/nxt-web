@@ -1178,6 +1178,12 @@ function Studio() {
           onClick: () => void brick.connectBluetooth(),
         },
         {
+          label: 'Connect via other serial port…',
+          icon: 'bluetooth',
+          disabled: !support.serial,
+          onClick: () => void brick.connectBluetooth(true),
+        },
+        {
           label: 'Disconnect',
           icon: 'disconnect',
           disabled: !connected,

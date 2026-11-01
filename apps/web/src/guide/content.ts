@@ -170,13 +170,32 @@ If the original MINDSTORMS software is installed and running, quit it first, bec
       {
         id: 'bluetooth',
         title: 'Bluetooth (experimental)',
-        body: `The brick can also be reached over Bluetooth, through the browser's serial-port support:
+        body: `The brick can also be reached over Bluetooth, through the browser's serial-port support (Chrome, Edge or Chromium 117 or newer):
 
 1. Switch on Bluetooth on the brick (Bluetooth menu → On/Off, Visibility on).
-2. Pair the brick with your computer in the system's Bluetooth settings. The brick asks for a passkey; the default is \`1234\`.
-3. In NXT Web Studio, choose Tools → **Connect via Bluetooth (experimental)** and pick the brick's serial port.
+2. Pair the brick with your computer in the system's Bluetooth settings. The brick asks for a passkey; the default is \`1234\`. Confirm it on the brick with the orange button and type the same passkey on the computer.
+3. In NXT Web Studio, choose Tools → **Connect via Bluetooth (experimental)** and pick the brick in the list.
+
+The list shows only paired Bluetooth devices that offer a serial port, not the computer's own serial ports.
 
 Bluetooth is much slower than USB, so downloads and the live views take longer. If it doesn't work, use USB.`,
+      },
+      {
+        id: 'bluetooth-linux',
+        title: 'Pairing on Linux',
+        body: `The brick uses old-style PIN pairing, which some desktop pairing wizards (KDE's, for example) fail at. Pair it from a terminal instead:
+
+1. Switch on the brick's Bluetooth with Visibility on.
+2. Open a terminal and run \`bluetoothctl\`. Then type, one line at a time:
+    \`agent KeyboardOnly\`
+    \`default-agent\`
+    \`scan on\`
+3. Wait until a line with **NXT** and its address appears (it starts with \`00:16:53\`), then type \`scan off\`.
+4. Type \`pair\` followed by that address, for example \`pair 00:16:53:0F:32:D7\`.
+5. The brick shows a passkey: press the orange button to accept \`1234\`. When the terminal asks **Enter PIN code**, type \`1234\` and press Enter.
+6. Type \`trust\` and the same address, then \`quit\`.
+
+Note: if the brick doesn't show up in **Connect via Bluetooth**, bind it to a serial port yourself and pick that port with Tools → **Connect via other serial port…**: \`sudo rfcomm bind 0\` plus the brick's address creates \`/dev/rfcomm0\`. On Arch the \`rfcomm\` tool is in the \`bluez-deprecated-tools\` package, and your user needs to be in the group that owns the port (\`uucp\` on Arch, \`dialout\` on Debian and Ubuntu).`,
       },
       {
         id: 'offline',

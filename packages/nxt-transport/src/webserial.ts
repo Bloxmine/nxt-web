@@ -4,6 +4,9 @@ import { BaseTransport } from './base.js';
 import { BluetoothDeframer, frameBluetooth } from './framing.js';
 import type { Transport } from './transport.js';
 
+/** Bluetooth Serial Port Profile service class, the serial service a paired brick offers. */
+export const SERIAL_PORT_PROFILE = '00001101-0000-1000-8000-00805f9b34fb';
+
 /**
  * Talks to a brick over an OS-paired Bluetooth serial port (RFCOMM) using Web
  * Serial. Experimental: the brick's Bluetooth stack is unreliable on modern hosts.
@@ -17,9 +20,19 @@ export class WebSerialTransport extends BaseTransport implements Transport {
     super();
   }
 
-  /** Shows the browser's serial port picker. */
-  static async request(serial: Serial = navigator.serial): Promise<WebSerialTransport> {
-    return new WebSerialTransport(await serial.requestPort());
+  /**
+   * Shows the browser's serial port picker. By default it lists only Bluetooth devices
+   * that offer the Serial Port Profile, so the computer's own serial ports (ttyS0…) stay
+   * out of the way; `anyPort` lists every port, for a port bound by hand (/dev/rfcomm0).
+   */
+  static async request(
+    serial: Serial = navigator.serial,
+    { anyPort = false }: { anyPort?: boolean } = {},
+  ): Promise<WebSerialTransport> {
+    const options: SerialPortRequestOptions = anyPort
+      ? {}
+      : { filters: [{ bluetoothServiceClassId: SERIAL_PORT_PROFILE }] };
+    return new WebSerialTransport(await serial.requestPort(options));
   }
 
   async connect(): Promise<void> {

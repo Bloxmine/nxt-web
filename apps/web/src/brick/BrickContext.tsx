@@ -34,7 +34,8 @@ export interface BrickContextValue {
   summary: BrickSummary | null;
   error: string | null;
   connectUsb(): Promise<void>;
-  connectBluetooth(): Promise<void>;
+  /** Bluetooth serial ports only, or with `anyPort` every serial port (for /dev/rfcomm0). */
+  connectBluetooth(anyPort?: boolean): Promise<void>;
   disconnect(): Promise<void>;
   refresh(): Promise<void>;
   /** Stops the program, all motors and sound. */
@@ -133,7 +134,8 @@ export function BrickProvider({ children }: { children: ReactNode }) {
   );
 
   const connectBluetooth = useCallback(
-    () => run(async () => attach(await WebSerialTransport.request())),
+    (anyPort = false) =>
+      run(async () => attach(await WebSerialTransport.request(navigator.serial, { anyPort }))),
     [attach, run],
   );
 
