@@ -1465,7 +1465,10 @@ function Studio() {
               )}
               <div className="bottom-area">
                 <ConfigPanel onEditVariables={() => setModal('variables')} />
-                <HelpPanel onOpenExample={(key) => actions.loadExample(key)} />
+                <HelpPanel
+                  onOpenExample={(key) => actions.loadExample(key)}
+                  onOpenGuide={(section) => setModal({ guide: section })}
+                />
               </div>
             </div>
           </div>

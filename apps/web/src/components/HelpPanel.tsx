@@ -9,6 +9,7 @@ import {
   type Example,
 } from '@nxt/blocks';
 import { useEditor } from '../editor/EditorContext';
+import { BLOCK_SECTIONS } from '../guide/blocks';
 import { BLOCK_TIPS } from '../lib/blockTips';
 import { iconUrl } from '../lib/icons';
 
@@ -27,31 +28,40 @@ function examplesWith(kind: Block['kind']): Example[] {
   return examplesByKind.get(kind) ?? [];
 }
 
+/** The palette entry a block comes from ("my-block" for a My Block). */
+function paletteKey(block: Block): string {
+  switch (block.kind) {
+    case 'wait':
+      return block.control.type === 'time' ? 'wait-time' : `wait-${block.control.condition.source}`;
+    case 'sensor':
+      return `sensor-${block.condition.source}`;
+    case 'resetRotation':
+      return 'reset-rotation';
+    case 'resetTimer':
+      return 'reset-timer';
+    case 'colorLamp':
+      return 'color-lamp';
+    case 'numberToText':
+      return 'number-to-text';
+    case 'file':
+      return 'file-access';
+    case 'sendMessage':
+      return 'send-message';
+    case 'receiveMessage':
+      return 'receive-message';
+    case 'myBlock':
+      return 'my-block';
+    case 'myBlockParam':
+      return 'my-block-param';
+    default:
+      return block.kind;
+  }
+}
+
 function helpFor(block: Block): string {
-  const key =
-    block.kind === 'wait'
-      ? block.control.type === 'time'
-        ? 'wait-time'
-        : `wait-${block.control.condition.source}`
-      : block.kind === 'sensor'
-        ? `sensor-${block.condition.source}`
-        : block.kind === 'resetRotation'
-          ? 'reset-rotation'
-          : block.kind === 'resetTimer'
-            ? 'reset-timer'
-            : block.kind === 'colorLamp'
-              ? 'color-lamp'
-              : block.kind === 'numberToText'
-                ? 'number-to-text'
-                : block.kind === 'file'
-                  ? 'file-access'
-                  : block.kind === 'sendMessage'
-                    ? 'send-message'
-                    : block.kind === 'receiveMessage'
-                      ? 'receive-message'
-                      : block.kind;
   return (
-    PALETTE[key]?.help ?? (block.kind === 'myBlock' ? 'A block you made from other blocks.' : '')
+    PALETTE[paletteKey(block)]?.help ??
+    (block.kind === 'myBlock' ? 'A block you made from other blocks.' : '')
   );
 }
 
@@ -59,7 +69,14 @@ function helpFor(block: Block): string {
  * "Little help" box: describes the selected block with tips and examples that use it,
  * and lists problems.
  */
-export function HelpPanel({ onOpenExample }: { onOpenExample(key: string): void }) {
+export function HelpPanel({
+  onOpenExample,
+  onOpenGuide,
+}: {
+  onOpenExample(key: string): void;
+  /** Opens the user guide at a section. */
+  onOpenGuide(section: string): void;
+}) {
   const { state, dispatch, issues, issuesByBlock } = useEditor();
   const found = state.selected ? findBlock(state.program, state.selected) : null;
   const own = found ? (issuesByBlock.get(found.block.id) ?? []) : [];
@@ -99,6 +116,17 @@ export function HelpPanel({ onOpenExample }: { onOpenExample(key: string): void 
                       </button>
                     </span>
                   ))}
+              </p>
+            )}
+            {BLOCK_SECTIONS[paletteKey(found.block)] && (
+              <p className="help-examples">
+                <button
+                  type="button"
+                  className="link-btn"
+                  onClick={() => onOpenGuide(BLOCK_SECTIONS[paletteKey(found.block)]!)}
+                >
+                  All settings and plugs of this block
+                </button>
               </p>
             )}
             {own.map((issue, i) => (

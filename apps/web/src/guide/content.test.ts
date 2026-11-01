@@ -1,4 +1,6 @@
+import { PALETTE } from '@nxt/blocks';
 import { describe, expect, it } from 'vitest';
+import { BLOCK_SECTIONS } from './blocks';
 import { chapterOf, GUIDE, GUIDE_ACTIONS, plainText, searchGuide } from './content';
 
 const sections = GUIDE.flatMap((c) => c.sections);
@@ -38,6 +40,18 @@ describe('user guide', () => {
     expect(searchGuide('permission')[0]!.section.id).toBe('permission');
     expect(searchGuide('zzzz nothing')).toEqual([]);
     expect(searchGuide('  ')).toEqual([]);
+  });
+
+  it('describes every block in the palette', () => {
+    for (const key of Object.keys(PALETTE)) {
+      const id = BLOCK_SECTIONS[key];
+      expect(id, key).toBeDefined();
+      expect(chapterOf(id!), key).not.toBeNull();
+    }
+    for (const id of Object.values(BLOCK_SECTIONS)) expect(chapterOf(id), id).not.toBeNull();
+    expect(searchGuide('ultrasonic trigger').map((h) => h.section.id)).toContain(
+      'block-ultrasonic',
+    );
   });
 
   it('strips markup for searching', () => {

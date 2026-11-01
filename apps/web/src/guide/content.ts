@@ -10,6 +10,8 @@
  *   `GUIDE_ACTIONS`).
  */
 
+import { BLOCK_CHAPTERS } from './blocks';
+
 export interface GuideSection {
   id: string;
   title: string;
@@ -220,7 +222,9 @@ Your programs, pictures and sounds are kept in this browser's storage, so they'r
 - \`Delete\` removes the selection. \`Ctrl+Z\` undoes anything.
 - Press \`I\` to insert a block by typing its name, after the selected block.
 
-Palettes: **Common** has the everyday blocks, **Complete** has all of them in groups, **My Blocks** has the blocks you made yourself, and **♥** has your favourites and recently used blocks. Right-click a block in the palette to add it to your favourites.`,
+Palettes: **Common** has the everyday blocks, **Complete** has all of them in groups, **My Blocks** has the blocks you made yourself, and **♥** has your favourites and recently used blocks. Right-click a block in the palette to add it to your favourites.
+
+Every block, with all its settings and plugs, is described in the block reference, starting at [[How to read the block reference|#block-reading]].`,
       },
       {
         id: 'config',
@@ -238,7 +242,9 @@ Display and Sound blocks offer a list of the pictures and sounds you have, and t
 - **Loop** repeats the blocks inside it: forever, a number of times, for a time, or until a sensor says so.
 - **Switch** has two beams and runs one of them, depending on a sensor or a wired value.
 
-Drop blocks inside a Loop or Switch to put them on its inner beam. Loops and switches grow to fit what's in them.`,
+Drop blocks inside a Loop or Switch to put them on its inner beam. Loops and switches grow to fit what's in them.
+
+All the details: [[Wait|#block-wait]], [[Loop|#block-loop]], [[Switch|#block-switch]] and [[what they can test|#block-conditions]].`,
       },
       {
         id: 'parallel',
@@ -295,6 +301,7 @@ Double-click a My Block to open it in its own tab. Changing it there changes eve
       },
     ],
   },
+  ...BLOCK_CHAPTERS,
   {
     id: 'programs',
     title: 'Saving, opening and sharing',
@@ -437,6 +444,7 @@ You can also type a message and send it into a mailbox yourself, to test a progr
 - Real motors slip, wobble and slow down as the battery runs low.
 - Real light and colour sensors depend on the room's light and the height of the sensor.
 - The ultrasonic sensor can miss soft or angled objects that the simulator does see.
+- On the brick, numbers are whole numbers (7 ÷ 2 gives 3); the simulator keeps decimals.
 
 Tip: Use the simulator to get the logic right, then fine-tune numbers such as turn degrees and thresholds on the real robot.`,
       },

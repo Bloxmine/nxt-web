@@ -209,7 +209,7 @@ export interface SendMessageBlock extends Base {
   text: string;
 }
 
-/** Reads the newest message from one of this brick's mailboxes. */
+/** Takes the oldest waiting message from one of this brick's mailboxes. */
 export interface ReceiveMessageBlock extends Base {
   kind: 'receiveMessage';
   /** Mailbox 1–10. */
