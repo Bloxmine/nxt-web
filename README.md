@@ -1,9 +1,34 @@
+<p align="center">
+  <img src="docs/images/banner.png" alt="NXT Web Studio: visual, block-based programming for the NXT brick, right in your browser" width="100%">
+</p>
+
 # NXT Web Studio
 
 Visual, block-based programming for the NXT brick, running entirely in your browser.
 Drag blocks, click Run, and the robot moves. No install and no server.
 
 > Independent project, not affiliated with the LEGO Group. See [NOTICE](NOTICE).
+
+![The editor: a program on the sequence beam, with a loop, data wires and the settings of the selected block](docs/images/editor.png)
+
+<table>
+  <tr>
+    <td width="50%"><img src="docs/images/simulator.png" alt="The simulator following a line on the oval mat"></td>
+    <td width="50%"><img src="docs/images/dark.png" alt="Dark theme, with the simulator driving through the obstacle room"></td>
+  </tr>
+  <tr>
+    <td align="center">Simulator: run a program on a virtual robot</td>
+    <td align="center">Dark theme and the obstacle room</td>
+  </tr>
+  <tr>
+    <td width="50%"><img src="docs/images/modern.png" alt="The same kind of program shown as modern Blockly-style blocks"></td>
+    <td width="50%"><img src="docs/images/guide.png" alt="The built-in user guide, opened at the simulator chapter"></td>
+  </tr>
+  <tr>
+    <td align="center">Modern blocks view</td>
+    <td align="center">Built-in user guide (F1)</td>
+  </tr>
+</table>
 
 **Status:** the editor, simulator, brick connection and compiler work; the compiler still
 needs its first run on a real brick (Phase 3 in the hardware checklist).

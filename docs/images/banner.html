@@ -1,0 +1,184 @@
+<!doctype html>
+<!-- Source of banner.png: open in Chromium at 1280×320 (device scale 2) and take a screenshot. -->
+<html>
+  <head>
+    <meta charset="utf-8" />
+    <style>
+      html,
+      body {
+        margin: 0;
+        width: 1280px;
+        height: 320px;
+        overflow: hidden;
+        background: #2b3038;
+      }
+      .b {
+        position: relative;
+        width: 1280px;
+        height: 320px;
+        font-family: Verdana, 'DejaVu Sans', sans-serif;
+        background:
+          linear-gradient(
+            180deg,
+            rgba(255, 255, 255, 0.1) 0,
+            rgba(255, 255, 255, 0.03) 50%,
+            rgba(0, 0, 0, 0) 50%,
+            rgba(0, 0, 0, 0.18) 100%
+          ),
+          linear-gradient(180deg, #59616e 0, #434a56 50%, #323842 50%, #262b33 100%);
+        box-shadow:
+          inset 0 -5px 0 #e8730c,
+          inset 0 -6px 0 #ffb259;
+      }
+      .grid {
+        position: absolute;
+        inset: 0;
+        opacity: 0.09;
+        background-image:
+          linear-gradient(#fff 1px, transparent 1px),
+          linear-gradient(90deg, #fff 1px, transparent 1px);
+        background-size: 32px 32px;
+        -webkit-mask-image: linear-gradient(90deg, transparent 0, #000 55%, #000 100%);
+      }
+      .icon {
+        position: absolute;
+        left: 56px;
+        top: 50px;
+        width: 180px;
+        height: 180px;
+        filter: drop-shadow(0 6px 10px rgba(0, 0, 0, 0.45));
+      }
+      h1 {
+        position: absolute;
+        left: 276px;
+        top: 58px;
+        margin: 0;
+        font-size: 66px;
+        font-weight: bold;
+        color: #fff;
+        letter-spacing: -1px;
+        text-shadow:
+          0 2px 0 rgba(0, 0, 0, 0.35),
+          0 0 18px rgba(0, 0, 0, 0.25);
+      }
+      h1 span {
+        color: #ffb259;
+      }
+      p {
+        position: absolute;
+        left: 280px;
+        top: 146px;
+        margin: 0;
+        font-size: 21px;
+        color: #d9dee6;
+        text-shadow: 0 1px 0 rgba(0, 0, 0, 0.4);
+      }
+      .beam {
+        position: absolute;
+        left: 280px;
+        top: 212px;
+        height: 68px;
+        display: flex;
+        align-items: center;
+      }
+      .beam:before {
+        content: '';
+        position: absolute;
+        left: -6px;
+        right: -40px;
+        top: 27px;
+        height: 14px;
+        border-radius: 7px;
+        background: linear-gradient(#d9dde3, #9aa1ab);
+        box-shadow: 0 1px 2px rgba(0, 0, 0, 0.5);
+      }
+      .blk {
+        position: relative;
+        display: flex;
+        width: 96px;
+        height: 62px;
+        margin-right: 22px;
+        border-radius: 7px;
+        overflow: hidden;
+        box-shadow:
+          0 2px 6px rgba(0, 0, 0, 0.5),
+          inset 0 0 0 1px rgba(0, 0, 0, 0.35);
+      }
+      .blk .l {
+        flex: 1;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        background: linear-gradient(#ffffff, #dfe3e8);
+      }
+      .blk .r {
+        width: 38px;
+        position: relative;
+      }
+      .blk .r:after {
+        content: '';
+        position: absolute;
+        left: 8px;
+        top: 18px;
+        width: 22px;
+        height: 22px;
+        border-radius: 50%;
+        background: radial-gradient(
+          circle at 35% 30%,
+          #fff,
+          rgba(255, 255, 255, 0.35) 45%,
+          rgba(255, 255, 255, 0.1) 70%
+        );
+      }
+      .g .r {
+        background: linear-gradient(#7ad35a, #3fa02a);
+      }
+      .o .r {
+        background: linear-gradient(#ffb04a, #ef7d10);
+      }
+      .y .r {
+        background: linear-gradient(#ffe45a, #f2c200);
+      }
+      .blk img {
+        width: 36px;
+        height: 36px;
+      }
+    </style>
+  </head>
+  <body>
+    <div class="b">
+      <div class="grid"></div>
+      <img class="icon" src="../../apps/web/public/icon.svg" />
+      <h1>NXT <span>Web</span> Studio</h1>
+      <p>Visual, block-based programming for the NXT brick, right in your browser.</p>
+      <div class="beam">
+        <div class="blk g">
+          <div class="l"><img src="../../apps/web/public/icons/32/car.png" /></div>
+          <div class="r"></div>
+        </div>
+        <div class="blk y">
+          <div class="l"><img src="../../apps/web/public/icons/32/eye.png" /></div>
+          <div class="r"></div>
+        </div>
+        <div class="blk g">
+          <div class="l"><img src="../../apps/web/public/icons/32/sound.png" /></div>
+          <div class="r"></div>
+        </div>
+        <div class="blk g">
+          <div class="l"><img src="../../apps/web/public/icons/32/monitor.png" /></div>
+          <div class="r"></div>
+        </div>
+        <div class="blk o">
+          <div class="l"><img src="../../apps/web/public/icons/32/hourglass.png" /></div>
+          <div class="r"></div>
+        </div>
+        <div class="blk o">
+          <div class="l">
+            <img src="../../apps/web/public/icons/32/arrow_rotate_clockwise.png" />
+          </div>
+          <div class="r"></div>
+        </div>
+      </div>
+    </div>
+  </body>
+</html>
