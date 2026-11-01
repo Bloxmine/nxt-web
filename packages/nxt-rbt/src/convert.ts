@@ -16,6 +16,7 @@ import {
   type Wire,
 } from '@nxt/blocks';
 import { ByteReader } from './bytes.js';
+import { DataSpace } from './dataspace.js';
 import type { RbtDiagram, RbtInstance, RbtNode, RbtProgram, RbtTerminal } from './decode.js';
 import type { LvValue } from './lvtype.js';
 import { steeringRatio, type BlockOrigin } from './export.js';
@@ -111,6 +112,22 @@ class Defaults {
 
 /** The (-inf, +inf, 0) single-precision range triple stored before numeric values. */
 const SGL_RANGE = [0xff, 0x80, 0, 0, 0x7f, 0x80, 0, 0, 0, 0, 0, 0];
+
+/**
+ * Reads a block's numeric settings by their front-panel names (see DataSpace), or null
+ * when the block's data can't be read that way.
+ */
+function namedSettings(inst: RbtInstance): ((label: string) => number) | null {
+  try {
+    const space = new DataSpace(inst.dstm, inst.dfds);
+    return (label) => {
+      const v = space.has(label) ? space.get(label) : undefined;
+      return typeof v === 'number' ? v : typeof v === 'boolean' ? Number(v) : 0;
+    };
+  } catch {
+    return null;
+  }
+}
 
 const DURATION_UNITS = ['unlimited', 'degrees', 'rotations', 'seconds'] as const;
 
@@ -594,6 +611,21 @@ export function convertRbt(rbt: RbtProgram): ImportResult {
         const ops = ['+', '-', '*', '/'] as const;
         return { ...createBlock('math'), op: ops[op] ?? '+', b, hub: true } as Block;
       }
+      case 'Numeric Operations':
+      case 'Numeric Comparison': {
+        // NXT-G 1.x's whole-number Math and Compare blocks; their settings are read by
+        // name (A, B, Operation), which also covers values the FP layout leaves out.
+        const get = namedSettings(inst);
+        const math = t === 'Numeric Operations';
+        const ops = math ? (['+', '-', '*', '/'] as const) : (['<', '>', '='] as const);
+        return {
+          ...createBlock(math ? 'math' : 'compare'),
+          a: get?.('A') ?? 0,
+          b: get?.('B') ?? 0,
+          op: ops[get?.('Operation') ?? 0] ?? ops[0],
+          hub: true,
+        } as Block;
+      }
       case 'FP Numeric Comparison': {
         const b = startsWith(d, 0xd8, [0, 0, 0xff, 0xff]) ? 0 : d.f32(0xd8);
         const anchor = d.find([0, 0, 0, 3, 0, 0, 0, 3, 0, 0, 0, 3], 0xd8);
@@ -717,6 +749,7 @@ export function convertRbt(rbt: RbtProgram): ImportResult {
         return block;
       }
       case 'FP Number To Text':
+      case 'Number To Text':
         return { ...createBlock('numberToText'), hub: true } as Block;
       case 'String Construct': {
         const parts: string[] = [];
@@ -747,7 +780,16 @@ export function convertRbt(rbt: RbtProgram): ImportResult {
             return null;
           return { ...createBlock('sensor'), condition, hub: true } as Block;
         }
-        if (/^Random/i.test(t)) return { ...createBlock('random'), hub: true } as Block;
+        if (/^Random/i.test(t)) {
+          // Minimum (A) and maximum (B), read by name.
+          const get = namedSettings(inst);
+          return {
+            ...createBlock('random'),
+            min: get?.('A') ?? 0,
+            max: get?.('B') ?? 0,
+            hub: true,
+          } as Block;
+        }
         if (/Reset/i.test(t) && /Rotation/i.test(t)) return createBlock('resetRotation');
         if (/^Stop/i.test(t)) return createBlock('stop');
         // A My Block: its template is the My Block's own .rbt file.
@@ -874,7 +916,13 @@ export function convertRbt(rbt: RbtProgram): ImportResult {
     const counter = counterNode
       ? (termsByOwner.get(counterNode.ptr) ?? []).find((t) => t.name === 'Loop Count')
       : undefined;
-    const showCounter = !!counter && reach(counter.ptr).some((t) => t.ownerKind === 'block');
+    // Show the counter plug when the count goes somewhere: a block, a Switch's value
+    // input or a My Block output.
+    const showCounter =
+      !!counter &&
+      reach(counter.ptr).some(
+        (t) => t.ownerKind === 'block' || t.ownerKind === 'switch' || t.ownerKind === 'param',
+      );
 
     // Wait-for-time blocks are loops with a time terminator and nothing inside.
     if (
@@ -1027,9 +1075,9 @@ export function convertRbt(rbt: RbtProgram): ImportResult {
   program.wires = wires;
   program.variables = [...variables].map(([name, type]) => ({ name, type }));
   if (program.variables.length === 0) program.variables = [{ name: 'Number 1', type: 'number' }];
-  // A logic or value Switch whose selector came from outside this diagram (a My Block's
-  // input parameter, which the editor does not have yet) gets a Constant instead, so it
-  // runs its default case.
+  // A logic or value Switch whose selector wire could not be carried over (it came from
+  // a My Block's input parameter, or from a block that was left out) gets a Constant
+  // instead, so it runs its default case.
   const unwired: Block[] = [];
   walkProgram(program, (b) => {
     if (
@@ -1064,7 +1112,7 @@ export function convertRbt(rbt: RbtProgram): ImportResult {
       to: { block: sw.id, plug: 'condition' },
     });
     warn(
-      'A Switch got its value from a My Block input, which is not supported yet; it now uses a Constant (its default case).',
+      'A Switch lost the value wired into it (from a My Block input or a block that was left out); it now uses a Constant, so it runs its default case.',
     );
   }
 

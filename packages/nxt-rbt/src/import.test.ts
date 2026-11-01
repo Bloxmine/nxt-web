@@ -240,6 +240,60 @@ function walk(blocks: Block[], fn: (b: Block) => void): void {
   }
 }
 
+// NXT 1.0 programs (NXT-G 1.x), fetched by the same script into their own folder.
+const dir1 = join(import.meta.dirname, '../../../fixtures/external/nxtprograms1');
+const files1 = existsSync(dir1)
+  ? readdirSync(dir1)
+      .filter((f) => f.endsWith('.rbt'))
+      .sort()
+  : [];
+const load1 = (name: string) => importRbt(new Uint8Array(readFileSync(join(dir1, name))), name);
+
+describe.skipIf(files1.length === 0)('NXT 1.0 programs (local only)', () => {
+  // Several NXT-G 1.x blocks are not supported yet (see docs/rbt-compat.md), so only
+  // programs that import without notes have to validate and lower.
+  it.each(files1)('%s imports (and runs when nothing was left out)', (name) => {
+    const { program, warnings } = load1(name);
+    if (warnings.length > 0) return;
+    expect(validateProgram(program).filter((i) => i.severity === 'error')).toEqual([]);
+    expect(() => lowerProgram(program)).not.toThrow();
+  });
+
+  it.skipIf(!files1.includes('Whack-a-Brick.rbt'))(
+    'Whack-a-Brick: whole-number Math, Compare, Number To Text and Random',
+    () => {
+      const { program, warnings } = load1('Whack-a-Brick.rbt');
+      expect(warnings).toEqual([]);
+      const blocks: Block[] = [];
+      const walk = (list: Block[]) =>
+        list.forEach((b) => {
+          blocks.push(b);
+          if (b.kind === 'loop') walk(b.body);
+          if (b.kind === 'switch') {
+            walk(b.whenTrue);
+            walk(b.whenFalse);
+            b.cases?.forEach((c) => walk(c.blocks));
+          }
+        });
+      walk(program.body);
+      program.parallel.forEach(walk);
+      // A brick is drawn at x = position × 34 − 24 (10, 44, 78 on the 100-pixel screen).
+      const math = blocks.filter((b) => b.kind === 'math').map((b) => [b.op, b.b]);
+      expect(math).toEqual(
+        expect.arrayContaining([
+          ['*', 34],
+          ['-', 24],
+          ['+', 1],
+          ['-', 15],
+        ]),
+      );
+      expect(blocks.find((b) => b.kind === 'compare')).toMatchObject({ op: '=' });
+      expect(blocks.find((b) => b.kind === 'random')).toMatchObject({ min: 1, max: 3 });
+      expect(blocks.some((b) => b.kind === 'numberToText')).toBe(true);
+    },
+  );
+});
+
 describe('Pack and Go (.rbtx)', async () => {
   const { deflateRawSync } = await import('node:zlib');
   const { importRbtx, unzip } = await import('./index.js');

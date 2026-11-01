@@ -31,6 +31,8 @@ export interface RbtInstance {
   tags: Map<string, LvValue | Uint8Array>;
   /** Front-panel default data (settings for blocks without a config tag). */
   dfds: Uint8Array;
+  /** Type map of the default data; with `dfds` it gives settings by name (DataSpace). */
+  dstm: Uint8Array;
   /** Plugs in connector-pane slot order. */
   plugs: TypeDesc[];
 }
@@ -115,7 +117,8 @@ function readInstance(number: number, bytes: Uint8Array, plugs: TypeDesc[]): Rbt
   const title =
     titl && titl.length > 0 ? String.fromCharCode(...titl.subarray(1, 1 + titl[0]!)) : '';
   const dfds = resourcesOfType(vi, 'DFDS')[0]?.data ?? new Uint8Array();
-  return { number, template, title, tags, dfds, plugs };
+  const dstm = resourcesOfType(vi, 'DSTM')[0]?.data ?? new Uint8Array();
+  return { number, template, title, tags, dfds, dstm, plugs };
 }
 
 /** Front-panel control names of the file's own VI, in type-map order (My Block parameters). */

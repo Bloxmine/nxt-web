@@ -23,6 +23,27 @@ checks against the projects' descriptions pass for BumperCar, GuitarTones, Drive
 Explorer, ForkliftTest, CheckoutScan, DataLogLight, LightMeter, 5ButtonRemote/5ButtonSteer
 and ColorRace.
 
+### NXT 1.0 programs
+
+The same script also downloads the site's NXT 1.0 projects into
+`fixtures/external/nxtprograms1/` (84 `.rbt` files, made with NXT-G 1.x; also
+git-ignored). **Status: 44 import without notes and run; all import without errors.**
+NXT-G 1.x blocks not supported yet, with the programs that use them:
+
+| Block           | Programs | Settings (by name)                                                     |
+| --------------- | -------- | ---------------------------------------------------------------------- |
+| Rotation Sensor | 22       | Connection, Threshold, Distance Type, Polarity, Direction, Reset       |
+| Range           | 8        | A, B, Value, Polarity                                                  |
+| Calibration     | 6        | Connection, SensorType, Maximum, Restore Default (no editor block yet) |
+| Abort           | 4        | Abort (stops the program)                                              |
+| File Access     | 3        | Mode, Type, Filename, File Size, Text In, Number In                    |
+| Message Read    | 2        | Mailbox, MessageType, Timeout (200ms)                                  |
+| Message Write   | 2        | Message Connection, Mailbox, MessageType, Timeout                      |
+
+All their settings can be read by name; what each value means still has to be checked
+against the programs, as was done for Math and Compare. Switches whose value came from
+one of these blocks fall back to their default case (the importer says so).
+
 ## File structure
 
 An `.rbt` is a LabVIEW 7 resource container ("RSRC", file type `LVIN`, creator `LBVW`).
@@ -153,6 +174,15 @@ behaviour). Loop and wait times are stored in milliseconds (u32 at 0xCC of the t
 | Range          | `DFDS`               | low, high, test value (floats)                                                      | Medium; inside/outside not decoded (inside assumed) |
 | Text           | `DFDS`               | A, B, C (u32 length + text each)                                                    | High                                                |
 | Number to Text | —                    | (no settings)                                                                       | High                                                |
+| Random         | `DFDS`, by name      | A = minimum, B = maximum                                                            | High (checked against the game's three positions)   |
+
+**NXT-G 1.x data blocks.** NXT 1.0 programs use the older whole-number blocks
+`Numeric Operations`, `Numeric Comparison` and `Number To Text` (the NXT 2.0 ones are
+`FP …`). Their plugs are 32-bit integers and their settings are read by name from the
+type map (`A`, `B`, `Operation`, with the same operation numbers as the FP blocks); the
+offsets of the FP layout give the same values. Checked on Whack-a-Brick, where the
+results make sense in the game (brick drawn at x = position × 34 − 24, score + 1,
+delay − 15, position = button). Saving back writes them as integers.
 
 `DFDS` stores front-panel defaults sparsely: values equal to the default are left out, which
 is why some fields are found by anchors rather than fixed offsets.
