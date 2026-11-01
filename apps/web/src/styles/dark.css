@@ -589,3 +589,11 @@
 [data-theme='dark'] .rc-warn {
   color: #e8b45a;
 }
+[data-theme='dark'] .robot-kind {
+  border-color: #1d1e21;
+  background: linear-gradient(#3c3f45, #2e3135);
+}
+[data-theme='dark'] .robot-kind.active {
+  border-color: #c98a3c;
+  background: linear-gradient(#4d453a, #3a3229);
+}

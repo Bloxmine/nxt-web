@@ -4457,3 +4457,30 @@ fieldset.controls.wired {
   padding-left: 8px;
   padding-right: 8px;
 }
+
+.robot-kinds {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+  margin-bottom: 10px;
+}
+
+.robot-kind {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  gap: 2px 6px;
+  padding: 6px 8px;
+  border: 1px solid #a9afb7;
+  border-radius: 6px;
+  background: linear-gradient(#fff, #e8ebef);
+}
+
+.robot-kind span {
+  grid-column: 2;
+  color: var(--text-muted);
+}
+
+.robot-kind.active {
+  border-color: #c77a22;
+  background: linear-gradient(#fffaf2, #ffe3bd);
+}

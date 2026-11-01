@@ -63,6 +63,24 @@ export interface Scenario {
 }
 
 /** How the simulated robot is built. Lengths in cm, measured from the wheel axle. */
+/**
+ * A car-like robot: one motor turns the front wheels, the drive motors turn the rear
+ * wheels. The robot's position (and the sensor offsets) is the middle of the rear axle.
+ */
+export interface SteeringGeometry {
+  /** Motor index (0 = A) that turns the front wheels. */
+  motor: 0 | 1 | 2;
+  /** Distance from the rear axle to the front axle (cm). */
+  wheelbase: number;
+  /**
+   * How far the steering motor turns from straight ahead to full lock (degrees), each
+   * way. There the wheels hit their end and the motor stalls, as on a real car.
+   */
+  lock: number;
+  /** How far the front wheels turn at full lock (degrees). */
+  angle: number;
+}
+
 export interface RobotGeometry {
   wheelRadius: number;
   /** Distance between the wheels. */
@@ -75,6 +93,8 @@ export interface RobotGeometry {
   /** Motor index (0 = A, 1 = B, 2 = C) driving the left wheel and the right wheel. */
   leftMotor: 0 | 1 | 2;
   rightMotor: 0 | 1 | 2;
+  /** Present for a car with steered front wheels; the wheel motors drive the rear axle. */
+  steering?: SteeringGeometry;
 }
 
 /** Robot dimensions, matching a typical two-wheeled NXT driving base. */
@@ -260,6 +280,11 @@ export class World {
   pose: Pose;
   /** True while the robot is pushing against a wall. */
   blocked = false;
+  /**
+   * A car's steering: how far its motor has turned from straight ahead (degrees),
+   * between −lock and lock. Kept here because a program can reset the motor's counter.
+   */
+  steer = 0;
   /** Sound sensor level (0–100), set from the user interface. */
   soundLevel = 0;
   /** Where the robot has been, for drawing its trail. */
@@ -283,6 +308,7 @@ export class World {
   reset(): void {
     this.pose = { ...this.start };
     this.blocked = false;
+    this.steer = 0;
     this.trail.length = 0;
     this.trail.push([this.pose.x, this.pose.y]);
   }
@@ -305,13 +331,28 @@ export class World {
     const dl = rad(leftDegrees) * robot.wheelRadius;
     const dr = rad(rightDegrees) * robot.wheelRadius;
     const distance = (dl + dr) / 2;
-    const turn = ((dl - dr) / robot.axle) * (180 / Math.PI);
+    const steering = robot.steering;
+    // A car turns around a point on its rear axle line (bicycle model); a two-wheeled
+    // robot turns by its wheels going at different speeds.
+    const turn = steering
+      ? ((distance * Math.tan(rad(this.steerAngle()))) / steering.wheelbase) * (180 / Math.PI)
+      : ((dl - dr) / robot.axle) * (180 / Math.PI);
     const mid = rad(this.pose.heading + turn / 2);
     const x = this.pose.x + distance * Math.cos(mid);
     const y = this.pose.y + distance * Math.sin(mid);
     const heading = (((this.pose.heading + turn) % 360) + 360) % 360;
+    const front = steering
+      ? [
+          [
+            x + steering.wheelbase * Math.cos(rad(heading)),
+            y + steering.wheelbase * Math.sin(rad(heading)),
+          ] as const,
+        ]
+      : [];
     const hits =
-      this.walls.some((w) => circleHitsWall(x, y, robot.radius, w)) ||
+      [[x, y] as const, ...front].some(([cx, cy]) =>
+        this.walls.some((w) => circleHitsWall(cx, cy, robot.radius, w)),
+      ) ||
       this.others.some(
         (o) =>
           Math.hypot(o.pose.x - x, o.pose.y - y) < o.robot.radius + robot.radius &&
@@ -325,6 +366,24 @@ export class World {
       this.trail.push([this.pose.x, this.pose.y]);
       if (this.trail.length > 4000) this.trail.shift();
     }
+  }
+
+  /**
+   * Turns a car's steering by `degrees` of its motor; it stops at full lock. Returns the
+   * degrees the motor really turned (less than asked when it hit the end).
+   */
+  turnSteering(degrees: number): number {
+    const lock = this.robot.steering?.lock ?? 0;
+    const next = Math.max(-lock, Math.min(lock, this.steer + degrees));
+    const turned = next - this.steer;
+    this.steer = next;
+    return turned;
+  }
+
+  /** A car's front wheel angle (degrees; positive steers right). */
+  steerAngle(): number {
+    const s = this.robot.steering;
+    return s ? (this.steer / s.lock) * s.angle : 0;
   }
 
   /** True when the front bumper touches a wall. */

@@ -10,7 +10,7 @@ import {
   type NxtClient,
   type OutputPort,
 } from '@nxt/protocol';
-import { idleMotor, startMotors, stepMotor, stopMotors, type Simulation } from '@nxt/sim';
+import type { Simulation } from '@nxt/sim';
 import type { Port, Profile } from './profile';
 
 export interface MotorDriver {
@@ -65,38 +65,32 @@ export class BrickDriver implements MotorDriver {
 }
 
 /**
- * Drives the simulated robot. Its motors are simulated here, so any port can be used;
- * the robot on the mat then moves like the profile's steering says: two wheels from the
- * left and right motors, or a car whose turning follows its steering motor's position.
+ * Drives the simulated robot through its own motors, so it moves exactly as it would
+ * under a program: a two-wheel robot by its wheels, a car by its steering motor (which
+ * stops at full lock) and its drive motors. See Tools → Robot setup.
  */
 export class SimDriver implements MotorDriver {
   readonly kind = 'simulator';
   readonly interval = 20;
-  private readonly motors = [idleMotor(), idleMotor(), idleMotor()];
-  private profile: Profile | null = null;
   private frame = 0;
   private last = performance.now();
 
   constructor(private readonly sim: Simulation) {
     const loop = (now: number) => {
-      this.step(Math.min(50, now - this.last));
+      // While a program runs, the simulator moves the robot itself.
+      if (!this.busy) this.sim.stepWorld(Math.min(50, now - this.last));
       this.last = now;
       this.frame = requestAnimationFrame(loop);
     };
     this.frame = requestAnimationFrame(loop);
   }
 
-  setProfile(profile: Profile): void {
-    this.profile = profile;
-  }
-
   read(): Promise<(number | null)[]> {
-    return Promise.resolve(this.motors.map((m) => m.rotation));
+    return Promise.resolve(this.sim.motors.map((m) => m.rotation));
   }
 
   send(port: Port, power: number, brake: boolean): Promise<void> {
-    if (power === 0) stopMotors(this.motors, [port], brake ? 'brake' : 'coast');
-    else startMotors(this.motors, [port], power, 0, null, brake ? 'brake' : 'coast');
+    this.sim.runMotorManually(port, power, brake);
     return Promise.resolve();
   }
 
@@ -109,38 +103,8 @@ export class SimDriver implements MotorDriver {
     return this.sim.status === 'running';
   }
 
-  private step(dt: number): void {
-    for (const m of this.motors) stepMotor(m, dt);
-    if (this.busy) return;
-    const [left, right] = this.wheels();
-    this.sim.driveManually(Math.round(left), Math.round(right));
-    this.sim.stepWorld(dt);
-  }
-
-  /** Powers for the simulated robot's two wheels. */
-  private wheels(): [number, number] {
-    const p = this.profile;
-    // In the motor's own direction, so a "reversed" motor still drives forwards.
-    const power = (port: Port) => {
-      const m = this.motors[port]!;
-      const raw = m.mode === 'run' ? m.power : 0;
-      return p?.motors[port].reversed ? -raw : raw;
-    };
-    const s = p?.steering;
-    if (s?.kind === 'differential') return [power(s.left), power(s.right)];
-    if (s?.kind === 'car') {
-      const drive = s.drive.length ? power(s.drive[0]!) : 0;
-      const sign = p!.motors[s.steer].reversed ? -1 : 1;
-      const angle = Math.max(-1, Math.min(1, (sign * this.motors[s.steer]!.rotation) / s.range));
-      // The inner wheels go slower, as on a car turning a corner.
-      return [drive * (1 + 0.6 * angle), drive * (1 - 0.6 * angle)];
-    }
-    const robot = this.sim.world.robot;
-    return [power(robot.leftMotor), power(robot.rightMotor)];
-  }
-
   dispose(): void {
     cancelAnimationFrame(this.frame);
-    if (!this.busy) this.sim.driveManually(0, 0);
+    if (!this.busy) for (const p of [0, 1, 2] as const) this.sim.runMotorManually(p, 0, true);
   }
 }

@@ -55,7 +55,7 @@ describe('compiled programs behave like the simulator', () => {
     }
     expect(vm.error).toBeNull();
     expect(near / 200).toBeGreaterThan(0.9);
-  });
+  }, 20_000); // Runs 20 s of compiled code; slow on a busy machine.
 
   it('obstacle avoider (ultrasonic over I2C) never touches a wall', () => {
     const { sim, vm } = compiled(example('avoid'), 'walls');

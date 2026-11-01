@@ -32,8 +32,8 @@ export interface SetupProps {
   update(change: (p: Profile) => Profile): void;
   loop: ControlLoop | null;
   live: LoopState;
-  /** Calibration needs the real robot. */
-  onBrick: boolean;
+  /** A robot (the brick or the simulator) is there to calibrate. */
+  canCalibrate: boolean;
 }
 
 function PortSelect({
@@ -120,7 +120,7 @@ function useTask() {
 
 // ---------------------------------------------------------------- Steering
 
-export function SteeringTab({ profile, update, loop, live, onBrick }: SetupProps) {
+export function SteeringTab({ profile, update, loop, live, canCalibrate }: SetupProps) {
   const s = profile.steering;
   const task = useTask();
   const setSteering = (steering: Profile['steering']) => update((p) => ({ ...p, steering }));
@@ -261,11 +261,11 @@ export function SteeringTab({ profile, update, loop, live, onBrick }: SetupProps
             <button
               type="button"
               className="btn"
-              disabled={!loop || !onBrick || live.busy !== null}
+              disabled={!loop || !canCalibrate || live.busy !== null}
               title={
-                onBrick
+                canCalibrate
                   ? 'Turns the steering slowly to each end, then sets the range and the centre'
-                  : 'Needs the real robot (connect the brick and choose it under Drive)'
+                  : 'Needs a robot: connect the brick, or open the simulator'
               }
               onClick={() =>
                 task.run(async () => {
@@ -327,7 +327,7 @@ export function SteeringTab({ profile, update, loop, live, onBrick }: SetupProps
 
 // ---------------------------------------------------------------- Motors
 
-export function MotorsTab({ profile, update, loop, live, onBrick }: SetupProps) {
+export function MotorsTab({ profile, update, loop, live, canCalibrate }: SetupProps) {
   const roles = steeringRoles(profile.steering);
   const task = useTask();
   const setMotor = (port: Port, change: Partial<Profile['motors'][number]>) =>
@@ -472,11 +472,11 @@ export function MotorsTab({ profile, update, loop, live, onBrick }: SetupProps) 
                 <button
                   type="button"
                   className="btn"
-                  disabled={busy || !onBrick}
+                  disabled={busy || !canCalibrate}
                   title={
-                    onBrick
+                    canCalibrate
                       ? 'Turns the motor slowly to each end, centres it and sets the limits'
-                      : 'Needs the real robot'
+                      : 'Needs a robot: connect the brick, or open the simulator'
                   }
                   onClick={() =>
                     task.run(async () => {

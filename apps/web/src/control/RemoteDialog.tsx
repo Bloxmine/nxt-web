@@ -337,7 +337,7 @@ export function RemoteDialog({ onClose }: { onClose(): void }) {
         )}
         {tab !== 'drive' &&
           (() => {
-            const props = { profile, update, loop, live, onBrick: target === 'brick' && !!loop };
+            const props = { profile, update, loop, live, canCalibrate: !!loop };
             if (tab === 'steering') return <SteeringTab {...props} />;
             if (tab === 'motors') return <MotorsTab {...props} />;
             if (tab === 'keys') return <KeysTab {...props} />;
@@ -392,6 +392,22 @@ function DriveTab({
   }, [screen]);
 
   const simBusy = target === 'simulator' && simulator.status === 'running';
+  // The simulated robot is built in Tools → Robot setup; say when it doesn't fit.
+  const simRobot = target === 'simulator' ? simulator.sim?.world.robot : undefined;
+  const steering = profile.steering;
+  let mismatch: string | null = null;
+  if (simRobot && steering.kind === 'car' && !simRobot.steering)
+    mismatch =
+      'The simulated robot has two wheels, not steering. Choose Car under Tools → Robot setup to drive it like a car.';
+  else if (simRobot?.steering && steering.kind === 'differential')
+    mismatch =
+      'The simulated robot is a car. Use car controls for it (New… → Car with a steering motor).';
+  else if (
+    simRobot?.steering &&
+    steering.kind === 'car' &&
+    steering.steer !== simRobot.steering.motor
+  )
+    mismatch = `The simulated car steers with motor ${PORT_NAMES[simRobot.steering.motor]}, these controls with motor ${PORT_NAMES[steering.steer]}. Make them the same (here under Steering, or in Tools → Robot setup).`;
 
   return (
     <div className="rc-drive">
@@ -441,6 +457,11 @@ function DriveTab({
           <button type="button" className="btn" onClick={() => simulator.setOpen(true)}>
             Show simulator
           </button>
+        </p>
+      )}
+      {mismatch && (
+        <p className="notice">
+          <img src={iconUrl('information')} alt="" /> {mismatch}
         </p>
       )}
       {simBusy && (

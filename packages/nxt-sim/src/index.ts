@@ -15,15 +15,7 @@ export {
 } from './challenges.js';
 export { glyph } from './font.js';
 export { Lcd, LCD_HEIGHT, LCD_WIDTH } from './lcd.js';
-export {
-  MAX_SPEED,
-  idleMotor,
-  startMotors,
-  steeredPowers,
-  stepMotor,
-  stopMotors,
-  type Motor,
-} from './motors.js';
+export { MAX_SPEED, steeredPowers, type Motor } from './motors.js';
 export { SCENARIOS, scenarioById } from './scenarios.js';
 export {
   Simulation,
@@ -49,6 +41,7 @@ export {
   type MatShape,
   type Pose,
   type RobotGeometry,
+  type SteeringGeometry,
   type Scenario,
   type Wall,
 } from './world.js';

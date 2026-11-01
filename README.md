@@ -45,7 +45,8 @@ buttons, and hear its tones. Running blocks light up and data wires show their v
 breakpoints with F9 and step block by block.
 
 Draw your own mats (or use a photo of a real one), play **challenges** with a timer and
-stars, tell the simulator how your robot is built (Tools → Robot setup), and put a second
+stars, tell the simulator how your robot is built (Tools → Robot setup: a two-wheel base, or a car
+whose steering motor stops at full lock), and put a second
 brick on the mat that talks to the first over simulated Bluetooth.
 
 **Editor helpers:** several programs open in tabs, a command palette (Ctrl+K), a program

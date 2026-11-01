@@ -1,6 +1,12 @@
 import { describe, expect, it } from 'vitest';
 import { ROBOT } from '@nxt/sim';
-import { DEFAULT_ROBOT, degreesForDistance, degreesForTurn, robotGeometry } from './robot';
+import {
+  CAR_ROBOT,
+  DEFAULT_ROBOT,
+  degreesForDistance,
+  degreesForTurn,
+  robotGeometry,
+} from './robot';
 
 describe('distance and turn calculator', () => {
   it('one wheel turn drives one circumference', () => {
@@ -22,5 +28,12 @@ describe('simulator robot', () => {
     const g = robotGeometry({ ...DEFAULT_ROBOT, track: 20, bumperOffset: 6, left: 'A' });
     expect(g.radius).toBeLessThan(g.bumperOffset);
     expect(g.leftMotor).toBe(0);
+  });
+  it('builds a car with a steering motor', () => {
+    const g = robotGeometry(CAR_ROBOT);
+    expect(g.steering).toEqual({ motor: 0, wheelbase: 16, lock: 75, angle: 30 });
+    expect([g.leftMotor, g.rightMotor]).toEqual([1, 2]);
+    // The bumper still reaches past the front collision circle.
+    expect(g.steering!.wheelbase + g.radius).toBeLessThan(g.bumperOffset);
   });
 });

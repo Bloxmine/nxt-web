@@ -326,8 +326,31 @@ export class Simulation {
 
   private physics(dt: number): void {
     const turned = this.motors.map((m) => stepMotor(m, dt));
-    const { leftMotor, rightMotor } = this.world.robot;
+    const { leftMotor, rightMotor, steering } = this.world.robot;
+    if (steering) {
+      // The front wheels stop at full lock: the steering motor stalls there.
+      const m = this.motors[steering.motor]!;
+      const wanted = turned[steering.motor]!;
+      const got = this.world.turnSteering(wanted);
+      if (got !== wanted) {
+        m.rotation -= wanted - got;
+        m.speed = 0;
+        // A stalled motor never reaches a degree target: like on the brick, it keeps
+        // trying, and a block waiting for it waits.
+        if (m.mode === 'run' && m.remaining !== null) m.remaining += Math.abs(wanted - got);
+      }
+    }
     this.world.drive(turned[leftMotor]!, turned[rightMotor]!);
+  }
+
+  /**
+   * Runs one motor by hand (remote control), −100…100; 0 stops it, braking or coasting.
+   * Only while no program is running; call {@link stepWorld} to move.
+   */
+  runMotorManually(port: 0 | 1 | 2, power: number, brake = true): void {
+    if (this.status === 'running') return;
+    if (power === 0) stopMotors(this.motors, [port], brake ? 'brake' : 'coast');
+    else startMotors(this.motors, [port], power, 0, null, brake ? 'brake' : 'coast');
   }
 
   private finish(): void {

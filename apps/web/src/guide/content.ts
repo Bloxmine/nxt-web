@@ -402,6 +402,10 @@ Choose **New mat…** or click the pencil to draw your own, with lines, colours 
 
 Tools → **Robot setup** sets this. The distance and turn calculator uses the same numbers, so set it up once and both agree with your robot.
 
+Choose **Car** for a robot that steers like a car: one motor (A unless you pick another) turns the front wheels, and the wheel motors drive the rear wheels. Set the wheelbase (rear axle to front axle), how far the steering motor turns to full lock, and how far the wheels turn then. At full lock the wheels hit their end and the motor stalls, as on a real car: a Move block asking for more degrees than that waits for ever. Turning the steering motor forwards steers right.
+
+Note: For a car, the distance and turn calculator still counts like a two-wheel robot, so use it for distances only.
+
 [[Open robot setup|robot]]`,
       },
       {
@@ -495,6 +499,8 @@ Keys only drive while the Drive tab is open and you aren't typing in a box. Swit
 4. Or set it by hand: straighten the wheels, click **Set centre** under Motors, and type the range.
 
 Near the end of its range the steering slows down and stops just before it. With **Turn the steering back to the centre**, the wheels straighten when you let go of the steering keys. A gamepad stick pushed part of the way steers part of the way.
+
+Tip: To practise without the brick, choose **Car** in Tools → Robot setup and drive the simulated robot. Its steering stops at full lock just like the real one, so **Find the ends** works there too.
 
 Note: The centre is remembered while the page is open. After switching the brick off, straighten the wheels and click **Set centre** again (or Find the ends).
 

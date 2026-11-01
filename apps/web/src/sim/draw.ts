@@ -227,10 +227,39 @@ function drawRobot(
   ctx.save();
   ctx.translate(x, y);
   ctx.rotate((heading * Math.PI) / 180);
-  // Wheels.
-  ctx.fillStyle = '#222';
-  ctx.fillRect(-3, -robot.axle / 2 - 1.6, 6, 2.6);
-  ctx.fillRect(-3, robot.axle / 2 - 1, 6, 2.6);
+  const steering = robot.steering;
+  // Where the brick sits: over the wheels, or in the middle of a car.
+  const bodyX = steering ? steering.wheelbase * 0.4 : 0;
+  if (steering) {
+    // A car: a chassis beam, rear wheels, and front wheels turned by the steering.
+    const wb = steering.wheelbase;
+    const half = robot.axle / 2;
+    ctx.fillStyle = '#8a919b';
+    ctx.fillRect(-2, -1.2, wb + 4, 2.4);
+    ctx.fillRect(-0.8, -half + 1, 1.6, robot.axle - 2);
+    ctx.fillRect(wb - 0.8, -half + 1, 1.6, robot.axle - 2);
+    const angle = (sim.world.steerAngle() * Math.PI) / 180;
+    ctx.fillStyle = '#222';
+    for (const [wx, wy, a] of [
+      [0, -half, 0],
+      [0, half, 0],
+      [wb, -half, angle],
+      [wb, half, angle],
+    ] as const) {
+      ctx.save();
+      ctx.translate(wx, wy);
+      ctx.rotate(a);
+      ctx.fillRect(-3, -1.3, 6, 2.6);
+      ctx.restore();
+    }
+  } else {
+    // Wheels.
+    ctx.fillStyle = '#222';
+    ctx.fillRect(-3, -robot.axle / 2 - 1.6, 6, 2.6);
+    ctx.fillRect(-3, robot.axle / 2 - 1, 6, 2.6);
+  }
+  ctx.save();
+  ctx.translate(bodyX, 0);
   // Body (the brick), white with an orange centre button.
   const g = ctx.createLinearGradient(0, -6, 0, 6);
   g.addColorStop(0, body);
@@ -246,6 +275,7 @@ function drawRobot(
   ctx.fillRect(-1, -3, 4, 6);
   ctx.fillStyle = '#e8730c';
   ctx.fillRect(-4.5, -1.2, 2.4, 2.4);
+  ctx.restore();
   // Front: bumper and sensors.
   ctx.fillStyle = sim.world.touching() ? '#d42020' : '#777';
   ctx.fillRect(robot.bumperOffset - 2, -4, 1.4, 8);
